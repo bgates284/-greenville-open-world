@@ -70,7 +70,9 @@ const Game = {
       const err = need.map(k => Tiles.map.get(k)).find(T => T && T.state === 'error');
       const dl = Net.downloaded - d0;
       const msg = dl > 0 || Net.active > 0 ? `Downloading real map data from OpenStreetMap (first visit only — it's saved on this PC afterwards). ${ready} of 9 areas ready.` : `Loading saved map… ${ready} of 9 areas ready.`;
-      const blocked = Net.errors >= 2 && ready === 0;
+      const busy = /busy|replied (429|5\d\d)|timed out|runtime error/i.test(Net.lastErr || '');
+      const blocked = Net.errors >= 2 && ready === 0 && !busy;
+      if (!blocked && Net.errors >= 2 && ready === 0 && busy) { UI.loading(true, 'Map server is busy', `The free OpenStreetMap server is overloaded right now — still retrying (${Net.errors} tries so far, switching between mirror servers). This usually clears within a minute or two.`, 0.05); await sleep(150); continue; }
       UI.loading(true, blocked ? "Can't reach the map servers" : null, blocked ? "This window can't download map data. If you opened the game inside the Claude app's preview, save the file and double-click it to open it in Chrome or Edge instead. Also check your internet connection. Still retrying…\n\nDetails: " + (Net.lastErr || '') + ' · page: ' + location.protocol + ' ' + (navigator.userAgentData ? navigator.userAgentData.brands.map(b => b.brand).join('/') : navigator.userAgent.slice(-40)) : msg, 0.05 + 0.95 * ready / 9);
       if (ready >= 9) break;
       const centerErr = Tiles.map.get(tileKey(tx, ty));

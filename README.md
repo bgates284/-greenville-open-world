@@ -28,10 +28,11 @@ Pressing F5 also brings you back to where you were.
 
 If Vite gives you trouble, `npm run dev:plain` runs the same live-reloading server with no dependencies.
 
-### Saved map data
-The dev server runs on `localhost`, which keeps its own copy of the downloaded map (separate from the
-Desktop file). To skip re-downloading Greenville: in the Desktop version use **Export map data**, then
-in the dev version use **Import**.
+### Map data
+In development the dev server fetches the OpenStreetMap data for the game, retries across several
+mirror servers when one is busy, and keeps a copy in `.cache/`, so each area is only downloaded once
+(even across restarts). The terminal window shows what it's doing. To reuse what the Desktop version
+already downloaded, use **Export map data** there and **Import** here.
 
 ## Build the double-clickable file
 

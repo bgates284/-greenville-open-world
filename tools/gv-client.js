@@ -149,6 +149,22 @@ function onChange(file) {
   });
 }
 
+// ---------- map data through the dev server (retries + a disk cache that survives restarts) ----------
+if (!window.GV_PROVIDER) window.GV_PROVIDER = {
+  async osm(bbox, query) {
+    try { const r = await fetch('/@gv/overpass', { method: 'POST', body: query }); if (r.ok) return await r.json(); throw new Error(await r.text()); }
+    catch (e) { console.warn('[dev] map relay failed, trying the map servers directly:', e.message); return fetchTileOSM(bbox); }
+  },
+  async dem(z, x, y) {
+    const r = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`, { mode: 'cors' }); if (!r.ok) throw new Error('elevation ' + r.status);
+    const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0);
+    const d = g.getImageData(0, 0, 256, 256).data; const out = new Float32Array(65536);
+    for (let i = 0; i < 65536; i++) out[i] = d[4 * i] * 256 + d[4 * i + 1] + d[4 * i + 2] / 256 - 32768;
+    return out;
+  },
+};
+
 // ---------- boot ----------
 (async () => {
   const spec = '/@gv/prelude.js'; await import(/* @vite-ignore */ spec); // three.js + addons → globals
