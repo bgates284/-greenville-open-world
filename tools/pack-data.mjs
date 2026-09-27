@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import { chunks } from './gv-hot.mjs';
 
 export function gridHelpers(root) {
@@ -33,4 +34,4 @@ export function packData(root, { quiet } = {}) {
   return { list, added, inCity, total };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))) packData(process.cwd());
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) packData(process.cwd());

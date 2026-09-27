@@ -11,7 +11,8 @@
     "desktop": "node tools/build.mjs --desktop",
     "check": "node tools/check.mjs",
     "pack-data": "node tools/pack-data.mjs",
-    "site": "node tools/build-site.mjs"
+    "site": "node tools/build-site.mjs",
+    "fetch-city": "node tools/fetch-city.mjs --pack"
   },
   "devDependencies": {
     "vite": "^6.3.5"

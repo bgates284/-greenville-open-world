@@ -56,7 +56,12 @@ The game is published from this repo by `.github/workflows/pages.yml` on every p
 The hosted version reads map squares from `public-data/osm/` first (no waiting on the map server),
 and only downloads squares that aren't packed yet.
 
-To ship more of the map: play or run the city download in dev (squares land in `.cache/`), then
+To download the whole city at once and publish it, double-click **`fetch-city.cmd`** (or run
+`npm run fetch-city`, then `publish.cmd`). It asks the map server for the city in ~30 large pieces,
+splits them into squares on your PC, packs them into `public-data/osm/`, commits and pushes. If a
+busy server skips some squares, just run it again — it only fetches what's missing.
+
+To ship squares you've explored by hand instead: play in dev (squares land in `.cache/`), then
 ```
 npm run pack-data    → copies downloaded squares into public-data/osm/
 git add public-data && git commit -m "More map squares" && git push
