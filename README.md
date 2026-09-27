@@ -49,3 +49,16 @@ development each file loads as its own classic script (`tools/gv-dev.mjs` serves
 by `tools/gv-hot.mjs`); when one changes, `tools/gv-client.js` runs the new version on top of the
 running game: objects like `Player` or `Plane` get the new methods but keep their live state, edited
 constants and data tables take their new values, and one-time setup code is not run again.
+
+## Hosting (GitHub Pages)
+
+The game is published from this repo by `.github/workflows/pages.yml` on every push to `main`.
+The hosted version reads map squares from `public-data/osm/` first (no waiting on the map server),
+and only downloads squares that aren't packed yet.
+
+To ship more of the map: play or run the city download in dev (squares land in `.cache/`), then
+```
+npm run pack-data    → copies downloaded squares into public-data/osm/
+git add public-data && git commit -m "More map squares" && git push
+```
+`npm run site` builds the hosted version locally into `site/` if you want to check it first.

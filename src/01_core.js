@@ -267,6 +267,16 @@ async function fetchTileOSM(b, depth = 0) {
     return { elements: els };
   }
 }
+let packedIndex = null;
+async function packedTile(tx, ty) {
+  if (!window.GV_DATA) return null;
+  try {
+    if (!packedIndex) packedIndex = fetch(window.GV_DATA + 'osm/index.json').then(r => r.ok ? r.json() : []).then(a => new Set(a)).catch(() => new Set());
+    const name = tx + '_' + ty; if (!(await packedIndex).has(name)) return null;
+    const r = await fetch(window.GV_DATA + 'osm/' + name + '.json.gz'); if (!r.ok) return null;
+    return JSON.parse(await gunzip(await r.arrayBuffer()));
+  } catch (e) { console.warn('packed map square unavailable', tx, ty, e); return null; }
+}
 const tileDataP = new Map();
 function getTileData(tx, ty, prio = 0) {
   const k = tileKey(tx, ty);
@@ -274,6 +284,9 @@ function getTileData(tx, ty, prio = 0) {
   const p = (async () => {
     const buf = await Store.get('osm', k);
     if (buf) { try { return JSON.parse(await gunzip(buf)); } catch (e) { console.warn('bad cache entry', k); } }
+    // the hosted version ships pre-downloaded map squares next to the game (see tools/build-site.mjs)
+    const packed = await packedTile(tx, ty);
+    if (packed) { const c = compactOSM(packed); try { await Store.put('osm', k, await gzip(JSON.stringify(c))); } catch (e) { } UI && UI.cacheDirty && UI.cacheDirty(); try { Overview.fromOSM(k, c); } catch (e) { } return c; }
     const raw = await netRun(() => window.GV_PROVIDER ? window.GV_PROVIDER.osm(tileBBox(tx, ty), overpassQuery(tileBBox(tx, ty))) : fetchTileOSM(tileBBox(tx, ty)), prio);
     const c = compactOSM(raw);
     try { await Store.put('osm', k, await gzip(JSON.stringify(c))); } catch (e) { }
