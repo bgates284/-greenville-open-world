@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Greenville Open World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --ink:#121019; --panel:rgba(22,17,33,.86); --panel-solid:#1a1426; --line:rgba(255,255,255,.12);
+  --text:#efebf5; --muted:#a79fb8; --purple:#6a35a0; --purple-deep:#3d1d63; --gold:#f2c230; --gold-ink:#2a1d00;
+  --ok:#7fd18b; --warn:#f0a44b; --bad:#ef6a6a;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font:14px/1.45 var(--sans);overflow:hidden;}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none;cursor:grab}
+#view.locked{cursor:none}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* ---------- menu ---------- */
+#menu{position:fixed;inset:0;display:flex;align-items:stretch;z-index:20;
+  background:linear-gradient(90deg,rgba(14,10,22,.92) 0,rgba(14,10,22,.78) 430px,rgba(14,10,22,.15) 760px,transparent 100%);}
+#menu[hidden]{display:none!important}
+.mpanel{width:min(460px,100%);box-sizing:border-box;padding:28px 28px 24px;overflow-y:auto;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.18em;color:var(--gold);text-transform:uppercase}
+.brand h1{font:800 64px/.9 var(--display);margin:6px 0 0;letter-spacing:.01em;text-transform:uppercase}
+.brand h1 span{color:var(--gold)}
+.brand .sub{color:var(--muted);font:13px/1.4 var(--mono);margin-top:6px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.primary{background:var(--gold);color:var(--gold-ink);border:0;border-radius:6px;padding:12px 22px;font-weight:600;font-size:16px;letter-spacing:.02em}
+.primary:hover{filter:brightness(1.08)}
+.primary:disabled{opacity:.5;cursor:progress}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:6px;padding:8px 12px;color:var(--text)}
+.ghost:hover{border-color:rgba(255,255,255,.35)}
+.ghost.danger{color:#ffb3b3}
+.section{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.section h2{margin:0;font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.field{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center}
+.field label{color:var(--muted);font-size:13px}
+select,input[type=range]{width:100%}
+select{background:var(--panel-solid);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;background:transparent;border:0;padding:7px 6px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--purple);color:#fff}
+.stat{font:12px/1.5 var(--mono);color:var(--muted)}
+.stat b{color:var(--text);font-weight:600}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.keys kbd{font:600 11px/1 var(--mono);background:rgba(255,255,255,.08);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:3px 6px;white-space:nowrap;justify-self:start}
+.keys span{color:var(--muted)}
+.confirm{background:rgba(239,106,106,.1);border:1px solid rgba(239,106,106,.35);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.foot{margin-top:auto;font:11px/1.5 var(--mono);color:var(--muted)}
+.foot a{color:var(--muted)}
+
+/* ---------- loading ---------- */
+#loading{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:rgba(10,8,16,.72)}
+#loading[hidden]{display:none!important}
+.lbox{width:min(420px,calc(100% - 32px));background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.lbox h3{margin:0;font:800 28px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+#loadMsg{font:12px/1.5 var(--mono);color:var(--muted);min-height:36px;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#hud[hidden]{display:none!important}
+#loc{position:absolute;left:16px;top:14px;display:flex;flex-direction:column;gap:2px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#street{font:800 30px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+#area{font:12px/1.3 var(--mono);color:#e4dcf2}
+#clock{position:absolute;right:16px;top:14px;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#clock .t{font:800 30px/1 var(--display)}
+#clock .w{font:12px/1.3 var(--mono);color:#e4dcf2}
+#minimap{position:absolute;left:16px;bottom:16px;width:190px;height:190px;border-radius:50%;box-shadow:0 0 0 3px rgba(0,0,0,.35),0 4px 18px rgba(0,0,0,.5)}
+#speedo{position:absolute;right:20px;bottom:18px;text-align:right;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+#speedo[hidden]{display:none!important}
+#spd{font:800 64px/.9 var(--display);font-variant-numeric:tabular-nums}
+#speedo small{display:block;font:600 11px/1 var(--mono);letter-spacing:.2em;color:var(--gold)}
+#gear{font:12px/1 var(--mono);color:#e4dcf2}
+#hint{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(18,14,28,.78);border:1px solid var(--line);padding:8px 14px;border-radius:6px;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .25s}
+#hint.on{opacity:1}
+#hint kbd{font:600 12px/1 var(--mono);background:var(--gold);color:var(--gold-ink);border-radius:3px;padding:2px 6px}
+#netchip{position:absolute;right:16px;top:74px;font:11px/1 var(--mono);background:rgba(18,14,28,.75);border:1px solid var(--line);border-radius:12px;padding:6px 10px;opacity:0;transition:opacity .3s}
+#netchip.on{opacity:1}
+#packchip{position:absolute;right:16px;top:104px;font:11px/1 var(--mono);background:rgba(18,14,28,.75);border:1px solid var(--line);border-radius:12px;padding:6px 10px;opacity:0;transition:opacity .3s}
+#packchip.on{opacity:1}
+#dbg{position:absolute;right:16px;top:100px;font:11px/1.4 var(--mono);background:rgba(0,0,0,.55);padding:6px 8px;border-radius:4px;white-space:pre}
+#dbg[hidden]{display:none!important}
+#toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);font:600 13px/1.3 var(--sans);background:rgba(18,14,28,.8);border:1px solid var(--line);padding:8px 14px;border-radius:6px;opacity:0;transition:opacity .3s;max-width:80vw;text-align:center}
+#toast.on{opacity:1}
+
+/* ---------- big map ---------- */
+#bigmap{position:fixed;inset:0;z-index:15;background:#18201a}
+#bigmap[hidden]{display:none!important}
+#bigmap canvas{width:100%;height:100%;display:block;cursor:crosshair}
+#bigmap .cap{position:absolute;left:16px;top:14px;font:12px/1.5 var(--mono);background:rgba(0,0,0,.55);padding:8px 10px;border-radius:6px;color:#e8e2f0}
+#bigmap .cap b{font:800 22px/1 var(--display);text-transform:uppercase;color:#fff;display:block;margin-bottom:4px}
+
+@media (max-width:700px){
+  #menu{background:rgba(14,10,22,.9)}
+  .brand h1{font-size:48px}
+  #street{font-size:22px}
+  #minimap{width:130px;height:130px}
+}
+@media (prefers-reduced-motion:reduce){ .bar>i,#hint,#toast,#netchip{transition:none} }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="3D view of Greenville"></canvas>
+
+<div id="hud" hidden>
+  <div id="loc"><div id="street">—</div><div id="area"></div></div>
+  <div id="clock"><div class="t" id="clockT">9:00 AM</div><div class="w" id="clockW">Partly cloudy · 72°F</div></div>
+  <canvas id="minimap" width="380" height="380" aria-label="Minimap"></canvas>
+  <div id="speedo" hidden><span id="spd">0</span><small>MPH</small><div id="gear">D</div></div>
+  <div id="hint"></div>
+  <div id="netchip"></div>
+  <div id="packchip"></div>
+  <div id="toast"></div>
+  <div id="dbg" hidden></div>
+</div>
+
+<div id="bigmap" hidden>
+  <canvas id="bigcanvas" aria-label="Map of Greenville"></canvas>
+  <div class="cap"><b>Greenville map</b>Click anywhere to travel there · Scroll to zoom · Drag to pan · M or Esc to close<br><span style="color:#f2c230">Gold outline</span> = saved on this PC</div>
+</div>
+
+<div id="loading" hidden>
+  <div class="lbox">
+    <h3 id="loadTitle">Building Greenville</h3>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div id="loadMsg">Starting…</div>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="mpanel">
+    <div class="brand">
+      <div class="eyebrow">Pitt County · North Carolina</div>
+      <h1>Greenville<br><span>Open World</span></h1>
+      <div class="sub">35.61°N 77.37°W · Tar River valley · built from OpenStreetMap</div>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="playBtn">Play</button>
+      <button class="ghost" id="resumeBtn" hidden>Resume</button>
+    </div>
+
+    <div class="section">
+      <h2>Start</h2>
+      <div class="field"><label for="startSel">Location</label><select id="startSel"></select></div>
+      <div class="field"><label for="lookBtn">Your character</label><div class="row"><button class="ghost" id="realBtn">Tee &amp; shorts</button><button class="ghost" id="lookEcuBtn">Game day (purple &amp; gold)</button><button class="ghost" id="lookBtn">Random classic</button><button class="ghost" id="glbBtn">Load .glb avatar…</button><input type="file" id="glbFile" accept=".glb,.gltf,model/gltf-binary" hidden></div></div>
+      <div class="field"><label for="timeSel">Time of day</label><select id="timeSel">
+        <option value="now">Right now (your clock)</option>
+        <option value="7">Sunrise · 7:00 AM</option>
+        <option value="10" selected>Morning · 10:00 AM</option>
+        <option value="13">Midday · 1:00 PM</option>
+        <option value="18.6">Golden hour · 6:35 PM</option>
+        <option value="19.4">Dusk · 7:25 PM</option>
+        <option value="22">Night · 10:00 PM</option>
+      </select></div>
+      <div class="field"><label for="clockRange">Clock</label><input type="range" id="clockRange" min="0" max="24" step="0.05" value="10"></div>
+      <div class="field"><label for="speedSel">Day length</label><select id="speedSel">
+        <option value="1">Real time (24 hours)</option>
+        <option value="30">48 minutes</option>
+        <option value="60" selected>24 minutes</option>
+        <option value="240">6 minutes</option>
+        <option value="0">Frozen</option>
+      </select></div>
+      <div class="field"><label for="weatherSel">Weather</label><select id="weatherSel">
+        <option value="clear">Clear</option>
+        <option value="partly" selected>Partly cloudy</option>
+        <option value="overcast">Overcast</option>
+        <option value="rain">Rain</option>
+      </select></div>
+    </div>
+
+    <div class="section">
+      <h2>Graphics</h2>
+      <div class="seg" role="group" aria-label="Graphics quality">
+        <button data-q="low" aria-pressed="false">Low</button>
+        <button data-q="medium" aria-pressed="true">Medium</button>
+        <button data-q="high" aria-pressed="false">High</button>
+      </div>
+      <div class="field"><label for="parcelChk">Neighborhoods</label><div><input type="checkbox" id="parcelChk" checked> <label for="parcelChk">Use Pitt County parcel records (missing houses, era &amp; storeys, addresses)</label></div></div>
+      <div class="field"><label for="soundChk">Sound</label><div><input type="checkbox" id="soundChk" checked> <label for="soundChk">Engine, rain and night sounds</label></div></div>
+    </div>
+
+    <div class="section">
+      <h2>People pack · Eastern NC crowd</h2>
+      <div class="stat" id="packStat">Loads automatically when you play.</div>
+      <div class="bar" id="packBarWrap" hidden><i id="packBar"></i></div>
+      <div class="row">
+        <button class="ghost" id="packBtn">Pause download</button>
+        <select id="packSize" aria-label="How many character models"><option value="12">12 characters</option><option value="24" selected>24 characters</option><option value="36">36 characters</option></select>
+      </div>
+      <div class="stat" style="opacity:.75">Realistic Microsoft Rocketbox people (MIT licence). Each downloads once (~40 MB) and is shrunk to ~1 MB and saved on this PC. Skin tones, genders, ages and outfits are mixed to match Pitt County / ECU census figures.</div>
+    </div>
+
+    <div class="section">
+      <h2>Map data saved on this PC</h2>
+      <div class="stat" id="cacheStat">Checking…</div>
+      <div class="bar" id="cityBarWrap" hidden><i id="cityBar"></i></div>
+      <div class="stat" id="cityMsg" hidden></div>
+      <div class="row">
+        <button class="ghost" id="cityBtn">Download whole city</button>
+        <button class="ghost" id="exportBtn">Export map file</button>
+        <button class="ghost" id="importBtn">Import map file</button>
+        <input type="file" id="importFile" accept=".json,.gvmap,application/json" hidden>
+        <button class="ghost danger" id="clearBtn">Clear</button>
+      </div>
+      <div class="confirm" id="clearConfirm" hidden>
+        <div>Delete all saved Greenville map data from this PC? It will download again as you explore.</div>
+        <div class="row"><button class="ghost danger" id="clearYes">Delete saved data</button><button class="ghost" id="clearNo">Keep it</button></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Controls</h2>
+      <div class="keys">
+        <kbd>W A S D</kbd><span>Walk / drive · arrows work too</span>
+        <kbd>Mouse</kbd><span>Look around (click the view to capture the mouse)</span>
+        <kbd>Shift</kbd><span>Run</span>
+        <kbd>Space</kbd><span>Jump · handbrake in the car</span>
+        <kbd>E</kbd><span>Get in or out of the car</span>
+        <kbd>C</kbd><span>Camera: chase · far · first person</span>
+        <kbd>H</kbd><span>Horn</span>
+        <kbd>L</kbd><span>Headlights</span>
+        <kbd>M</kbd><span>City map and travel</span>
+        <kbd>F</kbd><span>Face close-up (watch expressions and lip-sync)</span>
+        <kbd>B</kbd><span>Make your character talk (built-in voice)</span>
+        <kbd>V</kbd><span>Talk through your microphone — your character lip-syncs</span>
+        <kbd>G</kbd><span>Smile · <b>1</b> nod yes · <b>2</b> shake head</span>
+        <kbd>Y</kbd><span>Stuck? Jump back to the nearest street</span>
+        <kbd>T</kbd><span>Skip ahead 1 hour</span>
+        <kbd>R</kbd><span>Cycle weather</span>
+        <kbd>F3</kbd><span>Performance stats</span>
+        <kbd>Esc</kbd><span>This menu</span>
+      </div>
+    </div>
+    <div class="foot">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL). Elevation: Mapzen Terrain Tiles / USGS 3DEP.</div>
+  </div>
+</div>
+
+<!--MOCK-->
+<script type="module">
+/*GAME*/
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "greenville-open-world",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Open-world Greenville, NC in Three.js — real OpenStreetMap streets, Pitt County parcels, traffic, people and a plane at PGV.",
+  "scripts": {
+    "dev": "vite",
+    "dev:plain": "node tools/serve.mjs",
+    "build": "node tools/build.mjs",
+    "desktop": "node tools/build.mjs --desktop",
+    "check": "node tools/check.mjs"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}
