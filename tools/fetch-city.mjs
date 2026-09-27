@@ -18,23 +18,29 @@ const fileOf = (tx, ty) => path.join(cacheDir, keyOf(tx, ty) + '.json.gz');
 const have = (tx, ty) => fs.existsSync(fileOf(tx, ty));
 
 // ---- one Overpass request, rotating mirrors when a server is busy ----
-let mi = 0;
+// Mirrors that can't be reached at all from this network ("fetch failed") are dropped for the rest
+// of the run, so retries don't waste time on them.
+const dead = new Map(); let mi = 0;
+const live = () => MIRRORS.filter(m => (dead.get(m) || 0) < 2);
 async function overpass(query, label) {
   let last = '';
   for (let a = 0; a < 6; a++) {
-    const ep = MIRRORS[mi++ % MIRRORS.length], host = new URL(ep).host; const t0 = Date.now();
+    const pool = live().length ? live() : MIRRORS; const ep = pool[mi++ % pool.length], host = new URL(ep).host; const t0 = Date.now();
     try {
-      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 16 * 60 * 1000);
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 6 * 60 * 1000);
       const r = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(query), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'GreenvilleOpenWorld/1.0 (city download)' }, signal: ctl.signal });
-      const txt = await r.text(); clearTimeout(to);
+      const txt = await r.text(); clearTimeout(to); dead.delete(ep);
       if (r.ok && txt.trimStart().startsWith('{')) {
         const j = JSON.parse(txt);
         if (Array.isArray(j.elements) && !(j.remark && /runtime error|timed out|out of memory/i.test(j.remark))) { console.log(`  ${label}: ${j.elements.length.toLocaleString()} features from ${host} in ${Math.round((Date.now() - t0) / 1000)}s`); return j; }
         last = `${host}: ${j.remark}`;
       } else last = `${host}: HTTP ${r.status}`;
-    } catch (e) { last = `${host}: ${e.name === 'AbortError' ? 'timed out' : e.message}`; }
+    } catch (e) {
+      last = `${host}: ${e.name === 'AbortError' ? 'timed out' : 'unreachable from this network'}`;
+      if (e.name !== 'AbortError') { dead.set(ep, (dead.get(ep) || 0) + 1); if (dead.get(ep) === 2) console.log(`  (skipping ${host} from now on — it can't be reached from this network)`); }
+    }
     console.log(`  ${label}: server busy (${last}) — trying again`);
-    await sleep(Math.min(30000, 5000 * (a + 1)));
+    await sleep(Math.min(20000, 4000 * (a + 1)));
   }
   throw new Error(last);
 }
@@ -74,7 +80,7 @@ async function fetchBlock(x0, y0, x1, y1, depth = 0) {
   let j;
   try {
     const single = x0 === x1 && y0 === y1;
-    const q = single ? G.overpassQuery(bb) : G.overpassQuery(bb).replace('[timeout:120]', '[timeout:900][maxsize:2000000000]');
+    const q = single ? G.overpassQuery(bb) : G.overpassQuery(bb).replace('[timeout:120]', '[timeout:180][maxsize:268435456]');
     j = await overpass(q, label);
   } catch (e) {
     if (x0 === x1 && y0 === y1) { console.log(`  ${label}: skipped (${e.message}) — run again later`); return 0; }
