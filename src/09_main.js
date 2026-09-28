@@ -118,5 +118,5 @@ addEventListener('error', e => showErr((e.message || e.error) + (e.filename ? '\
 addEventListener('unhandledrejection', e => showErr(e.reason && (e.reason.stack || e.reason.message) || e.reason));
 
 // ---- boot ----
-try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Env, Store, Net, THREE, scene, renderer, camera, H }; }
+try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Food, nearestRoad, Env, Store, Net, THREE, scene, renderer, camera, H }; }
 catch (e) { console.error(e); showErr('Startup error: ' + (e && e.stack || e)); }
