@@ -58,7 +58,7 @@ const POLICY = {
   '03d_avatar.js': 'reload', '03e_npcs.js': 'reload', '03f_rocketbox.js': 'reload',
   '03g_food.js': 'tiles+setup', '03h_retail.js': 'tiles+setup', '03i_parcels.js': 'tiles',
   '03j_airport.js': 'plane', '04_world.js': 'tiles', '04b_food.js': 'tiles', '04c_neighborhoods.js': 'tiles', '04d_streets.js': 'tiles', '04e_overview.js': 'hot', '04f_landmarks.js': 'tiles',
-  '05_env.js': 'hot', '06_player.js': 'hot', '06b_plane.js': 'hot', '07_traffic.js': 'hot', '07b_hospital.js': 'hot', '08_ui.js': 'hot', '09_main.js': 'hot',
+  '05_env.js': 'hot', '06_player.js': 'hot', '06b_plane.js': 'hot', '07_traffic.js': 'hot', '07b_hospital.js': 'hot', '07c_hangout.js': 'hot', '08_ui.js': 'hot', '09_main.js': 'hot',
 };
 const policyOf = f => POLICY[f] || (/^04/.test(f) ? 'tiles' : 'reload');
 

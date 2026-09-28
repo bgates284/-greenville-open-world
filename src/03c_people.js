@@ -13,7 +13,8 @@ const OUTFITS = {
   jersey: { cell: [4, 2], fixed: true, sleeve: 'short', tint: 0x4b1f78 }, scrubs: { cell: [5, 2], fixed: true, sleeve: 'short', tint: 0x2a7f86, pants: 'scrubs' },
   floral: { cell: [6, 2], fixed: true, sleeve: 'none', dress: true, tint: 0xd86a7a }, labcoat: { cell: [7, 2], fixed: true, sleeve: 'long', coat: true, tint: 0xf4f4f2, pants: 'chino' },
   // hospital: scrubs in any colour (top + matching pants), patient gown
-  scrubsT: { cell: [0, 5], fixed: false, sleeve: 'short', pants: 'scrubsT' }, gown: { cell: [1, 5], fixed: true, sleeve: 'short', dress: true, gown: true },
+  scrubsT: { cell: [0, 5], fixed: false, sleeve: 'short', pants: 'scrubsT' }, tiedye: { cell: [5, 5], fixed: true, sleeve: 'short' },
+  hoodieTD: { cell: [5, 5], fixed: true, sleeve: 'long', hood: true }, bandtee: { cell: [6, 5], fixed: true, sleeve: 'short' }, gown: { cell: [1, 5], fixed: true, sleeve: 'short', dress: true, gown: true },
 };
 const PANTS_KIND = { jeans: [0, 3, true, 0x3d5a88], darkjeans: [1, 3, true, 0x1f2a44], chino: [2, 3, false], shorts: [3, 3, false], leggings: [4, 3, true, 0x1b1b1d], sweats: [5, 3, true, 0x8f9296], skirt: [6, 3, false], scrubs: [7, 3, true, 0x2a7f86], scrubsT: [2, 5, false] };
 const HOSPITAL = [35.6075, -77.4031];
@@ -116,7 +117,28 @@ function buildPersonAtlas() {
   at(2, 5, g => { grain(0.08, 2500); g.strokeStyle = 'rgba(0,0,0,.14)'; g.lineWidth = 2; for (const x of [64, 192]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke(); } g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, 0, 256, 10); });
   at(3, 5, g => { g.fillStyle = '#f2dd6a'; g.fillRect(0, 0, 256, 256); g.fillStyle = 'rgba(255,255,255,.85)'; for (let y = 14; y < 256; y += 22) for (let x = 8; x < 256; x += 22) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); } }); // yellow non-slip socks
   at(4, 5, g => { g.fillStyle = '#e9e9ec'; g.fillRect(0, 0, 256, 256); grain(0.08, 900); g.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 40; y < 180; y += 30) for (let x = 60; x < 200; x += 30) { g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); } }); // clogs
+  // tie-dye spiral
+  at(5, 5, g => { const cx = 128, cy = 96; const cols = ['#e8413c', '#f39a2b', '#f5d63a', '#4cc463', '#2f8fe0', '#8a4fd8'];
+    for (let rr = 190; rr > 0; rr -= 3) for (let a = 0; a < Math.PI * 2; a += 0.09) { const k = Math.floor((a * 3 + rr * 0.045) / (Math.PI * 2 / 6) + 60) % 6; g.fillStyle = cols[k]; g.globalAlpha = 0.5; g.beginPath(); g.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.8, 4, 0, 7); g.fill(); }
+    g.globalAlpha = 1; grain(0.08, 1200); g.fillStyle = 'rgba(0,0,0,.14)'; g.fillRect(0, 178, 256, 7); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 5; g.beginPath(); g.moveTo(104, 26); g.quadraticCurveTo(128, 50, 152, 26); g.stroke(); });
+  // faded black band tee with a leaf-and-sun print
+  shirtBase(6, 5, '#262628', g => { g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 5; g.beginPath(); g.moveTo(104, 26); g.quadraticCurveTo(128, 50, 152, 26); g.stroke();
+    g.fillStyle = '#f2b33a'; g.beginPath(); g.arc(128, 92, 26, 0, 7); g.fill(); g.fillStyle = '#3f9e4d'; for (let k = 0; k < 7; k++) { g.save(); g.translate(128, 112); g.rotate((k - 3) * 0.42); g.beginPath(); g.ellipse(0, -26, 6, 24, 0, 0, 7); g.fill(); g.restore(); }
+    g.fillStyle = '#e8e2d2'; g.font = font(800, 20); g.textAlign = 'center'; g.fillText('GOOD VIBES', 128, 160); });
   const t = ctex(c, { wrap: false }); t.anisotropy = MAX_ANISO; return t;
+}
+// laid-back regulars who hang around the smoke and vape shops
+function stonerLook(r) {
+  const fem = r() < 0.35; const L = { fem, role: 'stoner' };
+  L.face = fem ? 4 + Math.floor(r() * 3) : Math.floor(r() * 4); L.beard = !fem && r() < 0.45; L.earrings = r() < 0.4;
+  L.top = pick(['tiedye', 'tiedye', 'hoodieTD', 'bandtee', 'hoodie', 'hoodie', 'flannelB', 'tank'], r()); L.shirt = pick([0x3e5a3a, 0x5b2a86, 0x2f2f2f, 0x8a6a3a, 0x1f5e5a, 0x7a2e1a], r());
+  L.pantsKind = pick(['shorts', 'shorts', 'sweats', 'jeans', 'darkjeans'], r()); L.pants = pick([0x6b6a4a, 0x3a3a30, 0x7a6a50, 0x2a2a2a], r());
+  L.shoe = pick(['sneakB', 'sneakW', 'boots'], r());
+  L.hairStyle = fem ? pick(['long', 'braids', 'curly', 'bun'], r()) : pick(['dreads', 'dreads', 'long', 'curly', 'short'], r());
+  if (r() < 0.45) { L.beanie = pick([0x3f7a3a, 0x7a2e1a, 0xd9a520, 0x2a2a2a, 0x5b2a86], r()); L.rasta = r() < 0.35; } else if (r() < 0.25) L.bucket = pick([0xc9b99a, 0x3e5a3a, 0x2a2a2a], r());
+  L.shades = r() < 0.4; L.glasses = false; L.backpack = r() < 0.2; L.belt = false; L.watch = false;
+  L.scale = (fem ? 0.93 : 1.0) * (0.94 + r() * 0.12); L.width = 0.88 + r() * 0.2;
+  return L;
 }
 // who you meet at the hospital: role → look overrides for makePerson
 function hospitalLook(r, role) {
@@ -252,6 +274,7 @@ function makePerson(seed, look) {
     if (hs === 'braids') for (let k = 0; k < 7; k++) { const a = Math.PI * (0.7 + k * 0.1); H1(cap(0.012, 0.3, Math.cos(a) * 0.1, 1.45, Math.sin(a) * 0.1 - 0.02, 5)); }
   }
   if (hs === 'bun') { H1(hairCap(0.52)); H1(sph(0.05, 0, 1.73, -0.07)); }
+  if (hs === 'dreads') { H1(hairCap(0.55)); const rr = mulberry32(seed + 5); for (let k = 0; k < 16; k++) { const a = Math.PI * (0.55 + k * 0.058) + (rr() - 0.5) * 0.1, ln = 0.2 + rr() * 0.16; const d = cap(0.014, ln, Math.cos(a) * 0.1, 1.6 - ln / 2, Math.sin(a) * 0.1 - 0.015, 5); H1(d); } }
   if (hs === 'pony') { H1(hairCap(0.52)); H1(cap(0.03, 0.18, 0, 1.55, -0.125, 6)); }
   if (hs === 'cap') {
     H1(hairCap(0.5, 0.99));
@@ -291,6 +314,12 @@ function makePerson(seed, look) {
     const upper = new THREE.CapsuleGeometry(0.045, 0.16, 3, 8); upper.rotateX(Math.PI / 2); upper.scale(1.05, 0.8, 1); upper.translate(x, 0.055, 0.035); part(upper, ft, 0xffffff, sc);
     part(bx(0.1, 0.022, 0.265, x, 0.011, 0.035), ft, L.shoe === 'boots' ? 0x2a1a10 : L.shoe === 'grip' ? 0xe8d360 : L.shoe === 'clog' ? 0xd8d8dc : 0xeeeeee, CELL.plain);
   }
+  // ---------- hats & shades ----------
+  if (L.beanie) { const b = new THREE.SphereGeometry(0.121, 18, 9, 0, Math.PI * 2, 0, Math.PI * 0.5); b.scale(0.95, 1.12, 1.05); b.translate(0, 1.64, -0.012); part(b, BI.head, L.beanie, CELL.plain);
+    const cuff = new THREE.CylinderGeometry(0.117, 0.119, 0.045, 18, 1, true); cuff.scale(0.95, 1, 1.05); cuff.translate(0, 1.655, -0.012); part(cuff, BI.head, L.rasta ? 0xd9a520 : new THREE.Color(L.beanie).multiplyScalar(0.8).getHex(), CELL.plain);
+    if (L.rasta) { for (const [yy, cc] of [[1.69, 0xc8201e], [1.72, 0x2f8a3a]]) { const rb = new THREE.CylinderGeometry(0.108 - (yy - 1.69) * 0.9, 0.112 - (yy - 1.69) * 0.9, 0.028, 18, 1, true); rb.scale(0.95, 1, 1.05); rb.translate(0, yy, -0.012); part(rb, BI.head, cc, CELL.plain); } } }
+  if (L.bucket) { const c = new THREE.CylinderGeometry(0.105, 0.118, 0.1, 16, 1, false); c.translate(0, 1.71, -0.01); part(c, BI.head, L.bucket, CELL.plain); const b = new THREE.CylinderGeometry(0.16, 0.17, 0.012, 20, 1, false); b.translate(0, 1.662, -0.01); part(b, BI.head, L.bucket, CELL.plain); }
+  if (L.shades) { for (const s of [-1, 1]) { const l = new THREE.CylinderGeometry(0.02, 0.02, 0.006, 12); l.rotateX(Math.PI / 2); l.translate(s * 0.034, 1.641, 0.108); part(l, BI.head, 0x0c0c0e, CELL.plain); part(bx(0.004, 0.004, 0.1, s * 0.058, 1.645, 0.058), BI.head, 0x1a1a1a, CELL.plain); } part(bx(0.03, 0.004, 0.004, 0, 1.645, 0.108), BI.head, 0x1a1a1a, CELL.plain); }
   // ---------- hospital extras ----------
   if (L.surgCap) { part(hairCap(0.5, 1.045), BI.head, L.capC || 0x6f9fd0, CELL.plain); part(bx(0.21, 0.02, 0.02, 0, 1.69, -0.105), BI.head, L.capC || 0x6f9fd0, CELL.plain); }
   if (L.mask) { part(sph(0.062, 0, 1.588, 0.062, 1.2, 0.85, 0.72, 12, 8), BI.head, 0x9cc8e6, CELL.plain); for (const s of [-1, 1]) part(bx(0.004, 0.004, 0.09, s * 0.094, 1.61, 0.03), BI.head, 0xf4f4f4, CELL.plain); }

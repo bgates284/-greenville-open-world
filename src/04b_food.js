@@ -123,6 +123,12 @@ function foodBuilder(T, P, ctx) {
       T.hashItems.push([World.obsHash, World.obsHash.insert({ x, z, r: 0.7 }, x - 1, z - 1, x + 1, z + 1)]); placed++;
     }
   }
+  // neon signs in the shop windows: OPEN on one side, what they sell on the other
+  function neonWindows(f, L, la, lb, ra, rb, n, g0) {
+    const tag = { head_shop: 'GLASS · PIPES · CBD', 'e-cigarette': 'VAPE · E-JUICE · CBD', hookah: 'HOOKAH · LOUNGE', tobacco: /vape/i.test(f.name) ? 'TOBACCO · VAPE' : 'TOBACCO · CIGARS' }[f.amenity] || 'SMOKE SHOP';
+    const put = (a, b, text, col, w) => { const len = Math.hypot(b[0] - a[0], b[1] - a[1]); if (len < 0.9) return; const W = Math.min(len * 0.9, w), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; const i = slot(text, { sign: ['#000000', col], font: L.font }, 'neonT'); signQuad(i, [m[0] - tx * W / 2, m[1] - tz * W / 2], [m[0] + tx * W / 2, m[1] + tz * W / 2], g0 + 1.55, g0 + 1.55 + W / 4.4, n, 0.13); };
+    put(la, lb, 'OPEN', '#ff3b5c', 1.5); put(ra, rb, tag, L.neon, 2.6);
+  }
   function outwardNormals(ring) { const sa = signedArea(ring); return ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; const dx = b[0] - a[0], dz = b[1] - a[1]; const L = Math.hypot(dx, dz) || 1; let nx = dz / L, nz = -dx / L; if (sa < 0) { nx = -nx; nz = -nz; } return [nx, nz, L]; }); }
   function roadDir(x, z) { const r = nearestRoad(x, z, 160, rd => rd.car); if (!r) return null; const dx = r.x - x, dz = r.z - z, d = Math.hypot(dx, dz) || 1; return { dx: dx / d, dz: dz / d, d, r }; }
   function pylon(f, L, cx, cz, rd) {
@@ -252,7 +258,9 @@ function foodBuilder(T, P, ctx) {
     // wall signs: street face (+ one side face for chains)
     const sw = towerW ? Math.min(towerW * 0.92, 20) : frontTower ? 5.4 : big ? Math.min(flen * 0.4, 14) : Math.min(flen * 0.72, L.style === 'diner' ? 5.5 : 7.5), sh = sw / 4.4;
     const sy = towerW ? topY - 1.25 : hip ? Math.min(wallTop - 0.1, g0 + 3.6 + sh) : topY - 0.05;
-    const lettersMode = (L.brand || big || f.kind === 'shop') && !L.band ? 'let' : 'cab'; // stripes/checks behind letters would hide them
+    f._front = { x: mid[0], z: mid[1], nx: fnx, nz: fnz, w: flen };
+    const lettersMode = L.neon ? 'neon' : (L.brand || big || f.kind === 'shop') && !L.band ? 'let' : 'cab'; // stripes/checks behind letters would hide them
+    if (L.neon && flen > 4) neonWindows(f, L, [mid[0] - ux * (dw + 0.35), mid[1] - uz * (dw + 0.35)], [fa[0] + ux * 0.9, fa[1] + uz * 0.9], [mid[0] + ux * (dw + 0.35), mid[1] + uz * (dw + 0.35)], [fb[0] - ux * 0.9, fb[1] - uz * 0.9], fn, g0);
     const LL = lettersMode === 'let' ? letterLook(L, L.band ? L.trim2 : L.trim) : L; // letters must stand out from the band they sit on
     if (flen > 2.5) { const i0 = towerW || hip ? slot(f.name, L) : slot(f.name, LL, lettersMode); signQuad(i0, [mid[0] - ux * sw / 2, mid[1] - uz * sw / 2], [mid[0] + ux * sw / 2, mid[1] + uz * sw / 2], sy - sh - (frontTower ? 0.35 : 0), sy - (frontTower ? 0.35 : 0), fn, towerW ? towerFront + 0.08 : frontTower ? frontTower + 0.06 : 0.11); }
     if (L.brand && rd) {
@@ -311,7 +319,9 @@ function foodBuilder(T, P, ctx) {
         faceQ([p0[0], p0[1]], [p0[0] + tx * 0.42, p0[1] + tz * 0.42], g0, top, n, 0.1, C(L.wall).multiplyScalar(0.8)); faceQ([p1[0] - tx * 0.42, p1[1] - tz * 0.42], p1, g0, top, n, 0.1, C(L.wall).multiplyScalar(0.8)); }
       awning(p0, p1, n, bot - 0.12, 1.1, 0.4, C(L.awn));
       const sw = Math.min(w * 0.85, panelH * 0.86 * 4.4), sh = sw / 4.4; const cc = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
-      const i0 = slot(f.name, L); signQuad(i0, [cc[0] - tx * sw / 2, cc[1] - tz * sw / 2], [cc[0] + tx * sw / 2, cc[1] + tz * sw / 2], (bot + top) / 2 - sh / 2, (bot + top) / 2 + sh / 2, n, 0.12);
+      f._front = { x: cc[0], z: cc[1], nx: n[0], nz: n[1], w }; // where the shop's door is (used by the people who hang out there)
+      if (L.neon) neonWindows(f, L, [cc[0] - tx * 0.95, cc[1] - tz * 0.95], [p0[0] + tx * 0.5, p0[1] + tz * 0.5], [cc[0] + tx * 0.95, cc[1] + tz * 0.95], [p1[0] - tx * 0.5, p1[1] - tz * 0.5], n, g0);
+      const i0 = slot(f.name, L, L.neon ? 'neon' : 'cab'); signQuad(i0, [cc[0] - tx * sw / 2, cc[1] - tz * sw / 2], [cc[0] + tx * sw / 2, cc[1] + tz * sw / 2], (bot + top) / 2 - sh / 2, (bot + top) / 2 + sh / 2, n, 0.12);
       out.count++;
     }
   }
@@ -322,16 +332,22 @@ function foodBuilder(T, P, ctx) {
       if (!f._alone) continue;
       if (f.kind === 'centre') { const rd = roadDir(f.x, f.z); if (rd) pylon(f, f.look, f.x, f.z, rd); continue; }
       if (f.kind === 'fuel') { fuelStation(f); continue; }
-      const rd = roadDir(f.x, f.z); const fx = rd ? rd.dx : 0, fz = rd ? rd.dz : 1; const ux = -fz, uz = fx;
+      const rd = roadDir(f.x, f.z);
       const dims = f.kind === 'shop' ? (/supermarket|department|wholesale|doityourself/.test(f.amenity) ? [36, 26] : [16, 12]) : f.amenity === 'restaurant' ? [20, 14] : f.amenity === 'fast_food' ? [15, 11] : /cafe|ice_cream/.test(f.amenity) ? [11, 8] : [13, 10];
+      // which way the new building faces: toward the street; a place mapped right on the street (address estimates)
+      // may go on either side of it, and can slide along the street to find a free lot
+      const dirs = []; let along = [0];
+      if (rd && rd.d >= 1.5) dirs.push([rd.dx, rd.dz]);
+      else if (rd) { const pts = rd.r.road.pts, i = Math.min(rd.r.i, pts.length - 2); const sx = pts[i + 1][0] - pts[i][0], sz = pts[i + 1][1] - pts[i][1], sl = Math.hypot(sx, sz) || 1; dirs.push([-sz / sl, sx / sl], [sz / sl, -sx / sl]); along = [0, 14, -14, 28, -28]; }
+      else dirs.push([0, 1]);
       let placed = null;
-      for (const sc of [1, 0.8, 0.62]) {
-        const wx = dims[0] * sc / 2, wd = dims[1] * sc / 2; let cx = f.x, cz = f.z;
-        if (rd) { const need = rd.r.road.w / 2 + wd + 3; if (rd.d < need) { cx -= fx * (need - rd.d); cz -= fz * (need - rd.d); } }
+      search: for (const sh of along) for (const [fx, fz] of dirs) for (const sc of [1, 0.8, 0.62]) {
+        const ux = -fz, uz = fx; const wx = dims[0] * sc / 2, wd = dims[1] * sc / 2; let cx = f.x + ux * sh, cz = f.z + uz * sh;
+        if (rd) { const d0 = rd.d >= 1.5 ? rd.d : 0; const need = rd.r.road.w / 2 + wd + 3; if (d0 < need) { cx -= fx * (need - d0); cz -= fz * (need - d0); } }
         const ring = [[cx - ux * wx + fx * wd, cz - uz * wx + fz * wd], [cx - ux * wx - fx * wd, cz - uz * wx - fz * wd], [cx + ux * wx - fx * wd, cz + uz * wx - fz * wd], [cx + ux * wx + fx * wd, cz + uz * wx + fz * wd]];
         const probes = ring.concat([[cx, cz]], ring.map((p, i) => { const q = ring[(i + 1) % 4]; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; }));
         if (probes.some(p => insideBuilding(p[0], p[1]) || onRoadSurface(p[0], p[1]))) continue;
-        placed = ring; break;
+        placed = ring; break search;
       }
       if (placed) themedBuilding(placed, f, 0, 0);
     }
@@ -379,6 +395,12 @@ function foodBuilder(T, P, ctx) {
         g.fillStyle = '#111214'; g.fillRect(x, y, SW, SH); const [label, num] = s.text.split(/\s{2,}/);
         g.fillStyle = '#e8e8e8'; g.font = `700 34px "Arial Narrow", Arial, sans-serif`; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, x + 22, y + SH / 2 + 2, 190);
         g.fillStyle = s.fg; g.shadowColor = s.fg; g.shadowBlur = 12; g.font = `700 84px "Courier New", monospace`; g.textAlign = 'right'; g.fillText(num, x + SW - 20, y + SH / 2 + 4); g.shadowBlur = 0;
+      } else if (s.mode === 'neon' || s.mode === 'neonT') { // glowing tube lettering (on a dark panel, or straight on the glass)
+        if (s.mode === 'neon') { g.fillStyle = s.bg; g.fillRect(x, y, SW, SH); g.strokeStyle = s.fg; g.globalAlpha = 0.35; g.lineWidth = 3; g.strokeRect(x + 10, y + 10, SW - 20, SH - 20); g.globalAlpha = 1; }
+        let fs = s.mode === 'neonT' ? 78 : 70; g.font = fontOf(fs); let tw = g.measureText(s.text).width; if (tw > SW - 40) { fs = Math.max(24, Math.floor(fs * (SW - 40) / tw)); g.font = fontOf(fs); }
+        g.textAlign = 'center'; g.textBaseline = 'middle'; const cx = x + SW / 2, cy = y + SH / 2 + 2;
+        g.shadowColor = s.fg; g.shadowBlur = 22; g.strokeStyle = s.fg; g.lineWidth = Math.max(3, fs * 0.08); g.lineJoin = 'round'; g.strokeText(s.text, cx, cy, SW - 30); g.shadowBlur = 10; g.fillStyle = s.fg; g.fillText(s.text, cx, cy, SW - 30);
+        g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.75)'; g.font = fontOf(fs); g.globalAlpha = 0.6; g.fillText(s.text, cx, cy, SW - 30); g.globalAlpha = 1; // hot white core of the tubes
       } else if (s.mode === 'let') { // channel letters: just the lettering, with a darker return edge
         let fs = 92; g.font = fontOf(fs); let tw = g.measureText(s.text).width; if (tw > SW - 24) { fs = Math.max(26, Math.floor(fs * (SW - 24) / tw)); g.font = fontOf(fs); }
         g.textAlign = 'center'; g.textBaseline = 'middle'; const col = new THREE.Color(s.fg); const lum = col.r * 0.3 + col.g * 0.59 + col.b * 0.11;
