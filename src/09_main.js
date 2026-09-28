@@ -59,7 +59,7 @@ const Game = {
   async goTo(x, z, label) {
     UI.loading(true, 'Building Greenville', 'Finding ' + label + '…', 0.02);
     for (const c of Traffic.cars.slice()) Traffic.remove(c);
-    for (const p of Peds.list.slice()) Peds.remove(p); for (const c of Peds.crowd) disposePerson(c.person); Peds.crowd = [];
+    for (const p of Peds.list.slice()) Peds.remove(p); for (const c of Peds.crowd) disposePerson(c.person); Peds.crowd = []; HospitalLife.clear();
     this.menuFocus.set(x, 20, z);
     Tiles.update(x, z);
     const [tx, ty] = tileOfXZ(x, z); const need = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) need.push(tileKey(tx + dx, ty + dy));
@@ -102,7 +102,7 @@ const Game = {
     const f = sim ? Player.focus() : this.menuFocus;
     this._tu = (this._tu || 0) + dt; if (this._tu > 0.5) { this._tu = 0; Tiles.update(f.x, f.z); Env.updateLampLights(f); }
     Env.update(sim ? dt : 0, f);
-    if (sim) { Traffic.update(dt, f, this.simT); Peds.update(dt, f); Peds.updateCrowd(dt, f); updateSignalLights(this.simT); Grass.update(f); Sound.update(dt); UI.update(dt); }
+    if (sim) { Traffic.update(dt, f, this.simT); Peds.update(dt, f); Peds.updateCrowd(dt, f); try { HospitalLife.update(dt, f); } catch (e) { if (!HospitalLife.warned) { HospitalLife.warned = 1; console.warn('hospital people skipped', e); } } updateSignalLights(this.simT); Grass.update(f); Sound.update(dt); UI.update(dt); }
     this.bloom.strength = 0.18 + Env.night * 0.55; this.bloom.threshold = lerp(0.92, 0.6, Env.night);
     if (Q.bloom) this.composer.render(dt); else renderer.render(scene, camera);
   },
@@ -118,5 +118,5 @@ addEventListener('error', e => showErr((e.message || e.error) + (e.filename ? '\
 addEventListener('unhandledrejection', e => showErr(e.reason && (e.reason.stack || e.reason.message) || e.reason));
 
 // ---- boot ----
-try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, Env, Store, Net, THREE, scene, renderer, camera, H }; }
+try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Env, Store, Net, THREE, scene, renderer, camera, H }; }
 catch (e) { console.error(e); showErr('Startup error: ' + (e && e.stack || e)); }

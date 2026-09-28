@@ -14,6 +14,7 @@ const RB_POOL = [
   ['Adults/Male_Adult_12', 'm', 'D', 'casual'], ['Adults/Female_Adult_08', 'f', 'L', 'casual'], ['Adults/Male_Adult_02', 'm', 'L', 'casual'],
   ['Adults/Female_Adult_12', 'f', 'L', 'casual'], ['Adults/Male_Adult_18', 'm', 'D', 'casual'], ['Adults/Female_Adult_03', 'f', 'L', 'casual'],
   ['Adults/Male_Adult_10', 'm', 'M', 'casual'], ['Adults/Female_Adult_07', 'f', 'L', 'casual'], ['Professions/Business_Male_05', 'm', 'D', 'business'],
+  ['Professions/Medical_Female_01', 'f', 'L', 'medical'], ['Professions/Medical_Male_02', 'm', 'L', 'medical'],
   ['Adults/Female_Adult_17', 'f', 'L', 'casual'], ['Adults/Male_Adult_06', 'm', 'L', 'casual'], ['Adults/Female_Adult_14', 'f', 'L', 'casual'],
   ['Adults/Male_Adult_17', 'm', 'M', 'casual'], ['Adults/Female_Adult_04', 'f', 'L', 'casual'], ['Adults/Male_Adult_09', 'm', 'L', 'casual'],
   ['Professions/Medical_Female_02', 'f', 'L', 'medical'], ['Professions/Medical_Male_04', 'm', 'L', 'medical'], ['Adults/Female_Adult_13', 'f', 'L', 'casual'],
@@ -22,6 +23,7 @@ const RB_POOL = [
   ['Adults/Female_Adult_02', 'f', 'L', 'casual'], ['Professions/Police_Male_01', 'm', 'M', 'police'], ['Professions/Medical_Male_01', 'm', 'L', 'medical'],
   ['Adults/Male_Adult_11', 'm', 'L', 'casual'], ['Adults/Female_Adult_15', 'f', 'L', 'casual'], ['Professions/Sports_Male_04', 'm', 'L', 'sports'],
   ['Adults/Male_Adult_03', 'm', 'L', 'casual'], ['Professions/Business_Female_02', 'f', 'L', 'business'], ['Adults/Female_Adult_05', 'f', 'L', 'casual'],
+  ['Professions/Medical_Female_03', 'f', 'L', 'medical'], ['Professions/Medical_Male_03', 'm', 'L', 'medical'], ['Professions/Medical_Male_05', 'm', 'L', 'medical'],
 ];
 
 // ---- shader patch: multiply skin pixels (separate greyscale mask texture) by a per-person tone ----

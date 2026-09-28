@@ -302,6 +302,7 @@ function paintTerrain(T, P) {
     }
   }
   try { Airport.paint(g, kg); } catch (e) { }
+  try { paintLandmarkGround(g, P); } catch (e) { }
   // driveways to houses built from parcel records
   if (T.driveways) for (const d of T.driveways) { linePath(g, d); g.lineCap = 'butt'; g.strokeStyle = '#aaa69c'; g.lineWidth = 3.0; g.stroke(); linePath(kg, d); kg.strokeStyle = '#000'; kg.lineWidth = 4.5; kg.stroke(); }
   // building footprints block trees, slightly darker ground around them
@@ -535,6 +536,7 @@ const PAL = {
   metal: ['#ffffff', '#dfe6ea', '#e8e2d6', '#cfd8d0', '#d6d0e0'],
   shingle: ['#5a5a5c', '#3f4042', '#6b5a4a', '#4a4038', '#5d6468', '#7a6a58', '#3b4a3f', '#7a3b2c', '#48494b'],
   flat: ['#d8d8d6', '#bfc0bf', '#9a9b9c', '#e8e8e6', '#7d7f82', '#cfcac0'],
+  campus: ['#ffffff', '#fbeee8', '#f4e6de'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
@@ -543,6 +545,7 @@ async function buildBuildings(T, P) {
   let _cnt = 0;
   const W = T.W; const buckets = {}; for (const k in MAT.facade) buckets[k] = new MB(true); const roofS = new MB(true), roofF = new MB(true);
   const FB = foodBuilder(T, P, { buckets, roofF, roofS }); // restaurants: branded buildings, storefronts, new buildings
+  const decor = new MB(true), seats = new MB(true); const Z = P.zones || (P.zones = landmarkZones(P)); // landmark trim, grandstands
   const upt = (x, z) => Math.hypot(x - 0, z - 0);
   const luAt = (x, z) => { const u = Math.floor((x - W.x0) / (W.x1 - W.x0) * 512), v = Math.floor((z - W.z0) / (W.z1 - W.z0) * 512); if (u < 0 || v < 0 || u > 511 || v > 511) return 40; return decodeCls(T.luR[v * 512 + u]); };
   for (const B of P.buildings) {
@@ -602,6 +605,11 @@ async function buildBuildings(T, P) {
     // --- roof ---
     let shape = (t['roof:shape'] || '').toLowerCase();
     const obb = minAreaRect(ring); const rect = obb ? area / (obb.L * obb.W) : 0;
+    // ECU campus / hospital / stadium buildings get their own look (04f_landmarks.js)
+    const LM = landmarkStyle(B, cx, cz, area, obb, Z);
+    if (LM && LM.kind === 'skip') return;
+    if (LM && LM.kind === 'grandstand') { buildGrandstand(B, T, P, seats, Z); return; }
+    if (LM) { fac = LM.fac; if (!(parseLen(t.height) > 0)) h = LM.h; if (!shape) shape = LM.shape; }
     if (!shape) {
       const housey = fac === 'siding' || (fac === 'brick' && (HOUSEY.has(bt) || (bt === 'yes' && lu === 80)));
       if (housey && area < 480 && rect > 0.7 && obb.W < 16) shape = r3 < 0.55 ? 'hipped' : 'gabled';
@@ -617,8 +625,9 @@ async function buildBuildings(T, P) {
     let rise = 0;
     if (shape !== 'flat') { rise = Math.min(5, obb.W / 2 * Math.tan(pitch)); if (parseLen(t.height) > 0) wallTop = Math.max(base + 2.4, top - rise); }
     // --- colours ---
-    let wallCol = colHex(pick(PAL[fac], r3)); if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); if (fac !== 'siding') wallCol.lerp(new THREE.Color(1, 1, 1), 0.4); } catch (e) { }
+    let wallCol = colHex(pick(PAL[fac] || PAL.office, r3)); if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); if (fac !== 'siding') wallCol.lerp(new THREE.Color(1, 1, 1), 0.4); } catch (e) { }
     let roofCol = colHex(pick(shape === 'flat' ? PAL.flat : PAL.shingle, r4)); if (t['roof:colour']) try { roofCol = new THREE.Color(t['roof:colour']); } catch (e) { }
+    if (LM) { wallCol = new THREE.Color(LM.wall); if (!t['roof:colour']) roofCol = new THREE.Color(shape === 'flat' ? '#b9b7b1' : LM.roof); }
     const tf = TEX.facade[fac]; const texW = tf.bayW * 4, texH = tf.floorH * 4; const uOff = Math.floor(r2 * 4) / 4;
     const mbw = buckets[fac];
     // --- walls ---
@@ -669,6 +678,7 @@ async function buildBuildings(T, P) {
       // ceiling under the eaves so you can't see inside from below
       roofF.quad(A, Bq, C, D, [0, 0], [1, 0], [1, 1], [0, 1], [0, -1, 0], new THREE.Color(0.8, 0.8, 0.78));
     }
+    if (LM) try { landmarkExtras(LM, B, T, { ring, base, wallTop, gavg, obb, decor, area }); } catch (e) { console.warn('landmark details skipped', e); }
     // --- register for collision / names ---
     const bb = ring.reduce((m, p) => [Math.min(m[0], p[0]), Math.min(m[1], p[1]), Math.max(m[2], p[0]), Math.max(m[3], p[1])], [1e9, 1e9, -1e9, -1e9]);
     const item = { ring, holes: B.holes, minY: minH > 0 ? minH : 0, maxY: base + (wallTop - base) + rise + 50, name: t.name || '', cx, cz, h: wallTop + rise };
@@ -682,6 +692,7 @@ async function buildBuildings(T, P) {
   for (const k in buckets) { const g = buckets[k].geo(); if (g) { const m = new THREE.Mesh(g, MAT.facade[k]); m.castShadow = true; m.receiveShadow = true; T.group.add(m); } }
   const gs = roofS.geo(); if (gs) { const m = new THREE.Mesh(gs, MAT.shingle); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   const gf = roofF.geo(); if (gf) { const m = new THREE.Mesh(gf, MAT.flatroof); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
+  addMB(T, decor, lmPlainMat()); addMB(T, seats, standsMat());
 }
 
 // ---------- trees ----------
@@ -846,6 +857,7 @@ const Tiles = {
     T.group.removeFromParent();
     T.group.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.geometry.userData.shared && !Object.values(GEO).includes(o.geometry) && !isSharedGeo(o.geometry)) o.geometry.dispose(); });
     if (T.signMat) { MAT.signMats.delete(T.signMat); T.signMat.dispose(); T.signTex.dispose(); } if (T.foodMat) { MAT.foodSigns.delete(T.foodMat); T.foodMat.dispose(); T.foodTex.dispose(); } if (T.terrainMat) T.terrainMat.dispose(); if (T.tex) T.tex.dispose(); if (T.rtex) T.rtex.dispose();
+    for (const m of T.lmMats || []) { if (m.map) m.map.dispose(); m.dispose(); } World.hospitalSpots.delete(T.key);
     for (const [h, it] of T.hashItems) h.remove(it);
     unregisterRoads(T);
     World.areas = World.areas.filter(a => a.tile !== T.key);
@@ -881,6 +893,7 @@ async function buildTile(T) {
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
   TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
   await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
+  try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
   try { buildMailboxes(T); } catch (e) { }
   TT('buildTrees', () => buildTrees(T, P)); await yieldMaybe();
   TT('buildSignals', () => buildSignals(T, P));

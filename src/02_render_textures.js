@@ -154,6 +154,44 @@ function buildTextures() {
     }
     g.fillStyle = pick(['#7a1f2a', '#1f4e7a', '#2e6a3a', '#5b2a86'], r()); g.fillRect(0, 380, 512, 12);
   });
+  // ECU campus: Georgian-revival red brick, white multi-pane windows, limestone lintels with keystones
+  mk('campus', 3.8, 4.2, (g, ge, r) => {
+    g.fillStyle = '#cfc6b6'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0, row = 0; y < 512; y += 6, row++) for (let x = (row % 2) * -8; x < 512; x += 16) {
+      const t = r(); g.fillStyle = `rgb(${128 + t * 38 | 0},${46 + t * 18 | 0},${34 + t * 12 | 0})`; g.fillRect(x + 1, y + 1, 14, 4);
+    }
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      g.fillStyle = '#e9e4d8'; g.fillRect(x0 + 30, y0 + 16, 68, 10); g.fillStyle = '#d8d2c4'; g.fillRect(x0 + 58, y0 + 12, 12, 16); // lintel + keystone
+      g.fillStyle = '#e9e4d8'; g.fillRect(x0 + 32, y0 + 110, 64, 6);                                                              // sill
+      win(g, ge, r, x0 + 38, y0 + 30, 52, 78, '#fbfaf6', '#2a3440', '#56657a', .36);
+      g.fillStyle = '#fbfaf6'; for (const x of [55, 72]) g.fillRect(x0 + x, y0 + 30, 3, 78); for (const y of [56, 82]) g.fillRect(x0 + 38, y0 + y, 52, 3); // muntins
+      g.fillStyle = 'rgba(40,40,40,.55)'; g.fillRect(x0 + 24, y0 + 30, 10, 78); g.fillRect(x0 + 94, y0 + 30, 10, 78);            // shutters
+    }
+    g.fillStyle = 'rgba(233,228,216,.9)'; g.fillRect(0, 500, 512, 12);                                                             // stone water table
+  });
+  // Hospital: light precast panels with long ribbon windows
+  mk('hospital', 3.3, 4.2, (g, ge, r) => {
+    noiseFill(g, 512, 512, [214, 206, 190], 10, 71);
+    for (let f = 0; f < 4; f++) {
+      const y0 = 512 - (f + 1) * 128;
+      g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, y0 + 108, 512, 4);
+      const gr = g.createLinearGradient(0, y0 + 34, 0, y0 + 96); gr.addColorStop(0, '#5f8793'); gr.addColorStop(1, '#2d4b57'); g.fillStyle = gr; g.fillRect(0, y0 + 34, 512, 62);
+      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(0, y0 + 34, 512, 10);
+      for (let x = 0; x < 512; x += 64) { g.fillStyle = '#c9c6bf'; g.fillRect(x, y0 + 34, 5, 62); }
+      for (let b = 0; b < 8; b++) if (r() < .45) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(b * 64 + 5, y0 + 34, 59, 62); }
+    }
+  });
+  // Glass curtain wall (heart institute, cancer centre, stadium suites)
+  mk('medglass', 1.6, 4.2, (g, ge, r) => {
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      const gr = g.createLinearGradient(x0, y0, x0 + 128, y0 + 128); gr.addColorStop(0, '#8fb3c8'); gr.addColorStop(0.55, '#44697f'); gr.addColorStop(1, '#6f95ab'); g.fillStyle = gr; g.fillRect(x0, y0, 128, 128);
+      g.fillStyle = '#3a4d5a'; g.fillRect(x0, y0 + 104, 128, 24);                          // spandrel
+      if (r() < .4) { ge.fillStyle = r() < .5 ? '#e8f2ff' : '#fff0d6'; ge.fillRect(x0 + 4, y0 + 4, 120, 98); }
+    }
+    g.fillStyle = '#c7ccd0'; for (let x = 0; x <= 512; x += 128) g.fillRect(x - 3, 0, 6, 512); for (let y = 0; y <= 512; y += 128) g.fillRect(0, y - 3, 512, 6);
+  });
   // Metal building: ribbed panels
   mk('metal', 4.0, 4.0, (g, ge, r) => {
     noiseFill(g, 512, 512, [196, 200, 204], 10, 66);
@@ -237,6 +275,7 @@ function buildMaterials() {
   MAT.concrete = new THREE.MeshStandardMaterial({ map: TEX.concrete, roughness: 0.9 });
   MAT.facade = {};
   for (const k in TEX.facade) MAT.facade[k] = new THREE.MeshStandardMaterial({ map: TEX.facade[k].map, emissiveMap: TEX.facade[k].emi, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true, roughness: 0.88 });
+  if (MAT.facade.medglass) { MAT.facade.medglass.roughness = 0.22; MAT.facade.medglass.metalness = 0.45; }
   MAT.shingle = new THREE.MeshStandardMaterial({ map: TEX.shingle, vertexColors: true, roughness: 0.95 });
   MAT.flatroof = new THREE.MeshStandardMaterial({ map: TEX.flatroof, vertexColors: true, roughness: 0.9 });
   MAT.tree = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });

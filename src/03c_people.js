@@ -12,11 +12,15 @@ const OUTFITS = {
   stripes: { cell: [2, 2], fixed: true, sleeve: 'short', tint: 0x1f2a44 }, gville: { cell: [3, 2], fixed: true, sleeve: 'short', tint: 0x9a9a9a },
   jersey: { cell: [4, 2], fixed: true, sleeve: 'short', tint: 0x4b1f78 }, scrubs: { cell: [5, 2], fixed: true, sleeve: 'short', tint: 0x2a7f86, pants: 'scrubs' },
   floral: { cell: [6, 2], fixed: true, sleeve: 'none', dress: true, tint: 0xd86a7a }, labcoat: { cell: [7, 2], fixed: true, sleeve: 'long', coat: true, tint: 0xf4f4f2, pants: 'chino' },
+  // hospital: scrubs in any colour (top + matching pants), patient gown
+  scrubsT: { cell: [0, 5], fixed: false, sleeve: 'short', pants: 'scrubsT' }, gown: { cell: [1, 5], fixed: true, sleeve: 'short', dress: true, gown: true },
 };
-const PANTS_KIND = { jeans: [0, 3, true, 0x3d5a88], darkjeans: [1, 3, true, 0x1f2a44], chino: [2, 3, false], shorts: [3, 3, false], leggings: [4, 3, true, 0x1b1b1d], sweats: [5, 3, true, 0x8f9296], skirt: [6, 3, false], scrubs: [7, 3, true, 0x2a7f86] };
+const PANTS_KIND = { jeans: [0, 3, true, 0x3d5a88], darkjeans: [1, 3, true, 0x1f2a44], chino: [2, 3, false], shorts: [3, 3, false], leggings: [4, 3, true, 0x1b1b1d], sweats: [5, 3, true, 0x8f9296], skirt: [6, 3, false], scrubs: [7, 3, true, 0x2a7f86], scrubsT: [2, 5, false] };
 const HOSPITAL = [35.6075, -77.4031];
 function nearHospital(x, z) { return Math.hypot(x - lonToX(HOSPITAL[1]), z - latToZ(HOSPITAL[0])) < 450; }
-const CELL = { skin: [0, 4], hair: [1, 4], sneakW: [2, 4], sneakB: [3, 4], boots: [4, 4], plain: [5, 4], capECU: [6, 4], pack: [7, 4] };
+const CELL = { skin: [0, 4], hair: [1, 4], sneakW: [2, 4], sneakB: [3, 4], boots: [4, 4], plain: [5, 4], capECU: [6, 4], pack: [7, 4], grip: [3, 5], clog: [4, 5] };
+// real scrub colours (ECU Health nurses wear navy / ceil blue / wine; techs & students other colours)
+const SCRUB = [0x22345c, 0x22345c, 0x6f9fd0, 0x6f9fd0, 0x2a7f86, 0x6b2437, 0x2f5a44, 0x4a5058, 0x5b2a86, 0x1d1f24];
 function buildPersonAtlas() {
   const S = PCELL * PGRID; const c = cnv(S, S), g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
   const r = mulberry32(2024);
@@ -102,7 +106,39 @@ function buildPersonAtlas() {
   at(5, 4, g => { grain(0.05, 1500); });
   at(6, 4, g => { g.fillStyle = '#4b1f78'; g.fillRect(0, 0, 256, 256); grain(0.1, 1500); g.fillStyle = '#f2c230'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font(800, 60); g.fillText('ECU', 64, 150); });
   at(7, 4, g => { grain(0.12, 2500); g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 3; g.strokeRect(40, 60, 176, 120); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(60, 60, 136, 6); });
+  // ---------- hospital (row 5) ----------
+  shirtBase(0, 5, '#f2f2f2', g => { g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 4; g.beginPath(); g.moveTo(100, 18); g.lineTo(128, 66); g.lineTo(156, 18); g.stroke(); // V-neck scrub top
+    g.strokeStyle = 'rgba(0,0,0,.22)'; g.lineWidth = 2; g.strokeRect(146, 84, 28, 26); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(150, 80, 2, 12); g.fillRect(156, 80, 2, 10); g.fillRect(0, 170, 256, 4); });
+  shirtBase(1, 5, '#b9d3e6', g => { g.fillStyle = '#b9d3e6'; g.fillRect(0, 0, 256, 256); // patient gown: pale blue with a small navy diamond print
+    for (let y = 6; y < 256; y += 18) for (let x = (y / 18 & 1) * 9; x < 256; x += 18) { g.fillStyle = 'rgba(40,60,110,.55)'; g.beginPath(); g.moveTo(x, y - 3); g.lineTo(x + 3, y); g.lineTo(x, y + 3); g.lineTo(x - 3, y); g.fill(); }
+    g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 3; for (let k = 0; k < 6; k++) { const x = 20 + k * 44; g.beginPath(); g.moveTo(x, 150); g.quadraticCurveTo(x + 6, 200, x - 4, 256); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 5; g.beginPath(); g.moveTo(96, 18); g.quadraticCurveTo(128, 34, 160, 18); g.stroke(); });
+  at(2, 5, g => { grain(0.08, 2500); g.strokeStyle = 'rgba(0,0,0,.14)'; g.lineWidth = 2; for (const x of [64, 192]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke(); } g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, 0, 256, 10); });
+  at(3, 5, g => { g.fillStyle = '#f2dd6a'; g.fillRect(0, 0, 256, 256); g.fillStyle = 'rgba(255,255,255,.85)'; for (let y = 14; y < 256; y += 22) for (let x = 8; x < 256; x += 22) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); } }); // yellow non-slip socks
+  at(4, 5, g => { g.fillStyle = '#e9e9ec'; g.fillRect(0, 0, 256, 256); grain(0.08, 900); g.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 40; y < 180; y += 30) for (let x = 60; x < 200; x += 30) { g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); } }); // clogs
   const t = ctex(c, { wrap: false }); t.anisotropy = MAX_ANISO; return t;
+}
+// who you meet at the hospital: role → look overrides for makePerson
+function hospitalLook(r, role) {
+  if (!role) { const u = r(); role = u < 0.2 ? 'doctor' : u < 0.55 ? 'nurse' : u < 0.67 ? 'patient' : 'visitor'; }
+  const L = { role }; const fem = role === 'nurse' ? r() < 0.82 : r() < 0.5; L.fem = fem;
+  L.face = fem ? 4 + Math.floor(r() * 3) : Math.floor(r() * 4); L.beard = !fem && r() < 0.15; L.earrings = fem && r() < 0.4;
+  L.hairStyle = fem ? pick(['bun', 'bun', 'pony', 'bob', 'long', 'curly', 'braids'], r()) : pick(['short', 'short', 'fade', 'buzz', 'bald', 'curly'], r());
+  L.scale = (fem ? 0.93 : 1.0) * (0.94 + r() * 0.12);
+  if (role === 'nurse' || (role === 'doctor' && r() < 0.35)) { // scrubs (surgeons / residents wear them too)
+    const c = pick(SCRUB, r()); L.top = 'scrubsT'; L.shirt = c; L.pants = c; L.pantsKind = 'scrubsT';
+    L.shoe = r() < 0.4 ? 'clog' : pick(['sneakW', 'sneakW', 'sneakB'], r());
+    L.surgCap = r() < (role === 'doctor' ? 0.5 : 0.2); L.capC = r() < 0.5 ? c : pick([0x6f9fd0, 0x2f5a44, 0x8a3a6a, 0x223a6a], r());
+    L.mask = r() < 0.12; L.badge = true; L.stetho = role === 'doctor' || r() < 0.45; L.backpack = false;
+    if (role === 'doctor' && r() < 0.5) { L.top = 'labcoat'; L.pantsKind = 'scrubsT'; } // white coat over scrubs
+  } else if (role === 'doctor') {
+    L.top = 'labcoat'; L.pantsKind = 'chino'; L.pants = pick([0x2a2a2a, 0x3a4a5a, 0x5a4a3a, 0x1f2a44, 0x7a6a50], r()); L.shoe = pick(['boots', 'sneakB', 'sneakB'], r());
+    L.stetho = true; L.badge = true; L.backpack = false; L.glasses = r() < 0.35;
+  } else if (role === 'patient') {
+    L.top = 'gown'; L.pantsKind = null; L.shoe = 'grip'; L.backpack = false; L.belt = false; L.band = true; L.watch = false;
+    if (r() < 0.5) L.hairStyle = fem ? pick(['bob', 'bun', 'curly'], r()) : pick(['short', 'bald', 'buzz'], r());
+  } else { L.backpack = false; if (r() < 0.3) L.badge = true; } // visitors
+  return L;
 }
 // remap a geometry's uv (0..1) into atlas cell [col,row], optional sub-rect [u0,v0,w,h] in cell space
 function toCell(g, cell, sub) {
@@ -250,11 +286,21 @@ function makePerson(seed, look) {
     if (shorts) part(cyl(0.085, 0.082, 0.26, x, 0.8, 0, 12), up, pantsC, pantsCell);
     part(sph(0.058, x, 0.5, 0.012, 1, 1, 1, 8, 6), lo, bareLower ? skin : pantsC, bareLower ? skinC : pantsCell); // knee
     part(cap(0.054, 0.3, x, 0.29, -0.004, 10), lo, bareLower ? skin : pantsC, bareLower ? skinC : pantsCell);
-    if (bareLower) part(cyl(0.05, 0.048, 0.06, x, 0.1, 0, 8), lo, 0xf2f2f2, CELL.plain); // socks
+    if (bareLower) part(cyl(0.05, 0.048, L.shoe === 'grip' ? 0.14 : 0.06, x, L.shoe === 'grip' ? 0.13 : 0.1, 0, 8), lo, L.shoe === 'grip' ? 0xffffff : 0xf2f2f2, L.shoe === 'grip' ? CELL.grip : CELL.plain); // socks
     const sc = CELL[L.shoe] || CELL.sneakW;
     const upper = new THREE.CapsuleGeometry(0.045, 0.16, 3, 8); upper.rotateX(Math.PI / 2); upper.scale(1.05, 0.8, 1); upper.translate(x, 0.055, 0.035); part(upper, ft, 0xffffff, sc);
-    part(bx(0.1, 0.022, 0.265, x, 0.011, 0.035), ft, L.shoe === 'boots' ? 0x2a1a10 : 0xeeeeee, CELL.plain);
+    part(bx(0.1, 0.022, 0.265, x, 0.011, 0.035), ft, L.shoe === 'boots' ? 0x2a1a10 : L.shoe === 'grip' ? 0xe8d360 : L.shoe === 'clog' ? 0xd8d8dc : 0xeeeeee, CELL.plain);
   }
+  // ---------- hospital extras ----------
+  if (L.surgCap) { part(hairCap(0.5, 1.045), BI.head, L.capC || 0x6f9fd0, CELL.plain); part(bx(0.21, 0.02, 0.02, 0, 1.69, -0.105), BI.head, L.capC || 0x6f9fd0, CELL.plain); }
+  if (L.mask) { part(sph(0.062, 0, 1.588, 0.062, 1.2, 0.85, 0.72, 12, 8), BI.head, 0x9cc8e6, CELL.plain); for (const s of [-1, 1]) part(bx(0.004, 0.004, 0.09, s * 0.094, 1.61, 0.03), BI.head, 0xf4f4f4, CELL.plain); }
+  if (L.stetho) {
+    const t = new THREE.TorusGeometry(0.078, 0.007, 5, 22, Math.PI * 1.25); t.rotateX(Math.PI / 2); t.rotateY(-Math.PI * 0.875); t.translate(0, 1.465, -0.005); part(t, BI.chest, 0x1c1c1e, CELL.plain);
+    const zf = fem ? 0.104 : 0.114; for (const s of [-1, 1]) part(cap(0.007, 0.15, s * 0.062, 1.37, zf, 4), BI.chest, 0x1c1c1e, CELL.plain);
+    { const d = cyl(0.02, 0.02, 0.012, 0, 0, 0, 10); d.rotateX(Math.PI / 2); d.translate(0.062, 1.27, zf + 0.012); part(d, BI.chest, 0xc8c8cc, CELL.plain); }
+  }
+  if (L.badge) { part(bx(0.045, 0.062, 0.006, -0.085, 1.31, fem ? 0.1 : 0.106), BI.chest, 0xf8f8f8, CELL.plain); part(bx(0.045, 0.014, 0.007, -0.085, 1.334, fem ? 0.1 : 0.106), BI.chest, 0x4b1f78, CELL.plain); }
+  if (L.band) part(cyl(0.042, 0.042, 0.018, 0.2, 0.93, 0, 10), BI.lArmL, 0xf4f4f4, CELL.plain); // hospital wristband
   if (L.backpack) {
     part(bx(0.27, 0.36, 0.13, 0, 1.24, -0.165), BI.chest, L.packC, CELL.pack);
     part(bx(0.2, 0.12, 0.05, 0, 1.13, -0.24), BI.chest, L.packC, CELL.pack);
