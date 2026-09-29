@@ -52,6 +52,7 @@ const Game = {
       Player.camPos.set(x + Math.sin(Player.camYaw) * 7, Player.pos.y + 3, z + Math.cos(Player.camYaw) * 7);
     }
     this.started = true;
+    setTimeout(() => Prefetch.start(), 8000); // new players: save the whole county in the background
     $('menu').hidden = true; $('hud').hidden = false; this.playing = true; this.paused = false; canvasEl.focus();
     UI.toast(/your plane/.test(name) ? 'Welcome to Pitt-Greenville Airport — walk to the plane and press E to fly' : 'Welcome to ' + name + ' — press E to drive, M for the map', 5000);
   },

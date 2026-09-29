@@ -323,3 +323,41 @@ const UI = {
     const f = Player.focus(); g.fillStyle = '#b37cf0'; g.strokeStyle = '#fff'; g.lineWidth = 2 / s; g.beginPath(); g.arc(f.x, f.z, 7 / s, 0, 7); g.fill(); g.stroke();
   },
 };
+
+// =====================================================================
+// FIRST-VISIT DOWNLOAD — on the hosted site, new players quietly download every packed map square
+// of Pitt County (and its elevation) into the browser in the background, so the whole county
+// loads instantly from then on, even offline. It pauses while the area around you is loading.
+// =====================================================================
+const Prefetch = {
+  running: false, done: 0, total: 0,
+  async start() {
+    if (this.running || !window.GV_DATA || Store.failed) return; this.running = true;
+    try {
+      const list = await fetch(window.GV_DATA + 'osm/index.json').then(r => r.ok ? r.json() : []).catch(() => []);
+      const have = new Set(await Store.keys('osm')); const todo = list.filter(n => !have.has(n.replace('_', ',')) && !have.has(tileKey(...n.split('_').map(Number))));
+      this.total = list.length; this.done = list.length - todo.length; if (!todo.length) return this.dem(list);
+      // nearest squares first
+      const f = Player.focus ? Player.focus() : null; if (f) { const [px, py] = tileOfXZ(f.x, f.z); todo.sort((a, b) => { const [ax, ay] = a.split('_').map(Number), [bx, by] = b.split('_').map(Number); return Math.hypot(ax - px, ay - py) - Math.hypot(bx - px, by - py); }); }
+      const chip = $('prechip'); let i = 0;
+      const worker = async () => {
+        while (i < todo.length) {
+          while (Tiles.loadingCount() > 0 || document.hidden) await sleep(700); // never compete with the map you're standing in
+          const n = todo[i++]; const [tx, ty] = n.split('_').map(Number); const k = tileKey(tx, ty);
+          try { if (!(await Store.get('osm', k))) { const raw = await packedTile(tx, ty); if (raw) { const c = compactOSM(raw); await Store.put('osm', k, await gzip(JSON.stringify(c))); try { Overview.fromOSM(k, c); } catch (e) { } } } } catch (e) { }
+          this.done++; if (chip) { chip.textContent = `Saving Pitt County map for offline play · ${Math.round(this.done / this.total * 100)}%`; chip.style.opacity = this.done < this.total ? 1 : 0; }
+          await sleep(15);
+        }
+      };
+      await Promise.all([worker(), worker()]);
+      if (chip) chip.style.opacity = 0; UI.cacheDirty && UI.cacheDirty(); UI.toast('The whole Pitt County map is saved on this device', 4000);
+      await this.dem(list);
+    } catch (e) { console.warn('background map download stopped', e); }
+    finally { this.running = false; }
+  },
+  async dem(list) { // elevation for every square (a few dozen image tiles cover the county)
+    const seen = new Set();
+    for (const n of list) { const [tx, ty] = n.split('_').map(Number); const b = tileBBox(tx, ty); const key = Math.floor(lonToPX((b.w + b.e) / 2) / 256) + ',' + Math.floor(latToPY((b.s + b.n) / 2) / 256); if (seen.has(key)) continue; seen.add(key);
+      while (Tiles.loadingCount() > 0 || document.hidden) await sleep(700); try { await ensureDEM(b, 20); } catch (e) { } }
+  },
+};

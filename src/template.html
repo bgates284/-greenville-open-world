@@ -88,6 +88,7 @@ select{background:var(--panel-solid);border:1px solid var(--line);border-radius:
 #netchip{position:absolute;right:16px;top:74px;font:11px/1 var(--mono);background:rgba(18,14,28,.75);border:1px solid var(--line);border-radius:12px;padding:6px 10px;opacity:0;transition:opacity .3s}
 #netchip.on{opacity:1}
 #packchip{position:absolute;right:16px;top:104px;font:11px/1 var(--mono);background:rgba(18,14,28,.75);border:1px solid var(--line);border-radius:12px;padding:6px 10px;opacity:0;transition:opacity .3s}
+#prechip{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;font:11px/1 var(--mono);background:rgba(18,14,28,.75);border:1px solid var(--line);border-radius:12px;padding:6px 10px;opacity:0;transition:opacity .3s;white-space:nowrap}
 #packchip.on{opacity:1}
 #dbg{position:absolute;right:16px;top:100px;font:11px/1.4 var(--mono);background:rgba(0,0,0,.55);padding:6px 8px;border-radius:4px;white-space:pre}
 #dbg[hidden]{display:none!important}
@@ -127,6 +128,7 @@ select{background:var(--panel-solid);border:1px solid var(--line);border-radius:
   <div id="hint"></div>
   <div id="netchip"></div>
   <div id="packchip"></div>
+  <div id="prechip"></div>
   <div id="toast"></div>
   <div id="dbg" hidden></div>
 </div>
