@@ -121,9 +121,9 @@ const UI = {
     // big map
     const bc = $('bigcanvas'); this.bm = { scale: 0.35, cx: 0, cz: 0, drag: null };
     bc.addEventListener('wheel', e => { e.preventDefault(); this.bm.scale = clamp(this.bm.scale * (e.deltaY > 0 ? 0.85 : 1.18), 0.03, 4); this.drawBig(); }, { passive: false });
-    bc.addEventListener('mousedown', e => { this.bm.drag = { x: e.clientX, y: e.clientY, cx: this.bm.cx, cz: this.bm.cz, moved: false }; });
-    addEventListener('mousemove', e => { const d = this.bm.drag; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true; this.bm.cx = d.cx - dx / this.bm.scale; this.bm.cz = d.cz - dy / this.bm.scale; if (!$('bigmap').hidden) this.drawBig(); });
-    addEventListener('mouseup', e => { const d = this.bm.drag; this.bm.drag = null; if (d && !d.moved && e.target === bc) { const r = bc.getBoundingClientRect(); const x = this.bm.cx + (e.clientX - r.left - r.width / 2) / this.bm.scale, z = this.bm.cz + (e.clientY - r.top - r.height / 2) / this.bm.scale; this.closeBig(); Game.teleport(x, z); } });
+    bc.style.touchAction = 'none'; bc.addEventListener('pointerdown', e => { if (e.isPrimary === false) return; this.bm.drag = { x: e.clientX, y: e.clientY, cx: this.bm.cx, cz: this.bm.cz, moved: false }; });
+    addEventListener('pointermove', e => { const d = this.bm.drag; if (d && e.isPrimary === false) return; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true; this.bm.cx = d.cx - dx / this.bm.scale; this.bm.cz = d.cz - dy / this.bm.scale; if (!$('bigmap').hidden) this.drawBig(); });
+    addEventListener('pointerup', e => { if (e.isPrimary === false) return; const d = this.bm.drag; this.bm.drag = null; if (d && !d.moved && e.target === bc) { const r = bc.getBoundingClientRect(); const x = this.bm.cx + (e.clientX - r.left - r.width / 2) / this.bm.scale, z = this.bm.cz + (e.clientY - r.top - r.height / 2) / this.bm.scale; this.closeBig(); Game.teleport(x, z); } });
     this.refreshCache();
     this.mm = $('minimap').getContext('2d');
   },
