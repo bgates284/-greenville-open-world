@@ -48,8 +48,6 @@ const Touch = {
     for (const [t, f] of [['＋', () => { UI.bm.scale = clamp(UI.bm.scale * 1.4, 0.03, 4); UI.drawBig(); }], ['－', () => { UI.bm.scale = clamp(UI.bm.scale / 1.4, 0.03, 4); UI.drawBig(); }], ['✕', () => UI.closeBig()]]) {
       const b = document.createElement('button'); b.textContent = t; b.style.cssText = 'width:48px;height:48px;border-radius:10px;border:2px solid rgba(255,255,255,.45);background:rgba(20,16,32,.75);color:#fff;font:700 22px system-ui'; b.addEventListener('click', f); z.appendChild(b); }
     bm.appendChild(z);
-    // phones: start on the lighter graphics setting unless you've picked one
-    try { if (!localStorage.getItem('gv-quality')) localStorage.setItem('gv-quality', 'low'); } catch (e) { }
     setInterval(() => this.sync(), 200);
   },
 

@@ -95,7 +95,7 @@ const UI = {
       const L = Food.list.filter(test); if (!L.length) continue; const og = document.createElement('optgroup'); og.label = `${label} (${L.length})`;
       L.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(f => { const o = document.createElement('option'); o.value = `f${f.lat},${f.lon}`; o.textContent = f.kind === 'fuel' ? `${f.name} (gas)` : f.name; og.appendChild(o); }); sel.appendChild(og);
     }
-    try { const q = localStorage.getItem('gv-quality'); if (q && QUALITY[q]) this.setQuality(q, true); } catch (e) { }
+    this.setQuality('low', true); // always start on Low; a higher setting chosen in the menu lasts for that session
     document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => this.setQuality(b.dataset.q)));
     $('timeSel').addEventListener('change', e => { const v = e.target.value; const h = v === 'now' ? new Date().getHours() + new Date().getMinutes() / 60 : parseFloat(v); Env.hour = h; $('clockRange').value = h; });
     $('clockRange').addEventListener('input', e => { Env.hour = parseFloat(e.target.value); });
