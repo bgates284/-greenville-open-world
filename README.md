@@ -19,7 +19,7 @@ the game keeps running on the old code until it's fixed).
 
 | File(s) | What happens when you save |
 |---|---|
-| `05_env`, `06_player`, `06b_plane`, `07_traffic`, `07b_hospital`, `07c_hangout`, `08_ui`, `09_main`, `04e_overview` | New code swaps in instantly; you keep your position, speed and everything else |
+| `05_env`, `06_player`, `06b_plane`, `07_traffic`, `07b_hospital`, `07c_hangout`, `08_ui`, `08b_cinematic`, `09_main`, `04e_overview` | New code swaps in instantly; you keep your position, speed and everything else |
 | `03j_airport` | Swaps in, then the plane model and airport are rebuilt around you |
 | `04_world`, `04b_food`, `04c_neighborhoods`, `04d_streets`, `04f_landmarks`, `03g_food`, `03h_retail`, `03i_parcels` | Swaps in, then the map squares around you are rebuilt with the new code |
 | `01_core`, `02_render_textures`, `03_models`, `03c`–`03f` (people/avatars), `template.html` | The page reloads and puts you back where you were (walking, driving or flying) |

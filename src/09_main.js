@@ -59,7 +59,7 @@ const Game = {
   async goTo(x, z, label) {
     UI.loading(true, 'Building Greenville', 'Finding ' + label + '…', 0.02);
     for (const c of Traffic.cars.slice()) Traffic.remove(c);
-    for (const p of Peds.list.slice()) Peds.remove(p); for (const c of Peds.crowd) disposePerson(c.person); Peds.crowd = []; HospitalLife.clear(); Hangouts.clear();
+    for (const p of Peds.list.slice()) Peds.remove(p); for (const c of Peds.crowd) disposePerson(c.person); Peds.crowd = []; HospitalLife.clear(); Hangouts.clear(); if (Cine.active) Cine.finish();
     this.menuFocus.set(x, 20, z);
     Tiles.update(x, z);
     const [tx, ty] = tileOfXZ(x, z); const need = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) need.push(tileKey(tx + dx, ty + dy));
@@ -93,17 +93,19 @@ const Game = {
     this.fps = lerp(this.fps, 1 / Math.max(dt, 1e-3), 0.05);
     U.uTime.value += dt;
     const sim = this.playing && !this.paused;
-    if (sim) { this.simT += dt; Player.update(dt); }
+    if (sim) { this.simT += dt; if (!Cine.active) Player.update(dt); } // the idle cinematic (08b_cinematic.js) holds the player still
     else {
       // slow orbit behind the menu
       this.menuAng += dt * 0.03; const f = this.menuFocus; const gy = H(f.x, f.z);
       camera.position.set(f.x + Math.cos(this.menuAng) * 260, gy + 95, f.z + Math.sin(this.menuAng) * 260); camera.lookAt(f.x, gy + 5, f.z);
     }
-    const f = sim ? Player.focus() : this.menuFocus;
+    if (sim) try { Cine.update(dt); } catch (e) { if (!Cine.warned) { Cine.warned = 1; console.warn('idle cinematic skipped', e); } }
+    const f = sim ? (Cine.active ? Cine.focus : Player.focus()) : this.menuFocus;
     this._tu = (this._tu || 0) + dt; if (this._tu > 0.5) { this._tu = 0; Tiles.update(f.x, f.z); Env.updateLampLights(f); }
     Env.update(sim ? dt : 0, f);
     if (sim) { Traffic.update(dt, f, this.simT); Peds.update(dt, f); Peds.updateCrowd(dt, f); try { HospitalLife.update(dt, f); } catch (e) { if (!HospitalLife.warned) { HospitalLife.warned = 1; console.warn('hospital people skipped', e); } } try { Hangouts.update(dt, f); } catch (e) { if (!Hangouts.warned) { Hangouts.warned = 1; console.warn('smoke-shop regulars skipped', e); } } updateSignalLights(this.simT); Grass.update(f); Sound.update(dt); UI.update(dt); }
     this.bloom.strength = 0.18 + Env.night * 0.55; this.bloom.threshold = lerp(0.92, 0.6, Env.night);
+    if (sim) Cine.apply();
     if (Q.bloom) this.composer.render(dt); else renderer.render(scene, camera);
   },
 };
@@ -118,5 +120,5 @@ addEventListener('error', e => showErr((e.message || e.error) + (e.filename ? '\
 addEventListener('unhandledrejection', e => showErr(e.reason && (e.reason.stack || e.reason.message) || e.reason));
 
 // ---- boot ----
-try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Hangouts, Food, nearestRoad, insideBuilding, onRoadSurface, Env, Store, Net, THREE, scene, renderer, camera, H }; }
+try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Hangouts, Cine, Food, nearestRoad, insideBuilding, onRoadSurface, Env, Store, Net, THREE, scene, renderer, camera, H }; }
 catch (e) { console.error(e); showErr('Startup error: ' + (e && e.stack || e)); }
