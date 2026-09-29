@@ -23,12 +23,14 @@ const Cine = {
   },
 
   // ---------- the places it visits ----------
-  buildSpots() {
-    const S = [];
-    for (const [name, la, lo] of LANDMARKS) if (!/airport|your plane/i.test(name)) S.push({ name, x: lonToX(lo), z: latToZ(la) });
-    const extra = [['Uptown · 5th Street bars', 35.6111, -77.3721], ['ECU · College Hill', 35.6048, -77.3584], ['Greenville Blvd shops', 35.5838, -77.3710], ['Memorial Drive', 35.6085, -77.3955], ['Fire Tower Road', 35.5665, -77.4050], ['East 10th Street', 35.6000, -77.3345], ['Evans Street', 35.5800, -77.3790]];
-    for (const [name, la, lo] of extra) S.push({ name, x: lonToX(lo), z: latToZ(la) });
-    for (const f of Food.list) if (f.look && f.look.smoke) S.push({ name: f.name, x: f.x, z: f.z, smoke: f });
+  buildSpots() { // ECU, ECU Health, fast food and retail — never the smoke / vape shops
+    const S = [], add = (name, x, z) => S.push({ name, x, z });
+    for (const [name, la, lo] of LANDMARKS) if (/^ECU|Dowdy|Clark-LeClair|Greenville Mall/.test(name)) add(name, lonToX(lo), latToZ(la));
+    add('ECU · College Hill', lonToX(-77.3584), latToZ(35.6048)); add('ECU · Mendenhall & the Mall', lonToX(-77.3655), latToZ(35.6053)); add('ECU Health Medical Center · Emergency', lonToX(-77.4022), latToZ(35.6073)); add('ECU Brody School of Medicine', lonToX(-77.4062), latToZ(35.6098));
+    const pickSome = (list, n) => { const out = []; const used = new Set(); for (const f of list.sort(() => Math.random() - 0.5)) { const t = tileOfXZ(f.x, f.z).join(','); if (used.has(t)) continue; used.add(t); out.push(f); if (out.length >= n) break; } return out; };
+    const ok = f => f.look && !f.look.smoke && !SMOKE_KINDS.test(f.amenity || '');
+    for (const f of pickSome(Food.list.filter(f => ok(f) && f.kind === 'food' && f.amenity === 'fast_food'), 10)) add(f.name, f.x, f.z);
+    for (const f of pickSome(Food.list.filter(f => ok(f) && (f.kind === 'centre' || (f.kind === 'shop' && f.brand))), 10)) add(f.name, f.x, f.z);
     // shuffle so every idle session is a different tour
     for (let i = S.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [S[i], S[j]] = [S[j], S[i]]; }
     return S;
@@ -87,7 +89,6 @@ const Cine = {
     const out = []; const c = this.focus; const near = (x, z) => Math.hypot(x - c.x, z - c.z) < 170;
     for (const p of Peds.list) if (p.state === 'walk' && near(p.x, p.z)) out.push({ o: p, w: 3, label: 'out for a walk' });
     for (const p of Peds.crowd) if (near(p.x, p.z)) out.push({ o: p, w: 1, label: 'hanging out with friends' });
-    try { for (const set of Hangouts.sets.values()) for (const a of set.actors) if (near(a.x, a.z)) out.push({ o: a, w: 2, label: 'chilling outside the shop' }); } catch (e) { }
     try { for (const set of HospitalLife.sets.values()) for (const a of set.actors) if (near(a.x, a.z)) out.push({ o: a, w: 2, label: a.kind === 'push' ? 'nurse on a wheelchair run' : a.kind === 'iv' ? 'patient taking a walk' : a.kind === 'doctor' ? 'doctor between rounds' : 'hospital staff' }); } catch (e) { }
     return out;
   },
