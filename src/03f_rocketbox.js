@@ -96,13 +96,15 @@ const RB = {
     const fr = await fetch(`${base}/Export/${name}.fbx`); if (!fr.ok) throw new Error('model ' + fr.status); const fbx = await fr.arrayBuffer();
     // texture prefix (e.g. "f001") comes from the FBX material names
     const Loader = await this.fbxLoader(); const probe = new Loader(this.quietMgr());
-    const obj = probe.parse(fbx, ''); let prefix = null; obj.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) { const mm = /^(\w+?)_(body|head|opacity)/.exec(m.name); if (mm) prefix = mm[1]; } });
+    const obj = probe.parse(fbx, ''); let prefix = null; const extras = new Set(); obj.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) { const mm = /^(\w+?)_(body|head|opacity)/.exec(m.name); if (mm) prefix = mm[1]; const mx = /^[a-z]\d+_([a-z]+)/i.exec(m.name); if (mx && !/^(body|head|opacity)$/i.test(mx[1])) extras.add(mx[1].toLowerCase()); } });
     if (!prefix) throw new Error('no texture prefix for ' + name);
     const get = async (suffix) => { const r = await fetch(`${base}/Textures/${prefix}_${suffix}.tga`); if (!r.ok) throw new Error('tex ' + r.status); return decodeTGA(await r.arrayBuffer()); };
     const headC = toCanvas(await get('head_color'), 1024); const ref = skinReference(headC); const headM = skinMask(headC, ref, 256);
-    const bodyC = toCanvas(await get('body_color'), 512); const bodyM = skinMask(bodyC, ref, 128);
+    let bodyRaw; try { bodyRaw = await get('body_color'); } catch (e) { bodyRaw = await get('body_color_blue'); } // a few medical models only ship a "_blue" variant
+    const bodyC = toCanvas(bodyRaw, 512); const bodyM = skinMask(bodyC, ref, 128);
+    const extra = {}; for (const x of extras) { try { extra[x] = await blobOf(toCanvas(await get(x + '_color'), 256)); } catch (e) { } } // stethoscopes, face shields…
     let opC = null; try { opC = toCanvas(await get('opacity_color'), 512); } catch (e) { }
-    const rec = { v: 2, fbx, head: await blobOf(headC), body: await blobOf(bodyC), headMask: await blobOf(headM), bodyMask: await blobOf(bodyM), opacity: opC ? await blobOf(opC) : null, skin: ref.rgb };
+    const rec = { v: 2, fbx, head: await blobOf(headC), body: await blobOf(bodyC), headMask: await blobOf(headM), bodyMask: await blobOf(bodyM), opacity: opC ? await blobOf(opC) : null, skin: ref.rgb, extra };
     await Store.put('models', key, rec); return rec;
   },
   async buildTemplate(entry, rec, xbot) {
@@ -110,9 +112,12 @@ const RB = {
     const obj = l.parse(rec.fbx, ''); obj.animations = [];
     const tex = { head: await texFromBlob(rec.head), body: await texFromBlob(rec.body), opacity: rec.opacity ? await texFromBlob(rec.opacity) : null };
     const masks = { head: await texFromBlob(rec.headMask, false), body: await texFromBlob(rec.bodyMask, false) };
+    const extraTex = {}; for (const k in rec.extra || {}) try { extraTex[k] = await texFromBlob(rec.extra[k]); } catch (e) { }
     obj.traverse(o => {
       if (!o.isMesh) return; o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false;
       const conv = m => {
+        const mx = /^[a-z]\d+_([a-z]+)/i.exec(m.name || ''); const ex = mx && !/^(body|head|opacity)$/i.test(mx[1]) ? mx[1].toLowerCase() : null;
+        if (ex) { const t = extraTex[ex]; const e = new THREE.MeshStandardMaterial({ name: m.name, map: t || null, roughness: 0.5, metalness: 0.2, alphaTest: 0.4, side: THREE.DoubleSide }); if (!t) e.visible = false; return e; } // accessories keep their own texture (or hide)
         const kind = /opacity/.test(m.name) ? 'opacity' : /head/.test(m.name) ? 'head' : 'body';
         const nm = new THREE.MeshStandardMaterial({ name: m.name, map: tex[kind], roughness: kind === 'head' ? 0.62 : 0.8, metalness: 0 });
         if (kind === 'opacity') { nm.alphaTest = 0.45; nm.side = THREE.DoubleSide; nm.userData.isHair = true; if (!tex.opacity) nm.visible = false; }
@@ -128,7 +133,9 @@ const RB = {
     for (const c of clips) if (c.name === 'agree' || c.name === 'headshake') THREE.AnimationUtils.makeClipAdditive(c);
     for (const c of clips) for (const t of c.tracks) if (/\.position$/.test(t.name) && c.name !== 'agree' && c.name !== 'headshake') { const v = t.values; const x0 = v[0], z0 = v[2]; for (let k = 0; k < v.length; k += 3) { v[k] = x0; v[k + 2] = z0; } }
     const skinLin = new THREE.Color().setRGB(rec.skin[0] / 255, rec.skin[1] / 255, rec.skin[2] / 255, THREE.SRGBColorSpace);
-    const key = 'rb:' + path; NPCKit.tpl[key] = { wrap, clips, rb: true, gender, tone, role, skinLin, masks };
+    // where a hat sits: on top of the head, in the head bone's space (same for every copy of this model)
+    let hatLocal = null; { let hb = null; obj.traverse(q => { if (q.isBone && stripMx(q.name) === 'Head') hb = q; }); if (hb) { wrap.updateMatrixWorld(true); const bx = new THREE.Box3().setFromObject(wrap, true); const hp = hb.getWorldPosition(new THREE.Vector3()); const m = new THREE.Matrix4().makeTranslation(hp.x, bx.max.y - 0.062, hp.z + 0.01); hatLocal = m.premultiply(new THREE.Matrix4().copy(hb.matrixWorld).invert()); } }
+    const key = 'rb:' + path; NPCKit.tpl[key] = { wrap, clips, rb: true, gender, tone, role, skinLin, masks, bodyTex: tex.body, hatLocal };
     this.loaded.push(key);
   },
   async start() {
@@ -146,7 +153,7 @@ const RB = {
     finally { this.state = this.paused ? 'paused' : 'done'; UI.peoplePack && UI.peoplePack(); }
   },
   pause() { this.paused = true; },
-  spawn(seed, gender, role, eth, rr) {
+  spawn(seed, gender, role, eth, rr, more) {
     const pool = k => NPCKit.tpl[k];
     let cands = this.loaded.filter(k => pool(k).gender === gender && pool(k).role === role);
     if (!cands.length) cands = this.loaded.filter(k => pool(k).gender === gender && (pool(k).role === 'casual' || role === 'casual'));
@@ -161,7 +168,9 @@ const RB = {
     mul.setRGB(clamp(mul.r, 0.2, 2.4), clamp(mul.g, 0.2, 2.4), clamp(mul.b, 0.2, 2.4));
     if (eth === 'B' && T.tone === 'D') { const k = 0.85 + rr() * 0.3; mul = new THREE.Color(k, k, k); }
     const hair = (eth === 'W') ? new THREE.Color().setScalar(0.75 + rr() * 0.35) : new THREE.Color().setScalar(0.22 + rr() * 0.12);
-    const n = new NpcAvatar(key, seed, { skinMul: mul, hairMul: T.tone === 'D' ? null : hair });
+    const o = { skinMul: mul, hairMul: T.tone === 'D' ? null : hair };
+    if (more) { if (more.dress) try { o.bodyMap = more.dress(key); } catch (e) { console.warn('re-dress failed', e); } if (more.hat) o.hat = more.hat; }
+    const n = new NpcAvatar(key, seed, o);
     return { g: n.g, npc: n };
   },
 };
@@ -251,3 +260,74 @@ RB.playerModel = async function (outfit = 'casual') {
   }
   return root;
 };
+
+// =====================================================================
+// RE-DRESSING NPCs — a Rocketbox person's clothes can be repainted in the browser (hospital gown,
+// tie-dye, band tee, hoodie colours). Which texture pixels are shirt, sleeves, trousers or shoes is
+// found by drawing the model's own triangles into texture space, coloured by where they sit on the
+// body; skin (from the skin mask) is left alone, and the original folds and shading are kept.
+// =====================================================================
+const RBDress = {
+  cache: new Map(),
+  regions(T) { // per model: Uint8Array over the body texture, 0 none · 1 top · 2 arms · 3 legs · 4 feet
+    if (T.regionMap) return T.regionMap;
+    const img = T.bodyTex.image, W = img.width, Hh = img.height; const c = cnv(W, Hh), g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, W, Hh);
+    T.wrap.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(T.wrap, true); const h = box.max.y - box.min.y, cx = (box.min.x + box.max.x) / 2;
+    const v = new THREE.Vector3(); const cols = ['#000', '#010000', '#020000', '#030000', '#040000'];
+    T.wrap.traverse(o => {
+      if (!o.isMesh) return; const mats = [].concat(o.material); const geo = o.geometry, pos = geo.attributes.position, uv = geo.attributes.uv; if (!uv) return;
+      const idx = geo.index ? geo.index.array : null; const groups = geo.groups.length ? geo.groups : [{ start: 0, count: idx ? idx.length : pos.count, materialIndex: 0 }];
+      for (const gr of groups) {
+        const m = mats[gr.materialIndex || 0]; if (!m || m.userData.maskKind !== 'body') continue;
+        for (let k = gr.start; k < gr.start + gr.count; k += 3) {
+          const ids = [0, 1, 2].map(j => idx ? idx[k + j] : k + j); let yy = 0, xx = 0;
+          for (const i of ids) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); yy += v.y; xx += Math.abs(v.x - cx); } yy = (yy / 3 - box.min.y) / h; xx = xx / 3 / h;
+          const reg = yy < 0.055 ? 4 : (xx > 0.13 && yy > 0.42) ? 2 : yy > 0.52 ? 1 : 3;
+          g.fillStyle = cols[reg]; g.strokeStyle = cols[reg]; g.lineWidth = 2; g.beginPath();
+          ids.forEach((i, j) => { const px = uv.getX(i) * W, py = (1 - uv.getY(i)) * Hh; j ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath(); g.fill(); g.stroke();
+        }
+      }
+    });
+    const d = g.getImageData(0, 0, W, Hh).data; const R = new Uint8Array(W * Hh); for (let i = 0; i < R.length; i++) R[i] = d[i * 4];
+    return (T.regionMap = R);
+  },
+  // style: { top, arms, legs, feet } — each a function (u, v, x, y) → [r,g,b] or null to keep
+  texture(key, name, style) {
+    const ck = key + '|' + name; if (this.cache.has(ck)) return this.cache.get(ck);
+    const T = NPCKit.tpl[key]; if (!T || !T.bodyTex || !T.bodyTex.image) return null;
+    const img = T.bodyTex.image, W = img.width, Hh = img.height; const R = this.regions(T);
+    const c = cnv(W, Hh), g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0); const im = g.getImageData(0, 0, W, Hh), d = im.data;
+    const mc = cnv(W, Hh), mg = mc.getContext('2d', { willReadFrequently: true }); mg.drawImage(T.masks.body.image, 0, 0, W, Hh); const M = mg.getImageData(0, 0, W, Hh).data;
+    // average brightness of each region's cloth, so shading is relative (keeps folds, drops the old colour)
+    const sum = [0, 0, 0, 0, 0], cnt = [0, 0, 0, 0, 0];
+    for (let i = 0; i < R.length; i++) { const r = R[i]; if (!r || M[i * 4] > 110) continue; sum[r] += d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]; cnt[r]++; }
+    const fns = [null, style.top, style.arms || style.top, style.legs, style.feet];
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, r = R[i]; const fn = fns[r]; if (!fn || M[i * 4] > 110) continue;
+      const col = fn(x / W, y / Hh, x, y); if (!col) continue;
+      const l = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / Math.max(1, sum[r] / cnt[r]); const sh = clamp(0.55 + 0.45 * l, 0.62, 1.12);
+      d[i * 4] = clamp(col[0] * sh, 0, 255); d[i * 4 + 1] = clamp(col[1] * sh, 0, 255); d[i * 4 + 2] = clamp(col[2] * sh, 0, 255);
+    }
+    g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.flipY = T.bodyTex.flipY; t.anisotropy = 4;
+    this.cache.set(ck, t); return t;
+  },
+  rgb(h) { const n = typeof h === 'number' ? h : parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; },
+  // ---- ready-made looks ----
+  gown(key) { const B = [185, 211, 230], N = [52, 74, 128], S = [242, 221, 106]; return this.texture(key, 'gown', {
+    top: (u, v, x, y) => ((x + y) % 14 < 2 && (x - y + 1000) % 14 < 2) ? N : B, legs: (u, v, x, y) => ((x + y) % 14 < 2 && (x - y + 1000) % 14 < 2) ? N : B, feet: () => S }); },
+  tiedye(key, seed) { const P = [[232, 65, 60], [243, 154, 43], [245, 214, 58], [76, 196, 99], [47, 143, 224], [138, 79, 216]]; const r = mulberry32(seed); const cx = 0.3 + r() * 0.4, cy = 0.2 + r() * 0.3, tw = 14 + r() * 10;
+    return this.texture(key, 'tiedye' + (seed % 3), { top: (u, v) => { const a = Math.atan2(v - cy, u - cx), d = Math.hypot(u - cx, v - cy); const k = Math.floor(((a / (Math.PI * 2) + 1) * 6 + d * tw)) % 6; return P[(k + 6) % 6]; } }); },
+  solid(key, name, top, legs) { const T = top && this.rgb(top), L = legs && this.rgb(legs); return this.texture(key, name, { top: T ? () => T : null, legs: L ? () => L : null }); },
+};
+// a knit beanie (optionally with a rasta band) or a bucket hat, in the head bone's space
+function makeHat(kind, color) {
+  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
+  if (kind === 'beanie') {
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), m); crown.scale.set(0.108, 0.115, 0.118); crown.position.y = -0.012; g.add(crown);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8), roughness: 0.95, side: THREE.DoubleSide })); cuff.scale.set(0.11, 0.045, 0.12); cuff.position.y = -0.02; g.add(cuff);
+  } else {
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.105, 0.085, 20), m); top.position.y = 0.012; g.add(top);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.175, 0.01, 24), m); brim.position.y = -0.03; g.add(brim);
+  }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; }); return g;
+}

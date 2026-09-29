@@ -121,6 +121,8 @@ class NpcAvatar {
       } else if (kind === 'michelle') { const k = 0.82 + r() * 0.18; m.color.setRGB(k, k * (0.9 + r() * 0.1), k * (0.88 + r() * 0.12)); }
     }
     if (T.rb) { // Rocketbox: skin tone via shader uniform, hair darkening, slight outfit variety
+      if (opt.bodyMap) for (const m of this.mats) if (m.userData.maskKind === 'body') m.map = opt.bodyMap; // re-dressed clothes
+      if (opt.hat && T.hatLocal && this.bones.Head) { const hat = makeHat(opt.hat.kind, opt.hat.color); hat.matrix.copy(T.hatLocal); hat.matrix.decompose(hat.position, hat.quaternion, hat.scale); this.bones.Head.add(hat); this.hat = hat; }
       for (const m of this.mats) { if (m.userData.skinU) { m.userData.skinU = { value: new THREE.Color().copy(opt.skinMul || new THREE.Color(1, 1, 1)) }; patchSkin(m, T.masks[m.userData.maskKind] || T.masks.body); } if (m.userData.isHair && opt.hairMul) m.color.copy(opt.hairMul); }
     }
     if (kind === 'rpm') { const beard = r() < 0.55; const hat = r() < 0.6; inst.traverse(o => { if (o.isMesh && /Beard/.test(o.name)) o.visible = beard; if (o.isMesh && (o.material?.name || '').includes('Headwear')) o.visible = hat; }); }
@@ -133,6 +135,26 @@ class NpcAvatar {
     this.free = []; inst.traverse(o => { if (o.isBone && !driven.has(o.name)) this.free.push([o, o.quaternion.clone()]); });
     this.lookQ = new THREE.Quaternion(); this.eyeQ = new THREE.Quaternion(); this.t = r() * 20; this.talk = 0; this.acc = 0; this.phase = 0;
   }
+  // body poses layered on top of the idle/walk animation, as world-space turns of the joints
+  // (works on any rig): sit (chair), curb, push, lean, vape (hand to mouth), iv (hand on a pole), kick
+  applyPose(P) {
+    const B = this.bones; this.g.updateMatrixWorld(true);
+    const up = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.g.getWorldQuaternion(new THREE.Quaternion())); fwd.y = 0; fwd.normalize();
+    const lat = new THREE.Vector3().crossVectors(up, fwd).normalize(); // points to the person's left
+    const R = (n, axis, a) => { const b = B[n]; if (!b || !a) return; b.updateMatrixWorld(true); addWorldRotation(b, rotAxis(axis, a)); b.updateMatrixWorld(true); };
+    const k = P.k == null ? 1 : P.k;
+    const legs = (th, kn, side = 0) => { for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) { R(n + 'UpLeg', lat, -th); if (side) R(n + 'UpLeg', fwd, s * side); R(n + 'Leg', lat, kn); } };
+    switch (P.name) {
+      case 'sit': legs(1.5, 1.45, 0.05); R('LeftArm', lat, -0.35); R('RightArm', lat, -0.35); R('LeftForeArm', lat, -0.95); R('RightForeArm', lat, -0.95); break;
+      case 'curb': R('Spine', lat, 0.3); legs(1.95, 2.3, 0.14); R('LeftArm', lat, -0.75); R('RightArm', lat, -0.75); R('LeftForeArm', lat, -0.8); R('RightForeArm', lat, -0.8); break;
+      case 'push': R('Spine', lat, 0.12); R('LeftArm', lat, -0.95); R('RightArm', lat, -0.95); R('LeftForeArm', lat, -0.5); R('RightForeArm', lat, -0.5); break;
+      case 'lean': R('LeftUpLeg', lat, -0.55); R('LeftLeg', lat, 1.2); R('LeftArm', fwd, 0.25); R('RightArm', fwd, -0.25); R('LeftArm', lat, -0.3); R('RightArm', lat, -0.3); R('LeftForeArm', lat, -1.5); R('RightForeArm', lat, -1.5); break;
+      case 'iv': R('RightArm', lat, -0.45); R('RightArm', fwd, -0.3); R('RightForeArm', lat, -0.8); R('Spine', lat, 0.08); break;
+      case 'kick': R('RightUpLeg', lat, -1.0 * k); R('RightUpLeg', fwd, -0.4 * k); R('RightLeg', lat, 1.2 * k); R('LeftArm', fwd, 0.35 + 0.3 * k); R('RightArm', fwd, -0.35 - 0.3 * k); break;
+    }
+    if (P.hand && P.hand > 0.01) { const h = P.hand; R('RightArm', lat, -0.35 * h); R('RightArm', fwd, 0.45 * h); R('RightForeArm', lat, -2.25 * h); } // vape / phone to the face
+    if (P.talkArm && P.talkArm > 0.01) { R('LeftArm', lat, -0.45 * P.talkArm); R('LeftForeArm', lat, -1.0 * P.talkArm); }
+  }
   nod(which = 'agree') { const a = this.act[which]; if (a) { a.reset(); a.setEffectiveWeight(0.8); a.play(); } }
   update(dt, speed, air) {
     const d = camera.position.distanceTo(this.g.position);
@@ -142,6 +164,7 @@ class NpcAvatar {
     if (A.idle) A.idle.setEffectiveWeight(wIdle); if (A.walk) { A.walk.setEffectiveWeight(wWalk); A.walk.timeScale = clamp(speed / 1.35, 0.5, 2); } if (A.run) { A.run.setEffectiveWeight(wRun); A.run.timeScale = clamp(speed / 5, 0.6, 1.6); }
     this.mixer.update(ddt);
     for (const [b, q] of this.free) b.quaternion.copy(q);
+    if (this.pose) this.applyPose(this.pose);
     if (d > 45) return;
     const B = this.bones; this.g.updateMatrixWorld(true);
     const up = _v1.set(0, 1, 0), fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.g.getWorldQuaternion(_q3)), right = new THREE.Vector3().crossVectors(up, fwd).normalize();
@@ -190,4 +213,25 @@ function makeNpc(seed, x, z) {
   if (hosp && r < 0.6) return null;
   let kind = r < 0.55 ? 'rpm' : 'michelle'; if (!NPCKit.tpl[kind]) kind = Object.keys(NPCKit.tpl).find(k => !NPCKit.tpl[k].rb); if (!kind) return null;
   const n = new NpcAvatar(kind, seed); return { g: n.g, npc: n };
+}
+
+// a realistic (people-pack) person for a given part: 'doctor', 'nurse', 'patient', 'visitor', 'stoner'.
+// Returns null when the pack isn't loaded yet (callers then use the simple built-in people).
+function realPerson(role, r) {
+  if (typeof RB === 'undefined' || !RB.count()) return null;
+  const seed = Math.floor(r() * 1e6); let u = r(), eth = 'W'; for (const [k, w] of DEMO) { if (u < w) { eth = k; break; } u -= w; }
+  const has = (rl, g) => RB.loaded.some(k => NPCKit.tpl[k] && NPCKit.tpl[k].role === rl && NPCKit.tpl[k].gender === g);
+  if (role === 'doctor' || role === 'nurse') {
+    let g = role === 'nurse' ? (r() < 0.8 ? 'f' : 'm') : (r() < 0.5 ? 'f' : 'm'); if (!has('medical', g)) g = g === 'f' ? 'm' : 'f'; if (!has('medical', g)) return null;
+    return RB.spawn(seed, g, 'medical', eth, r);
+  }
+  const g = role === 'stoner' ? (r() < 0.35 ? 'f' : 'm') : (r() < 0.5 ? 'f' : 'm');
+  if (role === 'patient') return RB.spawn(seed, g, 'casual', eth, r, { dress: key => RBDress.gown(key) });
+  if (role === 'stoner') {
+    const pal = [0x3e5a3a, 0x5b2a86, 0x2a2a2a, 0x7a4a2a, 0x1f5e5a, 0x8a8f96]; const v = r();
+    const dress = v < 0.45 ? key => RBDress.tiedye(key, seed) : v < 0.7 ? key => RBDress.solid(key, 'band', '#262628', null) : (() => { const c = pal[Math.floor(r() * pal.length)]; return key => RBDress.solid(key, 'hood' + c, c, r() < 0.5 ? '#6b6a4a' : null); })();
+    const h = r(); const hat = h < 0.45 ? { kind: 'beanie', color: pick([0x3f7a3a, 0x7a2e1a, 0xd9a520, 0x2a2a2a, 0x5b2a86], r()) } : h < 0.6 ? { kind: 'bucket', color: pick([0xc9b99a, 0x3e5a3a, 0x2a2a2a], r()) } : null;
+    return RB.spawn(seed, g, 'casual', eth, r, { dress, hat });
+  }
+  return RB.spawn(seed, g, 'casual', eth, r);
 }

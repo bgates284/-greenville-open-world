@@ -23,6 +23,7 @@ const HospitalLife = {
       else if (d > 290 && this.sets.has(key)) { this.drop(this.sets.get(key)); this.sets.delete(key); }
     }
     for (const [key, set] of this.sets) if (!live.has(key)) { this.drop(set); this.sets.delete(key); }
+    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [key, set] of this.sets) if (set.simple && set.spot) { this.drop(set); this.sets.set(key, this.cast(set.spot, set.spots)); break; }
     for (const set of this.sets.values()) for (const a of set.actors) this.step(a, dt);
   },
   clear() { for (const set of this.sets.values()) this.drop(set); this.sets.clear(); },
@@ -51,7 +52,7 @@ const HospitalLife = {
     const v = at(6.6, 0.1); add(this.stander('visitor', r, v[0], v[1], w));
     // a doctor on the phone by the doors
     const ph = at(-4, -0.4); const doc = this.stander('doctor', r, ph[0], ph[1], null); if (doc) { doc.phone = true; doc.yaw = s.yaw; add(doc); }
-    return { actors };
+    return { actors, spot: s, spots, simple: !actors.some(a => a.person.npc) };
   },
   // open path between two points (trimmed where it would enter a building)
   path(a, b) {
@@ -66,12 +67,8 @@ const HospitalLife = {
   },
   person(role, r) {
     const seed = Math.floor(r() * 1e6);
-    // staff use the realistic medical models when the people pack has them
-    if ((role === 'doctor' || role === 'nurse') && typeof RB !== 'undefined' && r() < 0.5) {
-      const g = role === 'nurse' ? (r() < 0.8 ? 'f' : 'm') : (r() < 0.5 ? 'f' : 'm');
-      const has = RB.loaded.some(k => NPCKit.tpl[k] && NPCKit.tpl[k].role === 'medical' && NPCKit.tpl[k].gender === g);
-      if (has) { let u = r(), eth = 'W'; for (const [k, w] of DEMO) { if (u < w) { eth = k; break; } u -= w; } const n = RB.spawn(seed, g, 'medical', eth, r); if (n) { dynRoot.add(n.g); return n; } }
-    }
+    // realistic people-pack models (medical staff, patients re-dressed in gowns) when loaded; simple people otherwise
+    try { const n = realPerson(role, r); if (n) { dynRoot.add(n.g); return n; } } catch (e) { console.warn('realistic hospital person failed', e); }
     const p = makePerson(seed, hospitalLook(r, role)); dynRoot.add(p.g); return p;
   },
   walker(kind, r, path, speed) {
@@ -83,7 +80,7 @@ const HospitalLife = {
     if (kind === 'iv') { const pole = makeIVPole(); dynRoot.add(pole); a.props.push(pole); a.pole = pole; }
     return a;
   },
-  personProc(role, r) { const p = makePerson(Math.floor(r() * 1e6), hospitalLook(r, role)); dynRoot.add(p.g); return p; },
+  personProc(role, r) { return this.person(role, r); },
   stander(role, r, x, z, face) {
     const a = { kind: 'stand', x, z, yaw: face ? Math.atan2(face[0] - x, face[1] - z) : 0, props: [], gest: r() * 4, gT: 0 };
     if (insideBuilding(x, z)) return null;
@@ -102,6 +99,7 @@ const HospitalLife = {
       if (Player.mode === 'walk') { const dx = a.x - Player.pos.x, dz = a.z - Player.pos.z, d = Math.hypot(dx, dz); if (d < 0.7 && d > 1e-3 && a.kind === 'stand') { a.x = Player.pos.x + dx / d * 0.7; a.z = Player.pos.z + dz / d * 0.7; } }
       const y = groundY(a.x, a.z, H(a.x, a.z) + 1);
       if (a.kind === 'chair') { this.placeChair(a.chair, P, a.x, a.z, y, a.yaw); return; }
+      if (P.npc) P.npc.pose = a.phone ? { hand: 1 } : null;
       P.g.position.set(a.x, y, a.z); P.g.rotation.set(0, a.yaw, 0); animatePerson(P, 0, dt); npcLook(P, a.yaw, a.x, a.z, dt);
       if (a.phone && P.B) { P.B.uArmR.rotation.set(-0.35, 0, -0.55); P.B.lArmR.rotation.x = -2.1; P.B.head.rotation.z = -0.12; return; }
       a.gest -= dt; if (a.gest < 0) { a.gest = 2.5 + this.rnd() * 5; a.gT = 1.3; }
@@ -123,7 +121,8 @@ const HospitalLife = {
     a.x = x; a.z = z;
     const want = Math.atan2((p1[0] - p0[0]) * a.dir, (p1[1] - p0[1]) * a.dir); a.yaw += angleDiff(a.yaw, want) * Math.min(1, dt * 5);
     const y = groundY(x, z, H(x, z) + 1); const fx = Math.sin(a.yaw), fz = Math.cos(a.yaw);
-    P.g.position.set(x, y, z); P.g.rotation.set(0, a.yaw, 0); animatePerson(P, v, dt);
+    if (P.npc) P.npc.pose = a.kind === 'push' ? { name: 'push' } : a.kind === 'iv' ? { name: 'iv' } : null;
+    P.g.position.set(x, y, z); P.g.rotation.set(0, a.yaw, 0); animatePerson(P, a.kind === 'iv' ? v * 0.8 : v, dt);
     if (a.kind === 'push') {
       // chair rolls ahead of the nurse; arms forward on the handles, patient seated
       const cx = x + fx * 0.88, cz = z + fz * 0.88; this.placeChair(a.chair, a.rider, cx, cz, groundY(cx, cz, H(cx, cz) + 1), a.yaw, v, dt);
@@ -138,7 +137,9 @@ const HospitalLife = {
   placeChair(ch, rider, x, z, y, yaw, v = 0, dt = 0) {
     ch.position.set(x, y, z); ch.rotation.y = yaw;
     if (v && ch.userData.wheels) for (const w of ch.userData.wheels) w.rotation.x += v * dt / 0.3;
-    const g = rider.g; g.position.set(x - Math.sin(yaw) * 0.05, y, z - Math.cos(yaw) * 0.05); g.rotation.set(0, yaw, 0);
+    const g = rider.g; const drop = rider.npc ? Math.max(0, 0.93 * g.scale.y - 0.6) : 0; // realistic people: lower the whole body onto the seat
+    g.position.set(x - Math.sin(yaw) * (rider.npc ? 0.12 : 0.05), y - drop, z - Math.cos(yaw) * (rider.npc ? 0.12 : 0.05)); g.rotation.set(0, yaw, 0);
+    if (rider.npc) rider.npc.pose = { name: 'sit' };
     animatePerson(rider, 0, dt || 0.016); seatPose(rider);
   },
 };

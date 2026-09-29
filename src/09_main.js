@@ -120,5 +120,5 @@ addEventListener('error', e => showErr((e.message || e.error) + (e.filename ? '\
 addEventListener('unhandledrejection', e => showErr(e.reason && (e.reason.stack || e.reason.message) || e.reason));
 
 // ---- boot ----
-try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Hangouts, Cine, Food, nearestRoad, insideBuilding, onRoadSurface, Env, Store, Net, THREE, scene, renderer, camera, H }; }
+try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, HospitalLife, Hangouts, Cine, RB, NPCKit, Food, nearestRoad, insideBuilding, onRoadSurface, Env, Store, Net, THREE, scene, renderer, camera, H }; }
 catch (e) { console.error(e); showErr('Startup error: ' + (e && e.stack || e)); }

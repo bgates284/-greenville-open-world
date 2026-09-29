@@ -157,7 +157,9 @@ const Peds = {
     const dir = r() < 0.5 ? 1 : -1; let i = n.i, s = n.t; if (dir === -1) { i = n.i + 1; s = 1 - n.t; }
     const p = { road: n.road, i, dir, s: 0, speed: 1.05 + r() * 0.55, side: r() < 0.5 ? 1 : -1, state: 'walk', t: 0, x: 0, z: 0, yaw: 0, ox: 0, oz: 0, lat: 0, latV: 0, hop: 0 };
     const sg = segOf(p); p.s = s * sg.L;
-    p.person = makeNpc(this.seed, x, z) || makePerson(this.seed, nearHospital(x, z) ? hospitalLook(mulberry32(this.seed * 31)) : undefined); this.seed++; dynRoot.add(p.person.g);
+    const hr = nearHospital(x, z) ? mulberry32(this.seed * 31) : null; let hp = null;
+    if (hr) { const u = hr(); try { hp = realPerson(u < 0.2 ? 'doctor' : u < 0.52 ? 'nurse' : u < 0.62 ? 'patient' : 'visitor', hr); } catch (e) { } } // hospital: staff, patients in gowns, visitors
+    p.person = hp || makeNpc(this.seed, x, z) || makePerson(this.seed, hr ? hospitalLook(mulberry32(this.seed * 31)) : undefined); this.seed++; dynRoot.add(p.person.g);
     const lo = this.offset(p); const fdx = p.road.pts[Math.min(p.i, p.i + p.dir) + 1][0] - p.road.pts[Math.min(p.i, p.i + p.dir)][0], fdz = p.road.pts[Math.min(p.i, p.i + p.dir) + 1][1] - p.road.pts[Math.min(p.i, p.i + p.dir)][1]; const fl = Math.hypot(fdx, fdz) || 1;
     p.ox = -fdz / fl * lo; p.oz = fdx / fl * lo;
     p.x = sg.p0[0] + sg.dx * p.s + p.ox; p.z = sg.p0[1] + sg.dz * p.s + p.oz;

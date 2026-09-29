@@ -12,6 +12,8 @@ const Hangouts = {
     near.sort((a, b) => a[0] - b[0]); const want = new Set(near.slice(0, 4).map(n => n[1]));
     for (const [f, set] of this.sets) if (!want.has(f) && Math.hypot(f.x - focus.x, f.z - focus.z) > 270) { this.drop(set); this.sets.delete(f); }
     for (const f of want) if (!this.sets.has(f) && Tiles.readyAround(f.x, f.z, 0)) { const s = this.cast(f); if (s) this.sets.set(f, s); }
+    // once the realistic people have loaded, recast groups that were made of simple people
+    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [f, set] of this.sets) if (set.simple && set.actors.length) { this.drop(set); this.sets.set(f, this.cast(f)); break; }
     for (const set of this.sets.values()) for (const a of set.actors) this.step(a, dt, set);
     this.stepPuffs(dt);
   },
@@ -42,7 +44,7 @@ const Hangouts = {
     const S = this.spot(f); if (!S) return { actors: [], props: [] };
     let h = 0; for (const ch of f.name) h = (h * 31 + ch.charCodeAt(0)) | 0; const r = mulberry32(h);
     const actors = [], props = []; const faceRoad = Math.atan2(S.dx, S.dz);
-    const person = () => { const p = makePerson(Math.floor(r() * 1e6), stonerLook(r)); dynRoot.add(p.g); return p; };
+    const person = () => { let p = null; try { p = realPerson('stoner', r); } catch (e) { console.warn('realistic regular failed', e); } if (!p) p = makePerson(Math.floor(r() * 1e6), stonerLook(r)); dynRoot.add(p.g); return p; };
     const free = (x, z) => !insideBuilding(x, z) && !onRoadSurface(x, z);
     const add = (kind, x, z, yaw, extra) => { if (!free(x, z)) return null; const a = Object.assign({ kind, x, z, yaw, person: person(), t: r() * 10, puffT: 2 + r() * 8, gest: r() * 4 }, extra || {}); actors.push(a); return a; };
     // a loose circle of two or three
@@ -59,7 +61,7 @@ const Hangouts = {
       if (A && B) { const ball = new THREE.Mesh(this.ballGeo || (this.ballGeo = new THREE.IcosahedronGeometry(0.035, 1)), MAT.sack || (MAT.sack = new THREE.MeshStandardMaterial({ color: 0xd9722b, roughness: 0.95 }))); ball.castShadow = true; dynRoot.add(ball); props.push(ball); const game = { ball, A, B, t: 0, from: A, dur: 0.9 }; A.game = game; B.game = game; A.kicker = true; }
       else if (A) A.kind = 'chill';
     }
-    return { actors, props };
+    return { actors, props, simple: !actors.some(a => a.person.npc) };
   },
 
   // ---------- per frame ----------
@@ -67,42 +69,37 @@ const Hangouts = {
     const P = a.person; a.t += dt;
     const y = groundY(a.x, a.z, H(a.x, a.z) + 1);
     if (Player.mode === 'walk' && a.kind !== 'sit') { const dx = a.x - Player.pos.x, dz = a.z - Player.pos.z, d = Math.hypot(dx, dz); if (d < 0.7 && d > 1e-3) { a.x = Player.pos.x + dx / d * 0.7; a.z = Player.pos.z + dz / d * 0.7; } }
-    P.g.position.set(a.x, y, a.z); P.g.rotation.set(0, a.yaw, 0); animatePerson(P, 0, dt);
-    const B = P.B; if (!B) return;
-    // slow, easy body sway and head bob for everyone
-    const sw = Math.sin(a.t * 0.9); B.hips.rotation.z = sw * 0.035; B.spine.rotation.z = -sw * 0.02; B.head.rotation.x = 0.04 + Math.max(0, Math.sin(a.t * 2.1)) * 0.05;
-    if (a.kind === 'lean') { // back against the wall, one foot up on it, arms folded
-      P.g.rotation.set(-0.11, a.yaw, 0, 'YXZ'); B.uLegL.rotation.set(-0.55, 0, 0.05); B.lLegL.rotation.x = 1.25; B.footL.rotation.x = -0.2;
-      B.uArmL.rotation.set(-0.35, 0, 0.35); B.uArmR.rotation.set(-0.35, 0, -0.35); B.lArmL.rotation.set(-1.55, 0.5, 0); B.lArmR.rotation.set(-1.55, -0.5, 0);
-    }
-    if (a.kind === 'sit') { // on the curb, knees up, elbows on knees
-      B.hips.position.y = 0.2; B.spine.rotation.x = 0.28; B.uLegL.rotation.set(-1.25, 0, 0.12); B.uLegR.rotation.set(-1.25, 0, -0.12); B.lLegL.rotation.x = B.lLegR.rotation.x = 2.05; B.footL.rotation.x = B.footR.rotation.x = -0.5;
-      B.uArmL.rotation.set(-0.7, 0, 0.1); B.uArmR.rotation.set(-0.7, 0, -0.1); B.lArmL.rotation.x = B.lArmR.rotation.x = -0.9;
-    }
-    if (a.kind === 'chill') { // chatting: a gesture now and then
-      a.gest -= dt; if (a.gest < 0) { a.gest = 3 + this.rnd() * 6; a.gT = 1.4; }
-      if (a.gT > 0) { a.gT -= dt; const k = Math.sin((1.4 - a.gT) / 1.4 * Math.PI); B.uArmL.rotation.x = -0.45 * k; B.lArmL.rotation.x = -1.0 * k - 0.12; }
-    }
-    if (a.kind === 'sack' && a.game) this.sack(a, B, dt);
-    // a slow drag on the vape, then a cloud
-    if (a.kind !== 'sack') {
+    // what everyone is doing this moment (the same for simple and realistic people)
+    let hand = 0, talk = 0, kick = 0;
+    if (a.kind === 'chill') { a.gest -= dt; if (a.gest < 0) { a.gest = 3 + this.rnd() * 6; a.gT = 1.4; if (P.npc) { P.npc.talk = 1.5 + this.rnd() * 2; if (this.rnd() < 0.35) P.npc.nod('agree'); } } if (a.gT > 0) { a.gT -= dt; talk = Math.sin((1.4 - a.gT) / 1.4 * Math.PI); } }
+    if (a.kind === 'sack' && a.game) kick = this.sackTick(a, dt);
+    if (a.kind !== 'sack') { // a slow drag on the vape, then a cloud
       a.puffT -= dt;
-      if (a.puffT < 1.3 && a.puffT > 0) { const k = Math.sin(Math.min(1, (1.3 - a.puffT) / 0.5) * Math.PI / 2); B.uArmR.rotation.set(-0.3 * k - (a.kind === 'sit' ? 0.7 : 0), 0, -0.55 * k); B.lArmR.rotation.set(-2.15 * k - 0.12, 0, 0); }
-      if (a.puffT <= 0) { a.puffT = 6 + this.rnd() * 10; const hy = a.kind === 'sit' ? 1.0 : a.kind === 'lean' ? 1.58 : 1.6; this.cloud(a.x + Math.sin(a.yaw) * 0.18, y + hy * (P.look ? P.look.scale : 1), a.z + Math.cos(a.yaw) * 0.18, Math.sin(a.yaw), Math.cos(a.yaw)); }
+      if (a.puffT < 1.3 && a.puffT > 0) hand = Math.sin(Math.min(1, (1.3 - a.puffT) / 0.5) * Math.PI / 2);
+      if (a.puffT <= 0) { a.puffT = 6 + this.rnd() * 10; const sc = P.npc ? P.g.scale.y : (P.look ? P.look.scale : 1); const hy = (a.kind === 'sit' ? 1.0 : 1.6) * sc; this.cloud(a.x + Math.sin(a.yaw) * 0.18, y + hy, a.z + Math.cos(a.yaw) * 0.18, Math.sin(a.yaw), Math.cos(a.yaw)); }
     }
+    let drop = 0;
+    if (P.npc) { P.npc.pose = { name: a.kind === 'lean' ? 'lean' : a.kind === 'sit' ? 'curb' : a.kind === 'sack' ? 'kick' : null, k: kick, hand, talkArm: talk }; if (a.kind === 'sit') drop = Math.max(0, 0.93 * P.g.scale.y - 0.28); }
+    P.g.position.set(a.x, y - drop, a.z); P.g.rotation.set(a.kind === 'lean' ? -0.09 : 0, a.yaw, 0, 'YXZ'); animatePerson(P, 0, dt);
+    const B = P.B; if (!B) return;
+    // simple people: same poses with their own bones
+    const sw = Math.sin(a.t * 0.9); B.hips.rotation.z = sw * 0.035; B.spine.rotation.z = -sw * 0.02; B.head.rotation.x = 0.04 + Math.max(0, Math.sin(a.t * 2.1)) * 0.05;
+    if (a.kind === 'lean') { B.uLegL.rotation.set(-0.55, 0, 0.05); B.lLegL.rotation.x = 1.25; B.footL.rotation.x = -0.2; B.uArmL.rotation.set(-0.35, 0, 0.35); B.uArmR.rotation.set(-0.35, 0, -0.35); B.lArmL.rotation.set(-1.55, 0.5, 0); B.lArmR.rotation.set(-1.55, -0.5, 0); }
+    if (a.kind === 'sit') { B.hips.position.y = 0.2; B.spine.rotation.x = 0.28; B.uLegL.rotation.set(-1.25, 0, 0.12); B.uLegR.rotation.set(-1.25, 0, -0.12); B.lLegL.rotation.x = B.lLegR.rotation.x = 2.05; B.footL.rotation.x = B.footR.rotation.x = -0.5; B.uArmL.rotation.set(-0.7, 0, 0.1); B.uArmR.rotation.set(-0.7, 0, -0.1); B.lArmL.rotation.x = B.lArmR.rotation.x = -0.9; }
+    if (talk) { B.uArmL.rotation.x = -0.45 * talk; B.lArmL.rotation.x = -1.0 * talk - 0.12; }
+    if (a.kind === 'sack') { B.uLegR.rotation.set(-1.0 * kick, 0, 0.45 * kick); B.lLegR.rotation.x = 1.3 * kick; B.footR.rotation.x = 0; B.uArmL.rotation.set(0, 0, 0.3 + 0.3 * kick); B.uArmR.rotation.set(0, 0, -0.3 - 0.3 * kick); B.spine.rotation.x = 0.15; }
+    if (hand) { B.uArmR.rotation.set(-0.3 * hand - (a.kind === 'sit' ? 0.7 : 0), 0, -0.55 * hand); B.lArmR.rotation.set(-2.15 * hand - 0.12, 0, 0); }
   },
-  sack(a, B, dt) {
-    const G = a.game; if (a !== G.A) { this.kickPose(a, B, G); return; } // one of the pair runs the ball
-    G.t += dt; if (G.t > G.dur) { G.t = 0; G.from = G.from === G.A ? G.B : G.A; G.dur = 0.8 + this.rnd() * 0.4; }
-    const fr = G.from, to = G.from === G.A ? G.B : G.A; const k = G.t / G.dur;
-    const fx = fr.x + Math.sin(fr.yaw) * 0.35, fz = fr.z + Math.cos(fr.yaw) * 0.35, tx = to.x + Math.sin(to.yaw) * 0.35, tz = to.z + Math.cos(to.yaw) * 0.35;
-    const gy = groundY(fx, fz, H(fx, fz) + 1); G.ball.position.set(fx + (tx - fx) * k, gy + 0.45 + Math.sin(k * Math.PI) * 1.1, fz + (tz - fz) * k); G.ball.rotation.x += dt * 9;
-    this.kickPose(a, B, G);
-  },
-  kickPose(a, B, G) { // knee comes up just as the ball arrives
+  sackTick(a, dt) { // the pair's ball: one of them runs the timing; each lifts a knee just as it arrives
+    const G = a.game;
+    if (a === G.A) {
+      G.t += dt; if (G.t > G.dur) { G.t = 0; G.from = G.from === G.A ? G.B : G.A; G.dur = 0.8 + this.rnd() * 0.4; }
+      const fr = G.from, to = G.from === G.A ? G.B : G.A; const k = G.t / G.dur;
+      const fx = fr.x + Math.sin(fr.yaw) * 0.35, fz = fr.z + Math.cos(fr.yaw) * 0.35, tx = to.x + Math.sin(to.yaw) * 0.35, tz = to.z + Math.cos(to.yaw) * 0.35;
+      const gy = groundY(fx, fz, H(fx, fz) + 1); G.ball.position.set(fx + (tx - fx) * k, gy + 0.45 + Math.sin(k * Math.PI) * 1.1, fz + (tz - fz) * k); G.ball.rotation.x += dt * 9;
+    }
     const arriving = (G.from !== a) && G.t > G.dur * 0.75, leaving = G.from === a && G.t < G.dur * 0.2;
-    const k = arriving ? (G.t - G.dur * 0.75) / (G.dur * 0.25) : leaving ? 1 - G.t / (G.dur * 0.2) : 0;
-    B.uLegR.rotation.set(-1.0 * k, 0, 0.45 * k); B.lLegR.rotation.x = 1.3 * k; B.footR.rotation.x = 0; B.uArmL.rotation.set(0, 0, 0.3 + 0.3 * k); B.uArmR.rotation.set(0, 0, -0.3 - 0.3 * k); B.spine.rotation.x = 0.15;
+    return arriving ? (G.t - G.dur * 0.75) / (G.dur * 0.25) : leaving ? 1 - G.t / (G.dur * 0.2) : 0;
   },
 
   // ---------- vape clouds ----------
