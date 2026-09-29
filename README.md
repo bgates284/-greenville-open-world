@@ -56,7 +56,7 @@ The game is published from this repo by `.github/workflows/pages.yml` on every p
 The hosted version reads map squares from `public-data/osm/` first (no waiting on the map server),
 and only downloads squares that aren't packed yet.
 
-To download the whole city at once and publish it, double-click **`fetch-city.cmd`** (or run
+To download all of Pitt County (Greenville plus Winterville, Ayden, Farmville, Bethel, Grifton, Fountain, Falkland, Grimesland, Simpson and the countryside, about 2,700 map squares) and publish it, double-click **`fetch-county.cmd`**. It takes a couple of hours the first time and skips anything already downloaded, so you can stop it and run it again later. For just Greenville, double-click **`fetch-city.cmd`** (or run
 `npm run fetch-city`, then `publish.cmd`). It asks the map server for the city in ~30 large pieces,
 splits them into squares on your PC, packs them into `public-data/osm/`, commits and pushes. If a
 busy server skips some squares, just run it again — it only fetches what's missing.

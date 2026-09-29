@@ -83,6 +83,7 @@ function landmarkExtras(LM, B, T, ctx) {
         const ux = Math.cos(yaw), uz = -Math.sin(yaw); // along the wall
         const g0 = H(mx, mz);
         box(mx + e.nx * depth / 2, mz + e.nz * depth / 2, g0 - 0.3, g0 + 0.9, w / 2 + 0.6, depth / 2 + 0.6, yaw, WHITE); // steps / plinth
+        { const c = Math.cos(yaw), sn = Math.sin(yaw), px = mx + e.nx * depth / 2, pz = mz + e.nz * depth / 2, hw = w / 2 + 0.6, hd = depth / 2 + 0.6; addDeck(T, [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => [px + u * c + v * sn, pz - u * sn + v * c]), g0 + 0.9); }
         for (let k = 0; k < n; k++) { const f = -w / 2 + (k + 0.5) * w / n; const x = mx + ux * f + e.nx * (depth - 0.6), z = mz + uz * f + e.nz * (depth - 0.6); const cg = new THREE.CylinderGeometry(0.42, 0.5, colH, 14); cg.translate(x, g0 + 0.9 + colH / 2, z); addGeoTo(decor, cg, WHITE); }
         const yT = g0 + 0.9 + colH; box(mx + e.nx * depth / 2, mz + e.nz * depth / 2, yT, yT + 1.1, w / 2 + 0.4, depth / 2 + 0.2, yaw, WHITE); // entablature
         // pediment

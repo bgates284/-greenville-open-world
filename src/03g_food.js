@@ -114,7 +114,7 @@ const Food = {
       const meta = await Store.get('meta', 'places');
       if (meta && meta.rows) this.set(meta.rows);
       if (meta && Date.now() - meta.t < 7 * 864e5) return;
-      const bb = '(35.535,-77.47,35.67,-77.28)';
+      const bb = `(${COUNTY.s},${COUNTY.w},${COUNTY.n},${COUNTY.e})`; // restaurants & shops in every Pitt County town
       const q = `[out:json][timeout:120];(nwr["amenity"~"^(restaurant|fast_food|cafe|ice_cream|food_court|bar|pub|biergarten|fuel)$"]${bb};nwr["shop"]${bb};nwr["landuse"="retail"]["name"]${bb};);out center tags;`;
       const j = window.GV_PROVIDER ? null : await overpassFetch(q); if (!j) return;
       const rows = j.elements.filter(e => e.tags && e.tags.name && !/auction|mortuary|funeral|highway patrol/i.test(e.tags.name) && !/^(vacant|no|funeral_directors|erotic)$/.test(e.tags.shop || '')).map(e => { const t = e.tags; const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon; const type = t.shop || (t.landuse === 'retail' ? 'centre' : t.amenity); return [t.name, t.brand ? 1 : 0, type, t.cuisine || '', +la.toFixed(6), +lo.toFixed(6), e.type[0] + e.id, t.drive_through === 'yes' ? 1 : 0]; });

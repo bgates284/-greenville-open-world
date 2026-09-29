@@ -1,4 +1,4 @@
-// Downloads the whole city's map data in a few large requests and splits it into map squares
+// Downloads the map data for all of Pitt County (or just Greenville with --city) in a few large requests and splits it into map squares
 // locally (much faster than asking the busy public map server for ~255 squares one by one).
 //   npm run fetch-city            → fills .cache/overpass/ (what the dev server and pack-data use)
 //   npm run fetch-city -- --pack  → also copies everything into public-data/osm/ for the hosted site
@@ -99,16 +99,23 @@ async function fetchBlock(x0, y0, x1, y1, depth = 0) {
   return n;
 }
 
-const B = +(process.env.BLOCK || 3);
-const [cx0, cy0] = G.tileOfLL(G.CITY.s, G.CITY.w), [cx1, cy1] = G.tileOfLL(G.CITY.n, G.CITY.e);
+// area: all of Pitt County by default, or just Greenville with --city
+const AREA = process.argv.includes('--city') ? G.CITY : G.COUNTY, AREA_NAME = process.argv.includes('--city') ? 'Greenville' : 'Pitt County';
+const [cx0, cy0] = G.tileOfLL(AREA.s, AREA.w), [cx1, cy1] = G.tileOfLL(AREA.n, AREA.e);
+const [gx0, gy0] = G.tileOfLL(G.CITY.s, G.CITY.w), [gx1, gy1] = G.tileOfLL(G.CITY.n, G.CITY.e);
+// block size: 3×3 squares in town, 5×5 out in the countryside where there's far less data per square
+const B = +(process.env.BLOCK || 5);
+const inTown = (x0, y0, x1, y1) => x1 >= gx0 && x0 <= gx1 && y1 >= gy0 && y0 <= gy1;
 const total = (cx1 - cx0 + 1) * (cy1 - cy0 + 1); let missing = 0;
 for (let ty = cy0; ty <= cy1; ty++) for (let tx = cx0; tx <= cx1; tx++) if (!have(tx, ty)) missing++;
-console.log(`Greenville: ${total} map squares, ${total - missing} already downloaded, ${missing} to go.`);
+console.log(`${AREA_NAME}: ${total} map squares, ${total - missing} already downloaded, ${missing} to go.`);
 const t0 = Date.now(); let got = 0;
 for (let by = cy0; by <= cy1; by += B) for (let bx = cx0; bx <= cx1; bx += B) {
-  got += await fetchBlock(bx, by, Math.min(cx1, bx + B - 1), Math.min(cy1, by + B - 1));
+  const x1 = Math.min(cx1, bx + B - 1), y1 = Math.min(cy1, by + B - 1);
+  if (inTown(bx, by, x1, y1) && B > 3) { for (let sy = by; sy <= y1; sy += 3) for (let sx = bx; sx <= x1; sx += 3) got += await fetchBlock(sx, sy, Math.min(x1, sx + 2), Math.min(y1, sy + 2)); }
+  else got += await fetchBlock(bx, by, x1, y1);
   console.log(`  … ${got} of ${missing} new squares saved (${Math.round((Date.now() - t0) / 60000)} min)`);
 }
 let left = 0; for (let ty = cy0; ty <= cy1; ty++) for (let tx = cx0; tx <= cx1; tx++) if (!have(tx, ty)) left++;
-console.log(left ? `Done for now: ${left} squares couldn't be downloaded (busy servers) — run this again to get them.` : 'The whole city is downloaded.');
+console.log(left ? `Done for now: ${left} squares couldn't be downloaded (busy servers) — run this again to get them.` : `All of ${AREA_NAME} is downloaded.`);
 if (process.argv.includes('--pack')) packData(root);

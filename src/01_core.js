@@ -24,6 +24,7 @@ const tileKey = (tx, ty) => tx + ',' + ty;
 function tileBBox(tx, ty) { const w = LON0 + tx * TLON, s = LAT0 + ty * TLAT; return { w, s, e: w + TLON, n: s + TLAT }; }
 function tileWorld(tx, ty) { const b = tileBBox(tx, ty); return { x0: lonToX(b.w), x1: lonToX(b.e), z0: latToZ(b.n), z1: latToZ(b.s) }; }
 const CITY = { s: 35.53, n: 35.675, w: -77.47, e: -77.28 };  // Greenville city limits + ETJ, Winterville edge, airport, Simpson
+const COUNTY = { s: 35.36, n: 35.84, w: -77.70, e: -77.05 }; // all of Pitt County: Bethel to Grifton, Farmville/Fountain to Grimesland
 
 const LANDMARKS = [
   ['Pitt-Greenville Airport · your plane', 35.6316, -77.3871],
@@ -38,6 +39,16 @@ const LANDMARKS = [
   ['Arlington Boulevard', 35.5918, -77.3927],
   ['Greenville Convention Center', 35.5730, -77.3911],
   ['River Park North', 35.6277, -77.3561],
+  ['Winterville · Main St', 35.5290, -77.4011],
+  ['Ayden · Downtown', 35.4727, -77.4155],
+  ['Farmville · Main St', 35.5954, -77.5853],
+  ['Bethel · Main St', 35.8071, -77.3786],
+  ['Grifton · Downtown', 35.3724, -77.4386],
+  ['Fountain', 35.6721, -77.6358],
+  ['Falkland', 35.6999, -77.5139],
+  ['Grimesland', 35.5637, -77.1928],
+  ['Simpson', 35.5760, -77.2786],
+  ['Stokes', 35.7115, -77.2733],
 ];
 
 const QUALITY = {
@@ -339,7 +350,21 @@ function demAt(ix, iy) {
   if (k !== _dk) { _dk = k; _dt = demTiles.get(k) || null; }
   return _dt ? _dt[(iy & 255) * 256 + (ix & 255)] : DEM_FALLBACK;
 }
+// Ground height. The rendered terrain is a grid of TGRID×TGRID cells per map square (≈11 m), so H returns
+// the height of that exact triangle surface — people, roads, sidewalks and props all stand on what you see,
+// instead of on the raw 8 m elevation data that the coarser mesh only approximates.
+const TGRID = 96;
 function H(x, z) {
+  const [tx, ty] = tileOfXZ(x, z); const W = tileWorld(tx, ty);
+  const cx = (W.x1 - W.x0) / TGRID, cz = (W.z1 - W.z0) / TGRID;
+  const gi = (x - W.x0) / cx, gj = (z - W.z0) / cz; let i = Math.floor(gi), j = Math.floor(gj); i = Math.min(TGRID - 1, Math.max(0, i)); j = Math.min(TGRID - 1, Math.max(0, j));
+  const fx = gi - i, fz = gj - j; const x0 = W.x0 + i * cx, z0 = W.z0 + j * cz;
+  // same diagonal as buildTerrainMesh: triangles (i,j)(i,j+1)(i+1,j) and (i+1,j)(i,j+1)(i+1,j+1)
+  const hb = Hraw(x0, z0 + cz), hc = Hraw(x0 + cx, z0);
+  if (fx + fz <= 1) { const ha = Hraw(x0, z0); return ha + (hc - ha) * fx + (hb - ha) * fz; }
+  const hd = Hraw(x0 + cx, z0 + cz); return hd + (hb - hd) * (1 - fx) + (hc - hd) * (1 - fz);
+}
+function Hraw(x, z) { // raw elevation data (bilinear)
   const px = lonToPX(xToLon(x)) - 0.5, py = latToPY(zToLat(z)) - 0.5;
   const ix = Math.floor(px), iy = Math.floor(py), fx = px - ix, fy = py - iy;
   const a = demAt(ix, iy), b = demAt(ix + 1, iy), c = demAt(ix, iy + 1), d = demAt(ix + 1, iy + 1);

@@ -204,20 +204,26 @@ function paintLine(R, Ry, ln, clearAt, mk) {
 // ---- walkable ground height: terrain, road deck, sidewalk top ----
 function groundY(x, z, yRef) {
   let y = surfaceY(x, z, yRef);
+  // porches, plinths and steps you can walk up onto
+  for (const it of World.deckHash.query(x, z, x, z)) if ((yRef === undefined || it.top <= yRef + 1.2) && pointInPoly(x, z, it.poly)) y = Math.max(y, it.top);
   const n = nearestRoad(x, z, 18, r => r.mesh && !r.bridge);
   if (!n) return y;
-  const r = n.road, hw = r.w / 2, g = H(x, z);
-  if (n.d < hw + 0.2) return Math.max(y, g + 0.15 + r.rank * 0.012);
+  const r = n.road, hw = r.w / 2;
+  // the road and sidewalk meshes take their height from their own centre line, so measure there too
+  if (n.d < hw + 0.2) return Math.max(y, H(n.x, n.z) + 0.15 + r.rank * 0.012);
   if (r.sidewalk && n.d < hw + 2.3) {
     // which side of the road, and is there a sidewalk there (and not in the gap at a junction)?
     const a = r.pts[n.i], b = r.pts[n.i + 1]; const dx = b[0] - a[0], dz = b[1] - a[1]; const side = ((x - n.x) * -dz + (z - n.z) * dx) > 0 ? 1 : -1;
     const ok = r.sidewalk === 'both' || (r.sidewalk === 'right' && side > 0) || (r.sidewalk === 'left' && side < 0);
-    if (ok) return Math.max(y, g + 0.3);
+    if (ok) { const l = Math.hypot(dx, dz) || 1, o = hw + 1.125; const sx = n.x + (-dz / l) * o * side, sz = n.z + (dx / l) * o * side; return Math.max(y, H(sx, sz) + 0.3); }
   }
   // sidewalk corners at intersections
-  if (World.walkHash) for (const it of World.walkHash.query(x, z, x, z)) if (pointInPoly(x, z, it.poly)) return Math.max(y, g + 0.3);
+  if (World.walkHash) for (const it of World.walkHash.query(x, z, x, z)) if (pointInPoly(x, z, it.poly)) return Math.max(y, H(x, z) + 0.3);
   return y;
 }
+// register a raised walkable surface (poly in x/z, top height); removed with the map square
+function addDeck(T, poly, top) { const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]); T.hashItems.push([World.deckHash, World.deckHash.insert({ poly, top }, Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs))]); }
+function boxPoly(cx, cz, ux, uz, hl, hw) { const vx = -uz, vz = ux; return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [cx + ux * hl * s + vx * hw * t, cz + uz * hl * s + vz * hw * t]); }
 
 // ---- parking lots: painted stall lines laid out on the same rows buildParked fills with cars ----
 function buildParkingLines(T, P, mk) {

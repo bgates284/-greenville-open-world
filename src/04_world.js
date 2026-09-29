@@ -19,6 +19,7 @@ const World = {
   roads: new Map(), nodeAdj: new Map(),
   segHash: new SpatialHash(30), bridgeHash: new SpatialHash(30),
   bldHash: new SpatialHash(20), obsHash: new SpatialHash(12), mmHash: new SpatialHash(150),
+  deckHash: new SpatialHash(20), // raised walkable surfaces: porches, plinths, steps  ({poly, top})
   signals: new Map(), stops: new Set(), areas: [],
 };
 function parseLen(v) { if (v == null) return NaN; const m = String(v).match(/-?[\d.]+/); if (!m) return NaN; let n = parseFloat(m[0]); if (/ft|'/.test(v)) n *= 0.3048; return n; }
@@ -321,11 +322,11 @@ function offsetLine(pts, off) {
 }
 
 function buildTerrainMesh(T) {
-  const W = T.W, N = Q.grid;
+  const W = T.W, N = TGRID; // must match H() in 01_core.js
   const pos = new Float32Array((N + 1) * (N + 1) * 3), uv = new Float32Array((N + 1) * (N + 1) * 2);
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
     const k = j * (N + 1) + i, x = W.x0 + (W.x1 - W.x0) * i / N, z = W.z0 + (W.z1 - W.z0) * j / N;
-    pos[3 * k] = x; pos[3 * k + 1] = H(x, z); pos[3 * k + 2] = z; uv[2 * k] = i / N; uv[2 * k + 1] = j / N;
+    pos[3 * k] = x; pos[3 * k + 1] = Hraw(x, z); pos[3 * k + 2] = z; uv[2 * k] = i / N; uv[2 * k + 1] = j / N;
   }
   const idx = [];
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -480,7 +481,7 @@ function buildRoadMeshes(T, P) {
         // clear stretches between junctions, cut exactly where each junction's corner begins
         const blocks = js.map(([c, e]) => [c - e, c + e]).sort((p, q) => p[0] - q[0]); let s0 = 0; const total = R[R.length - 1][2];
         const runs = []; for (const [b0, b1] of blocks) { if (b0 > s0) runs.push([s0, b0]); s0 = Math.max(s0, b1); } if (s0 < total) runs.push([s0, total]);
-        for (const [r0, r1] of runs) { if (r1 - r0 < 0.6) continue; const sub = clipPath(R, r0, r1); if (sub.length >= 2) strip(sw, sub, side * (road.w / 2 + 1.125), 2.25, p => H(p[0], p[1]) + 0.3, 1 / 6, true); } // curb + sidewalk
+        for (const [r0, r1] of runs) { if (r1 - r0 < 0.6) continue; const sub = clipPath(R, r0, r1); if (sub.length >= 2) strip(sw, sub, side * (road.w / 2 + 1.125), 2.25, (p, i) => { const o = side * (road.w / 2 + 1.125), a = sub[Math.max(0, i - 1)], b = sub[Math.min(sub.length - 1, i + 1)]; const tx = b[0] - a[0], tz = b[1] - a[1], tl = Math.hypot(tx, tz) || 1; return H(p[0] - tz / tl * o, p[1] + tx / tl * o) + 0.3; }, 1 / 6, true); } // curb + sidewalk
       }
     }
     // street lamps

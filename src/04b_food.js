@@ -279,7 +279,7 @@ function foodBuilder(T, P, ctx) {
       const A2 = [a[0] + fnx * depth, a[1] + fnz * depth], B2 = [b[0] + fnx * depth, b[1] + fnz * depth];
       dress.quad([a[0], yy + 0.5, a[1]], [b[0], yy + 0.5, b[1]], [B2[0], yy, B2[1]], [A2[0], yy, A2[1]], [0, 0], [0, 0], [0, 0], [0, 0], [fnx * 0.3, 1, fnz * 0.3], C('#4d463f'));
       dress.quad([a[0], yy + 0.5, a[1]], [b[0], yy + 0.5, b[1]], [B2[0], yy, B2[1]], [A2[0], yy, A2[1]], [0, 0], [0, 0], [0, 0], [0, 0], [-fnx * 0.3, -1, -fnz * 0.3], C('#d8cbb3'));
-      box((a[0] + b[0]) / 2 + fnx * depth / 2, (a[1] + b[1]) / 2 + fnz * depth / 2, ux, uz, flen / 2, depth / 2, g0 - 0.3, g0 + 0.35, C('#8a6a4a'));
+      box((a[0] + b[0]) / 2 + fnx * depth / 2, (a[1] + b[1]) / 2 + fnz * depth / 2, ux, uz, flen / 2, depth / 2, g0 - 0.3, g0 + 0.35, C('#8a6a4a')); addDeck(T, boxPoly((a[0] + b[0]) / 2 + fnx * depth / 2, (a[1] + b[1]) / 2 + fnz * depth / 2, ux, uz, flen / 2, depth / 2), g0 + 0.35);
       for (let s = 0.4; s < flen; s += 2.6) { const px = a[0] + ux * s + fnx * (depth - 0.2), pz = a[1] + uz * s + fnz * (depth - 0.2); box(px, pz, ux, uz, 0.1, 0.1, g0 + 0.35, yy + 0.05, C('#efe8da')); }
       for (let s = 1.6; s < flen - 1; s += 1.9) { const px = a[0] + ux * s + fnx * 1.4, pz = a[1] + uz * s + fnz * 1.4; box(px, pz, ux, uz, 0.28, 0.3, g0 + 0.35, g0 + 0.8, C('#3f2c1f')); box(px - fnx * 0.25, pz - fnz * 0.25, ux, uz, 0.28, 0.05, g0 + 0.8, g0 + 1.45, C('#3f2c1f')); }
     }
