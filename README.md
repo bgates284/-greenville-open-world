@@ -67,3 +67,19 @@ npm run pack-data    → copies downloaded squares into public-data/osm/
 git add public-data && git commit -m "More map squares" && git push
 ```
 `npm run site` builds the hosted version locally into `site/` if you want to check it first.
+
+## Real-world layers
+
+Each map square also loads three public datasets (saved on your PC after the first download; the game
+falls back to its own guesses wherever one isn't available):
+
+- **Aerial photos** — USGS National Map NAIP imagery (USDA summer aerial photography, ~0.6 m,
+  public domain), draped on the ground.
+- **Buildings** — NC Emergency Management's statewide *NC Risk Building Footprints* (every structure,
+  with storeys and occupancy type). Adds the buildings OpenStreetMap is missing, mostly in the
+  countryside, and gives mapped buildings their storeys. Footprints date from 2009–12, so ones now
+  under a road or a mapped parking lot are skipped.
+- **Trees** — Meta / World Resources Institute 1 m canopy height map. Trees stand on the real tree tops
+  at their real heights. This one is processed once on your PC: double-click **`fetch-canopy.cmd`**
+  (about 550 MB is read from the source files; it resumes if stopped), then `publish.cmd`. It saves
+  ~2,700 small files in `public-data/canopy/`.

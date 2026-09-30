@@ -49,9 +49,9 @@ const Airport = {
   paint(g, kg) {
     this.init();
     const poly = (ctx, pts) => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill(); };
-    g.fillStyle = '#6a9143'; kg.fillStyle = '#000';
-    for (const r of this.clear) { const c = this.corners(r); poly(g, c); poly(kg, c); }
-    g.fillStyle = '#48494c'; for (const r of this.rects) poly(g, this.corners(r));
+    kg.fillStyle = '#000'; if (g) g.fillStyle = '#6a9143';
+    for (const r of this.clear) { const c = this.corners(r); if (g) poly(g, c); poly(kg, c); }
+    if (g) { g.fillStyle = '#48494c'; for (const r of this.rects) poly(g, this.corners(r)); }
   },
   async ensure() {
     this.init(); if (this.built || this.building) return; this.building = true;

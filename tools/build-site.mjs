@@ -13,6 +13,9 @@ html = html.replace('<script type="importmap">', '<script>window.GV_DATA = "data
 fs.writeFileSync(path.join(site, 'index.html'), html);
 const dataSrc = path.join(root, 'public-data', 'osm'); let n = 0;
 if (fs.existsSync(dataSrc)) for (const f of fs.readdirSync(dataSrc)) { fs.copyFileSync(path.join(dataSrc, f), path.join(site, 'data', 'osm', f)); if (f.endsWith('.gz')) n++; }
+// tree canopy heights per square (npm run fetch-canopy)
+const canSrc = path.join(root, 'public-data', 'canopy'); let nc = 0;
+if (fs.existsSync(canSrc)) { fs.mkdirSync(path.join(site, 'data', 'canopy'), { recursive: true }); for (const f of fs.readdirSync(canSrc)) { fs.copyFileSync(path.join(canSrc, f), path.join(site, 'data', 'canopy', f)); if (f.endsWith('.gz')) nc++; } }
 if (!fs.existsSync(path.join(site, 'data', 'osm', 'index.json'))) fs.writeFileSync(path.join(site, 'data', 'osm', 'index.json'), '[]');
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
-console.log(`Built site/ — game ${Math.round(html.length / 1024)} KB, ${n} packed map squares`);
+console.log(`Built site/ — game ${Math.round(html.length / 1024)} KB, ${n} packed map squares, ${nc} canopy squares`);

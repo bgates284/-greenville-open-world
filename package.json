@@ -12,9 +12,11 @@
     "check": "node tools/check.mjs",
     "pack-data": "node tools/pack-data.mjs",
     "site": "node tools/build-site.mjs",
-    "fetch-city": "node tools/fetch-city.mjs --pack"
+    "fetch-city": "node tools/fetch-city.mjs --pack",
+    "fetch-canopy": "node tools/fetch-canopy.mjs"
   },
   "devDependencies": {
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "geotiff": "^2.1.3"
   }
 }

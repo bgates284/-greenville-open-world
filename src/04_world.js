@@ -252,10 +252,11 @@ function paintTerrain(T, P) {
   const rc = cnv(256, 256), rg = rc.getContext('2d');
   const kc = cnv(512, 512), kg = kc.getContext('2d', { willReadFrequently: true });
   const setT = (ctx, s) => ctx.setTransform(s / sx, 0, 0, s / sz, -W.x0 * s / sx, -W.z0 * s / sz);
-  // base ground: unmapped land in town is mostly lawn / fields
-  g.fillStyle = '#5f7f3a'; g.fillRect(0, 0, S, S);
-  const r = mulberry32(T.tx * 7919 + T.ty * 104729);
-  for (let i = 0; i < 260; i++) {
+  // base ground: the real aerial photo when we have it (03k_realdata.js), else lawn / fields
+  const AER = !!T.aerial; T.aerialUsed = AER; const r = mulberry32(T.tx * 7919 + T.ty * 104729);
+  if (AER) { g.filter = 'saturate(1.1) contrast(1.05) brightness(1.12)'; g.drawImage(T.aerial, 0, 0, S, S); g.filter = 'none'; }
+  else g.fillStyle = '#5f7f3a', g.fillRect(0, 0, S, S);
+  if (!AER) for (let i = 0; i < 260; i++) {
     const x = r() * S, y = r() * S, rad = (8 + r() * 60) * S / 1024;
     const col = pick(['rgba(110,140,66,.30)', 'rgba(84,112,52,.30)', 'rgba(128,132,72,.22)', 'rgba(70,98,44,.28)', 'rgba(140,128,86,.14)'], r());
     const gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
@@ -267,6 +268,10 @@ function paintTerrain(T, P) {
   for (const a of areas) { try { paintArea(a); } catch (e) { } }
   function paintArea(a) {
     const st = AREA_STYLE[a.kind];
+    if (AER) { // the photo already shows it; only the masks (water, tree classes) are needed
+      if (a.kind === 'water') { ringsPath(rg, a.rings, a.holes); rg.fillStyle = '#000'; rg.fill('evenodd'); }
+      ringsPath(kg, a.rings, a.holes); kg.fillStyle = `rgb(${st.cls},${st.cls},${st.cls})`; kg.fill('evenodd'); return;
+    }
     ringsPath(g, a.rings, a.holes); g.fillStyle = st.c; g.fill('evenodd');
     if (a.kind === 'farmland') { g.save(); ringsPath(g, a.rings, a.holes); g.clip('evenodd'); g.strokeStyle = 'rgba(70,90,40,.45)'; g.lineWidth = 1.2; const bb = a.rings[0].reduce((m, p) => [Math.min(m[0], p[0]), Math.min(m[1], p[1]), Math.max(m[2], p[0]), Math.max(m[3], p[1])], [1e9, 1e9, -1e9, -1e9]); for (let x = bb[0]; x < bb[2]; x += 2.5) { g.beginPath(); g.moveTo(x, bb[1]); g.lineTo(x, bb[3]); g.stroke(); } g.restore(); }
     if (a.kind === 'pitch' || a.kind === 'court') { g.strokeStyle = 'rgba(240,240,240,.8)'; g.lineWidth = 0.25; ringsPath(g, a.rings); g.stroke(); }
@@ -276,10 +281,11 @@ function paintTerrain(T, P) {
     ringsPath(kg, a.rings, a.holes); const cv = st.cls; kg.fillStyle = `rgb(${cv},${cv},${cv})`; kg.fill('evenodd');
   }
   // residential lots from the county parcels: mown lawns
-  if (T.lawns) { g.fillStyle = 'rgba(112,150,64,.32)'; for (const L of T.lawns) { ringsPath(g, [L]); g.fill(); } }
+  if (T.lawns && !AER) { g.fillStyle = 'rgba(112,150,64,.32)'; for (const L of T.lawns) { ringsPath(g, [L]); g.fill(); } }
   // snapshot landuse classes (before blocking)
   const lu = kg.getImageData(0, 0, 512, 512).data; T.luR = new Uint8Array(512 * 512); for (let i = 0; i < T.luR.length; i++) T.luR[i] = lu[i * 4];
-  // lines: streams, rails
+  // lines: streams, rails (with a photo underneath these only go into the masks)
+  g.globalAlpha = AER ? 0 : 1;
   for (const L of P.lines) {
     if (L.kind === 'water') { linePath(g, L.pts); g.strokeStyle = '#34463d'; g.lineWidth = L.w; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(); linePath(rg, L.pts); rg.strokeStyle = '#000'; rg.lineWidth = L.w * 0.8; rg.stroke(); linePath(kg, L.pts); kg.strokeStyle = '#000'; kg.lineWidth = L.w + 3; kg.stroke(); }
     if (L.kind === 'rail') {
@@ -295,22 +301,24 @@ function paintTerrain(T, P) {
     const hw = rd.tags.highway; const info = RC[hw] ? roadInfo(rd.tags) : null;
     if (rd.tags.tunnel === 'yes' || rd.tags.tunnel === 'building_passage') continue;
     if (info) {
+      g.globalAlpha = AER ? 0 : 1;
       const paintOnly = hw === 'service' && /parking_aisle|driveway|drive-through/.test(rd.tags.service || '');
       linePath(g, rd.pts); g.strokeStyle = paintOnly && rd.tags.service === 'driveway' ? '#a8a49b' : '#3d3e41'; g.lineWidth = paintOnly ? (rd.tags.service === 'driveway' ? 3.2 : 5.5) : info.w + 0.8; g.stroke();
       linePath(kg, rd.pts); kg.strokeStyle = '#000'; kg.lineWidth = info.w + (paintOnly ? 1.5 : 5); kg.stroke();
     } else if (WALK.has(hw)) {
       const unpaved = hw === 'path' || hw === 'track' || /dirt|ground|gravel|unpaved|grass/.test(rd.tags.surface || '');
       const w = hw === 'track' ? 3 : hw === 'pedestrian' ? 5 : hw === 'cycleway' ? 2.5 : 1.8;
-      linePath(g, rd.pts); g.strokeStyle = unpaved ? '#8f8163' : '#b3afa5'; g.lineWidth = w; g.stroke();
+      g.globalAlpha = AER ? 0.4 : 1; linePath(g, rd.pts); g.strokeStyle = unpaved ? '#8f8163' : '#b3afa5'; g.lineWidth = w; g.stroke();
       linePath(kg, rd.pts); kg.strokeStyle = '#000'; kg.lineWidth = w + 1; kg.stroke();
     }
   }
-  try { Airport.paint(g, kg); } catch (e) { }
+  g.globalAlpha = 1;
+  try { Airport.paint(AER ? null : g, kg); } catch (e) { }
   try { paintLandmarkGround(g, P); } catch (e) { }
   // driveways to houses built from parcel records
   if (T.driveways) for (const d of T.driveways) { linePath(g, d); g.lineCap = 'butt'; g.strokeStyle = '#aaa69c'; g.lineWidth = 3.0; g.stroke(); linePath(kg, d); kg.strokeStyle = '#000'; kg.lineWidth = 4.5; kg.stroke(); }
   // building footprints block trees, slightly darker ground around them
-  for (const b of P.buildings) { ringsPath(kg, [b.ring]); kg.fillStyle = '#000'; kg.fill(); kg.strokeStyle = '#000'; kg.lineWidth = 4; kg.stroke(); ringsPath(g, [b.ring]); g.strokeStyle = 'rgba(40,50,30,.35)'; g.lineWidth = 1.2; g.stroke(); }
+  for (const b of P.buildings) { ringsPath(kg, [b.ring]); kg.fillStyle = '#000'; kg.fill(); kg.strokeStyle = '#000'; kg.lineWidth = 4; kg.stroke(); if (!AER) { ringsPath(g, [b.ring]); g.strokeStyle = 'rgba(40,50,30,.35)'; g.lineWidth = 1.2; g.stroke(); } }
   const tr = kg.getImageData(0, 0, 512, 512).data; T.treeR = new Uint8Array(512 * 512); for (let i = 0; i < T.treeR.length; i++) T.treeR[i] = tr[i * 4];
   T.tex = ctex(c, { wrap: false }); T.tex.wrapS = T.tex.wrapT = THREE.ClampToEdgeWrapping; T.tex.flipY = false;
   T.rtex = new THREE.CanvasTexture(rc); T.rtex.flipY = false; T.rtex.wrapS = T.rtex.wrapT = THREE.ClampToEdgeWrapping;
@@ -713,6 +721,8 @@ function buildTrees(T, P) {
     if (force) sp = q < .6 ? 'oak' : 'pine';
     lists[sp].push([x, z, 0.75 + r() * 0.55, r() * 6.28]);
   };
+  if (T.canopy) { placeCanopyTrees(T, lists, r); T.canopy = null; }
+  else {
   for (const [x, z] of P.trees) put(x, z, 80, true);
   for (const row of P.treeRows) { const R = resample(row, 9); for (const p of R) put(p[0], p[1], 80, true); }
   let count = P.trees.length;
@@ -720,6 +730,7 @@ function buildTrees(T, P) {
     const u = r(), v = r(); const px = Math.floor(u * 512), pz = Math.floor(v * 512); const cls = decodeCls(T.treeR[pz * 512 + px]); if (!cls) continue;
     if (r() > (dens[cls] || 0) / maxD) continue;
     put(W.x0 + (px + r()) / 512 * sx, W.z0 + (pz + r()) / 512 * sz, cls); count++;
+  }
   }
   const o = new THREE.Object3D(); const col = new THREE.Color();
   for (const sp in lists) {
@@ -734,6 +745,36 @@ function buildTrees(T, P) {
     });
     im.castShadow = Q !== QUALITY.low; im.receiveShadow = true; im.computeBoundingSphere(); T.group.add(im);
   }
+}
+
+// trees on the real tree tops from the canopy height map (03k_realdata.js): every local maximum
+// of canopy height is a crown; its height sets the tree's size
+function treeBaseH(sp) { const g = GEO[sp]; if (!g.boundingBox) g.computeBoundingBox(); return Math.max(1, g.boundingBox.max.y); }
+function placeCanopyTrees(T, lists, r) {
+  const C = T.canopy, N = Canopy.N, W = T.W, sx = W.x1 - W.x0, sz = W.z1 - W.z0; const tops = [];
+  const at = (u, v) => (u < 0 || v < 0 || u >= N || v >= N) ? 0 : C[v * N + u];
+  for (let v = 0; v < N; v++) for (let u = 0; u < N; u++) {
+    const h = C[v * N + u]; if (h < 12) continue; // under 3 m: shrubs / grass
+    let top = true; for (let dv = -1; dv <= 1 && top; dv++) for (let du = -1; du <= 1; du++) { if (!du && !dv) continue; const o = at(u + du, v + dv); if (o > h || (o === h && (dv < 0 || (dv === 0 && du < 0)))) { top = false; break; } }
+    if (!top) continue;
+    // tree mask: not on roads, buildings, water or rails
+    const mu = Math.min(511, Math.floor((u + 0.5) / N * 512)), mv = Math.min(511, Math.floor((v + 0.5) / N * 512));
+    const cls = decodeCls(T.treeR[mv * 512 + mu]); if (!cls) continue;
+    tops.push([u, v, h / 4, cls]);
+  }
+  // too many for this quality level: keep an even random sample (tall ones slightly favoured)
+  let keep = tops; if (tops.length > Q.trees) { keep = tops.map(t => [t, r() * (0.7 + Math.min(0.6, t[2] / 40))]).sort((a, b) => b[1] - a[1]).slice(0, Q.trees).map(q => q[0]); }
+  const base = { pine: treeBaseH('pine'), oak: treeBaseH('oak'), myrtle: treeBaseH('myrtle') };
+  for (const [u, v, h, cls] of keep) {
+    const q = r(); let sp;
+    if (h < 5.5) sp = q < 0.6 ? 'myrtle' : 'oak';
+    else if (cls === 160) sp = q < (h > 18 ? 0.72 : 0.5) ? 'pine' : 'oak';   // woods: loblolly pine + hardwoods
+    else if (cls === 80 || cls === 240) sp = q < (h > 20 ? 0.45 : 0.25) ? 'pine' : 'oak'; // neighbourhoods / campus: mostly oaks
+    else sp = q < 0.55 ? 'pine' : 'oak';
+    const x = W.x0 + (u + 0.3 + r() * 0.4) / N * sx, z = W.z0 + (v + 0.3 + r() * 0.4) / N * sz;
+    lists[sp].push([x, z, clamp(h / base[sp], 0.35, 2.6), r() * 6.28]);
+  }
+  T.canopyTrees = keep.length;
 }
 
 // ---------- signals & stop signs ----------
@@ -897,14 +938,19 @@ function TT(n, f) { const t = performance.now(); const r = f(); TIMES[n] = (TIME
 async function TTa(n, f) { const t = performance.now(); const r = await f(); TIMES[n] = (TIMES[n] || 0) + performance.now() - t; return r; }
 async function buildTile(T) {
   const parcelP = Parcels.get(T.tx, T.ty).catch(() => null); // county parcels load alongside the map data
+  const aerialP = Aerial.get(T.tx, T.ty).catch(() => null), ncP = NCBuildings.get(T.tx, T.ty).catch(() => null), canopyP = Canopy.get(T.tx, T.ty).catch(() => null); // real-world layers (03k_realdata.js)
   const data = await getTileData(T.tx, T.ty, T.prio);
   await ensureDEM(tileBBox(T.tx, T.ty), T.prio);
   if (T.state === 'gone') return;
   _yieldT = performance.now();
   const P = TT('parseTile', () => parseTile(data, T.tx, T.ty)); await yieldMaybe();
   TT('registerRoads', () => registerRoads(T, P)); await yieldMaybe();
+  const late = ms => sleep(ms).then(() => null);
+  try { mergeNCBuildings(T, P, await Promise.race([ncP, late(15000)])); } catch (e) { console.warn('NC building footprints skipped', e); } await yieldMaybe();
+  T.aerial = await Promise.race([aerialP, late(15000)]); T.canopy = await Promise.race([canopyP, late(8000)]);
+  if (T.state === 'gone') { if (T.aerial && T.aerial.close) T.aerial.close(); return; }
   try { T.parcelAdded = applyParcels(T, P, await Promise.race([parcelP, sleep(12000).then(() => null)])); } catch (e) { console.warn('parcels skipped', e); } await yieldMaybe();
-  TT('paintTerrain', () => paintTerrain(T, P)); await yieldMaybe();
+  TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
   TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
   await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
