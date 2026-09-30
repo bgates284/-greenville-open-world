@@ -958,6 +958,7 @@ async function buildTile(T) {
   try { TT('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); }
   try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();
   try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
+  try { TT('buildHandmade', () => buildHandmade(T, P)); } catch (e) { console.warn('hand-built landmarks skipped', e); }
   try { buildMailboxes(T); } catch (e) { }
   TT('buildTrees', () => buildTrees(T, P)); await yieldMaybe();
   TT('buildSignals', () => buildSignals(T, P));

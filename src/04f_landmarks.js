@@ -32,6 +32,7 @@ const zoneAt = (Z, kind, x, z) => Z.find(q => q.kind === kind && inArea(q.a, x, 
 function landmarkStyle(B, cx, cz, area, obb, Z) {
   const t = B.tags, bt = t.building || t['building:part'] || 'yes', n = t.name || '';
   const lv = parseFloat(t['building:levels']); const rect = obb ? area / (obb.L * obb.W) : 0;
+  if (n === 'The Cupola' || n === 'Greenville Amphitheater') return { kind: 'skip' }; // hand-built (04g_handmade.js)
   if (/^(parking|garage|garages|shed|roof|carport|service)$/.test(bt)) return null;
   // stands inside a football stadium are replaced by the seating bowl; other grandstands become stepped seating
   if (bt === 'grandstand' || bt === 'stadium' || bt === 'bleachers') {
@@ -49,7 +50,7 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
     let h = lv > 0 ? lv * 4.2 + 0.9 : /Joyner Library/.test(n) ? 21 : /Colliseum|Coliseum/.test(n) ? 17 : /Recreation/.test(n) ? 12 : area < 600 ? 9.3 : area < 2600 ? 13.5 : 17.7;
     const hip = rect > 0.72 && obb && obb.W < 26 && area < 3200 && h < 19;
     return { kind: 'campus', fac: 'campus', h, shape: hip ? 'hipped' : 'flat', wall: pick(['#ffffff', '#fbeee8', '#f4e6de', '#fff4ee'], (B.id % 11) / 11), roof: hip ? '#4f5856' : '#b9b7b1',
-      portico: /Wright Auditorium|Joyner Library|Spilman|Ragsdale|Whichard Building/.test(n), name: n };
+      portico: /Wright Auditorium|Spilman|Ragsdale|Whichard Building/.test(n), name: n };
   }
   return null;
 }
@@ -119,6 +120,15 @@ function signMesh(T, tex, wdt, hgt, emissive) {
 // ER canopy + ambulances, helipad, rooftop lettering on the main hospital
 function hospitalDetails(LM, T, ctx, edges, box, frontEdge) {
   const { wallTop, obb, decor } = ctx;
+  // tower crown: a lit glass band and a crown fascia above the top floor, glass fins up the long faces
+  { const GL = new THREE.Color('#5d7f99'), CR = new THREE.Color('#e9e6df'), FIN = new THREE.Color('#3f5a70');
+    for (const e of edges) {
+      const q = (o, y) => [e.a[0] + e.nx * o, y, e.a[1] + e.nz * o], r = (o, y) => [e.b[0] + e.nx * o, y, e.b[1] + e.nz * o];
+      decor.quad(q(0.3, wallTop + 0.9), r(0.3, wallTop + 0.9), r(0.3, wallTop + 4.2), q(0.3, wallTop + 4.2), [0, 0], [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], GL);
+      decor.quad(q(0.45, wallTop + 4.2), r(0.45, wallTop + 4.2), r(0.45, wallTop + 5.6), q(0.45, wallTop + 5.6), [0, 0], [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], CR);
+      if (e.L > 25) { const n = Math.floor(e.L / 9); for (let k = 1; k < n; k++) { const t = k / n; const x = e.a[0] + (e.b[0] - e.a[0]) * t + e.nx * 0.35, z = e.a[1] + (e.b[1] - e.a[1]) * t + e.nz * 0.35; const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L; decor.quad([x - tx * 0.9, ctx.base + 4, z - tz * 0.9], [x + tx * 0.9, ctx.base + 4, z + tz * 0.9], [x + tx * 0.9, wallTop, z + tz * 0.9], [x - tx * 0.9, wallTop, z - tz * 0.9], [0, 0], [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], FIN); } }
+    }
+  }
   const spots = World.hospitalSpots.get(T.key) || []; World.hospitalSpots.set(T.key, spots);
   // helipad on the roof
   if (obb) {
@@ -253,6 +263,24 @@ function buildStadiums(T, P, Z) {
       const cap = new MB(true); const q4 = [P3(-L / 2, -D / 2, top), P3(L / 2, -D / 2, top), P3(L / 2, D / 2, top), P3(-L / 2, D / 2, top)]; cap.quad(...q4, [0, 0], [0, 0], [0, 0], [0, 0], [0, 1, 0], new THREE.Color('#cfcfca'));
       for (const [[u0, v0], [u1, v1]] of facesT) cap.quad(P3(u0, v0, top - 2.6), P3(u1, v1, top - 2.6), P3(u1, v1, top - 1.4), P3(u0, v0, top - 1.4), [0, 0], [0, 0], [0, 0], [0, 0], [((v1 - v0)) * ux / 50 + ((u0 - u1)) * pm.dx / 50, 0, (v1 - v0) * uz / 50 + (u0 - u1) * pm.dz / 50], new THREE.Color(ECU_PURPLE));
       addMB(T, cap, lmPlainMat());
+      // press level on top: set back, glass all round, broad roof with a camera deck and antennas
+      { const pl = new MB(true); const L2 = L * 0.72, D2 = D * 0.7, y0 = top, y1 = top + 6.5; const off = -1.2;
+        const Q = (u, v, y) => P3(u, v + off, y);
+        for (const [[u0, v0], [u1, v1]] of [[[-L2 / 2, -D2 / 2], [L2 / 2, -D2 / 2]], [[L2 / 2, -D2 / 2], [L2 / 2, D2 / 2]], [[L2 / 2, D2 / 2], [-L2 / 2, D2 / 2]], [[-L2 / 2, D2 / 2], [-L2 / 2, -D2 / 2]]]) {
+          pl.quad(Q(u0, v0, y0), Q(u1, v1, y0), Q(u1, v1, y0 + 1.2), Q(u0, v0, y0 + 1.2), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#d9d6cf'));
+          pl.quad(Q(u0, v0, y0 + 1.2), Q(u1, v1, y0 + 1.2), Q(u1, v1, y1 - 0.8), Q(u0, v0, y1 - 0.8), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#223445'));
+          pl.quad(Q(u0, v0, y1 - 0.8), Q(u1, v1, y1 - 0.8), Q(u1, v1, y1), Q(u0, v0, y1), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color(ECU_PURPLE));
+        }
+        const R4 = [Q(-L2 / 2 - 1.5, -D2 / 2 - 2, y1), Q(L2 / 2 + 1.5, -D2 / 2 - 2, y1), Q(L2 / 2 + 1.5, D2 / 2 + 1, y1), Q(-L2 / 2 - 1.5, D2 / 2 + 1, y1)]; pl.quad(...R4, [0, 0], [0, 0], [0, 0], [0, 0], [0, 1, 0], new THREE.Color('#bdbab3'));
+        for (let k = -3; k <= 3; k++) { const u = k * L2 / 7; pl.quad(Q(u - 0.05, -D2 / 2 + 0.5, y1), Q(u + 0.05, -D2 / 2 + 0.5, y1), Q(u + 0.05, -D2 / 2 + 0.5, y1 + 1.1), Q(u - 0.05, -D2 / 2 + 0.5, y1 + 1.1), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#444')); }
+        pl.quad(Q(-L2 / 2, -D2 / 2 + 0.5, y1 + 1.0), Q(L2 / 2, -D2 / 2 + 0.5, y1 + 1.0), Q(L2 / 2, -D2 / 2 + 0.5, y1 + 1.1), Q(-L2 / 2, -D2 / 2 + 0.5, y1 + 1.1), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#444'));
+        for (const u of [-L2 * 0.3, L2 * 0.25]) { const c = new THREE.CylinderGeometry(0.08, 0.12, 7, 6); const p = Q(u, 0, y1 + 3.5); c.translate(p[0], p[1], p[2]); addGeoTo(pl, c, new THREE.Color('#9a9c9e')); }
+        addMB(T, pl, lmPlainMat());
+        const outS = signMesh(T, textTexture([['DOWDY-FICKLEN STADIUM', 120, '#ffffff', 128]], { w: 1024, h: 256 }), 64, 16, false);
+        outS.position.set(tx + pm.dx * (D / 2 + 0.06), top - 8, tz + pm.dz * (D / 2 + 0.06)); outS.rotation.y = Math.atan2(pm.dx, pm.dz); T.group.add(outS);
+        const pir = signMesh(T, textTexture([['PIRATES', 190, ECU_GOLD, 128]], { w: 1024, h: 256 }), 26, 6.5, false);
+        pir.position.set(tx - pm.dx * (D2 / 2 - off + 0.08), top + 5.2, tz - pm.dz * (D2 / 2 - off + 0.08)); pir.rotation.y = Math.atan2(-pm.dx, -pm.dz); T.group.add(pir);
+      }
       const sign = signMesh(T, textTexture([['EAST CAROLINA', 170, ECU_GOLD, 128]], { w: 1024, h: 256 }), 60, 15, false);
       sign.position.set(tx - pm.dx * (D / 2 + 0.05), top - 7, tz - pm.dz * (D / 2 + 0.05)); sign.rotation.y = Math.atan2(-pm.dx, -pm.dz); T.group.add(sign);
       const bb = [[-L / 2, -D / 2], [L / 2, -D / 2], [L / 2, D / 2], [-L / 2, D / 2]].map(([u, v]) => [tx + u * ux + v * pm.dx, tz + u * uz + v * pm.dz]);

@@ -388,6 +388,10 @@ function buildMedians(T, J) {
   let built = 0;
   for (const id of T.roadIds) {
     const A = World.roads.get(id); if (!A || !A.mesh || A.bridge || !A.oneway || A.rank < 4) continue; const nm = (A.tags && (A.tags.name || A.tags.ref)) || ''; if (!nm) continue;
+    // quick reject: is there another one-way piece with the same name running the other way nearby at all?
+    const cands = new Set(); { const k = Math.floor(A.pts.length / 2), p = A.pts[k]; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const q of A.pts) { x0 = Math.min(x0, q[0]); z0 = Math.min(z0, q[1]); x1 = Math.max(x1, q[0]); z1 = Math.max(z1, q[1]); }
+      for (const it of World.segHash.query(x0 - 35, z0 - 35, x1 + 35, z1 + 35)) { const B = it.road; if (B !== A && B.oneway && B.mesh && !B.bridge && ((B.tags && (B.tags.name || B.tags.ref)) || '') === nm) cands.add(B); } }
+    if (!cands.size) continue;
     const blocks = []; for (let i = 0; i < A.nodes.length; i++) { const j = clearOf.get(A.nodes[i]) || (World.nodeAdj.get(A.nodes[i]) || []).length > 2 && { e: 8 }; if (j) blocks.push([A.cum[i] - (j.e || 8) - 2, A.cum[i] + (j.e || 8) + 2]); }
     const total = A.cum[A.cum.length - 1]; const S = [];
     for (let s = 2; s < total - 2; s += 4) {
@@ -397,7 +401,7 @@ function buildMedians(T, J) {
       const dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L; const tA = A.oneway;
       let best = null, bd = 40;
       for (const it of World.segHash.query(px - 40, pz - 40, px + 40, pz + 40)) {
-        const B = it.road; if (B === A || !B.oneway || B.bridge || !B.mesh) continue; const nb = (B.tags && (B.tags.name || B.tags.ref)) || ''; if (nb !== nm) continue;
+        const B = it.road; if (!cands.has(B)) continue;
         const c = B.pts[it.i], e = B.pts[it.i + 1]; const sd = segDist(px, pz, c[0], c[1], e[0], e[1]); if (sd.d >= bd) continue;
         const lb = Math.hypot(e[0] - c[0], e[1] - c[1]) || 1; const dot = ((e[0] - c[0]) / lb * B.oneway) * (dx * tA) + ((e[1] - c[1]) / lb * B.oneway) * (dz * tA);
         if (dot > -0.85) continue; bd = sd.d; best = { B, cx: sd.cx, cz: sd.cz, d: sd.d };
