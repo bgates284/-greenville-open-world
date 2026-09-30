@@ -42,27 +42,38 @@ async function source(qk) {
   sources.set(qk, p); return p;
 }
 
-// ---- one map square ----
-async function square(tx, ty) {
-  const b = G.tileBBox(tx, ty); // {s,w,n,e}
-  const grid = new Uint8Array(N * N); let any = 0;
-  const qks = new Set(); for (const la of [b.s, b.n]) for (const lo of [b.w, b.e]) qks.add(quadkey(...tileXY(la, lo)));
+// ---- one row of map squares at a time ----
+// The source files are stored as full-width strips, so a whole row ("band") of squares is read in one
+// go per source file and then cut up — every strip is downloaded and decoded only once.
+async function readBand(ty, w, e) {
+  const b = G.tileBBox(0, ty); const parts = [];
+  const qks = new Set(); for (const la of [b.s, b.n]) for (let lo = w; lo <= e + 0.3; lo += 0.3) qks.add(quadkey(...tileXY(la, Math.min(lo, e))));
   for (const qk of qks) {
     const S = await source(qk); const [minx, miny, maxx, maxy] = S.bbox; const rx = (maxx - minx) / S.w, ry = (maxy - miny) / S.h;
-    const [x0m, y0m] = merc(b.s, b.w), [x1m, y1m] = merc(b.n, b.e);
+    const [x0m, y0m] = merc(b.s, w), [x1m, y1m] = merc(b.n, e);
     let px0 = Math.floor((x0m - minx) / rx), px1 = Math.ceil((x1m - minx) / rx), py0 = Math.floor((maxy - y1m) / ry), py1 = Math.ceil((maxy - y0m) / ry);
     px0 = Math.max(0, px0); py0 = Math.max(0, py0); px1 = Math.min(S.w, px1); py1 = Math.min(S.h, py1);
     if (px1 <= px0 || py1 <= py0) continue;
     const ras = await S.image.readRasters({ window: [px0, py0, px1, py1], samples: [0], interleave: true });
-    const ww = px1 - px0, nd = S.nodata;
-    for (let j = 0; j < py1 - py0; j++) {
+    parts.push({ S, minx, maxy, rx, ry, px0, py0, ww: px1 - px0, hh: py1 - py0, ras });
+  }
+  return parts;
+}
+function cutSquare(parts, tx, ty) {
+  const b = G.tileBBox(tx, ty); const grid = new Uint8Array(N * N); let any = 0;
+  for (const P of parts) {
+    const { minx, maxy, rx, ry, px0, py0, ww, hh, ras } = P; const nd = P.S.nodata;
+    const i0 = Math.max(0, Math.floor((b.w * 20037508.342789244 / 180 - minx) / rx) - px0), i1 = Math.min(ww, Math.ceil((b.e * 20037508.342789244 / 180 - minx) / rx) - px0 + 1);
+    if (i1 <= i0) continue;
+    for (let j = 0; j < hh; j++) {
       const ym = maxy - (py0 + j + 0.5) * ry; const lat = (2 * Math.atan(Math.exp(ym / 6378137)) - Math.PI / 2) * 180 / Math.PI;
       const v = Math.floor((b.n - lat) / (b.n - b.s) * N); if (v < 0 || v >= N) continue;
-      for (let i = 0; i < ww; i++) {
-        let h = ras[j * ww + i]; if (h == null || h === nd || !(h > 0) || h > 90) continue;
-        const xm = minx + (px0 + i + 0.5) * rx; const lon = xm * 180 / 20037508.342789244;
+      const row = j * ww;
+      for (let i = i0; i < i1; i++) {
+        const h = ras[row + i]; if (!(h > 0) || h === nd || h > 90) continue;
+        const lon = (minx + (px0 + i + 0.5) * rx) * 180 / 20037508.342789244;
         const u = Math.floor((lon - b.w) / (b.e - b.w) * N); if (u < 0 || u >= N) continue;
-        const q = Math.min(255, Math.round(h * 4)); const k = v * N + u; if (q > grid[k]) { grid[k] = q; any++; }
+        const q = Math.min(255, Math.round(h * 4)); const k = v * N + u; if (q > grid[k]) { if (!grid[k]) any++; grid[k] = q; }
       }
     }
   }
@@ -75,27 +86,25 @@ const A = G.COUNTY;
 const [cx0, cy0] = G.tileOfLL(A.s, A.w), [cx1, cy1] = G.tileOfLL(A.n, A.e);
 if (process.argv.includes('--probe')) {
   const qks = new Set(); for (const la of [A.s, A.n]) for (const lo of [A.w, A.e]) qks.add(quadkey(...tileXY(la, lo)));
-  for (const qk of qks) { try { const S = await source(qk); log(qk, 'size', S.w, 'x', S.h, 'bbox', S.bbox.map(v => v.toFixed(0)).join(','), 'nodata', S.nodata, 'bits', S.bps, 'fmt', S.fmt, 'images', await S.tiff.getImageCount(), 'tile', S.image.getTileWidth(), S.image.getTileHeight()); } catch (e) { log(qk, 'FAILED', e.message); } }
-  const t0 = Date.now(); const [tx, ty] = G.tileOfLL(35.6117, -77.3718); const n = await square(tx, ty); log(`test square ${tx}_${ty}: ${n} canopy cells in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  for (const qk of qks) { try { const S = await source(qk); log(qk, 'size', S.w, 'x', S.h, 'nodata', S.nodata, 'bits', S.bps, 'fmt', S.fmt); } catch (e) { log(qk, 'FAILED', e.message); } }
+  const t0 = Date.now(); const [tx, ty] = G.tileOfLL(35.6117, -77.3718); const parts = await readBand(ty, G.tileBBox(tx, ty).w, G.tileBBox(tx, ty).e); const n = cutSquare(parts, tx, ty); log(`test square ${tx}_${ty}: ${n} canopy cells in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   process.exit(0);
 }
-const todo = []; for (let ty = cy0; ty <= cy1; ty++) for (let tx = cx0; tx <= cx1; tx++) if (!fs.existsSync(path.join(out, `${tx}_${ty}.bin.gz`))) todo.push([tx, ty]);
-// Greenville first, then outward
-const [gx, gy] = G.tileOfLL(35.6117, -77.3718); todo.sort((a, b) => Math.hypot(a[0] - gx, a[1] - gy) - Math.hypot(b[0] - gx, b[1] - gy));
-const total = (cx1 - cx0 + 1) * (cy1 - cy0 + 1);
-log(`Pitt County canopy: ${total} map squares, ${total - todo.length} already done, ${todo.length} to go.`);
-const t0 = Date.now(); let done = 0, failed = 0, next = 0;
-async function worker() {
-  while (next < todo.length) {
-    const [tx, ty] = todo[next++];
-    for (let a = 0; a < 4; a++) {
-      try { await square(tx, ty); done++; break; }
-      catch (e) { if (a === 3) { failed++; log(`  ${tx}_${ty}: failed (${e.message}) — run again later`); } else await new Promise(r => setTimeout(r, 3000 * (a + 1))); }
-    }
-    if ((done + failed) % 25 === 0) { const m = (Date.now() - t0) / 60000; log(`  … ${done} of ${todo.length} squares (${m.toFixed(1)} min, about ${Math.round(m / Math.max(1, done) * (todo.length - done))} min left)`); }
-  }
+const has = (tx, ty) => fs.existsSync(path.join(out, `${tx}_${ty}.bin.gz`));
+const total = (cx1 - cx0 + 1) * (cy1 - cy0 + 1); let left = 0; for (let ty = cy0; ty <= cy1; ty++) for (let tx = cx0; tx <= cx1; tx++) if (!has(tx, ty)) left++;
+log(`Pitt County canopy: ${total} map squares in ${cy1 - cy0 + 1} rows, ${total - left} already done, ${left} to go.`);
+const t0 = Date.now(); let done = 0, rows = 0, failedRows = 0;
+for (let ty = cy0; ty <= cy1; ty++) {
+  const need = []; for (let tx = cx0; tx <= cx1; tx++) if (!has(tx, ty)) need.push(tx);
+  if (!need.length) continue;
+  const w = G.tileBBox(need[0], ty).w, e = G.tileBBox(need[need.length - 1], ty).e;
+  let parts = null;
+  for (let a = 0; a < 4 && !parts; a++) { try { parts = await readBand(ty, w, e); } catch (err) { log(`  row ${ty}: ${err.message} — ${a < 3 ? 'retrying' : 'skipped, run again later'}`); await new Promise(r => setTimeout(r, 5000 * (a + 1))); } }
+  if (!parts) { failedRows++; continue; }
+  for (const tx of need) { cutSquare(parts, tx, ty); done++; }
+  parts = null; sources.forEach(p => p.then(S => S.tiff.source && S.tiff.source.blockCache && S.tiff.source.blockCache.clear && S.tiff.source.blockCache.clear()).catch(() => { }));
+  rows++; const m = (Date.now() - t0) / 60000; log(`  row ${ty}: ${need.length} squares — ${done} of ${left} done (${m.toFixed(1)} min, about ${Math.round(m / done * (left - done))} min left)`);
 }
-await Promise.all([worker(), worker(), worker(), worker()]);
 const list = fs.readdirSync(out).filter(f => f.endsWith('.bin.gz')).map(f => f.replace('.bin.gz', '')).sort();
 fs.writeFileSync(path.join(out, 'index.json'), JSON.stringify(list));
-log(failed ? `Done for now: ${failed} squares failed — run this again to finish them.` : `All ${list.length} squares of canopy saved in public-data/canopy/.`);
+log(failedRows ? `Done for now: ${failedRows} rows failed — run this again to finish them.` : `All ${list.length} squares of canopy saved in public-data/canopy/.`);
