@@ -124,6 +124,7 @@ function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
     // surface: fan from the centre across the mouths and curb returns
     // (subdivided so it follows the ground as closely as the road ribbons underneath it do)
     const yv = p => H(p[0], p[1]) + 0.15 + j.rmax * 0.012 + 0.045;
+    if (ring.length >= 3) addDeck(T, ring.slice(), null, 0.15 + j.rmax * 0.012 + 0.045); // people stand on the plate, not under it
     const RS = 4; const L = (p, t) => [j.x + (p[0] - j.x) * t, j.z + (p[1] - j.z) * t];
     for (let i = 0; i < ring.length; i++) {
       const p = ring[i], q = ring[(i + 1) % ring.length]; if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.01) continue;
@@ -205,7 +206,7 @@ function paintLine(R, Ry, ln, clearAt, mk) {
 function groundY(x, z, yRef) {
   let y = surfaceY(x, z, yRef);
   // porches, plinths and steps you can walk up onto
-  for (const it of World.deckHash.query(x, z, x, z)) if ((yRef === undefined || it.top <= yRef + 1.2) && pointInPoly(x, z, it.poly)) y = Math.max(y, it.top);
+  for (const it of World.deckHash.query(x, z, x, z)) { const top = it.off != null ? H(x, z) + it.off : it.top; if ((yRef === undefined || top <= yRef + 1.2) && pointInPoly(x, z, it.poly)) y = Math.max(y, top); }
   const n = nearestRoad(x, z, 18, r => r.mesh && !r.bridge);
   if (!n) return y;
   const r = n.road, hw = r.w / 2;
@@ -222,7 +223,8 @@ function groundY(x, z, yRef) {
   return y;
 }
 // register a raised walkable surface (poly in x/z, top height); removed with the map square
-function addDeck(T, poly, top) { const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]); T.hashItems.push([World.deckHash, World.deckHash.insert({ poly, top }, Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs))]); }
+// top: a fixed height, or off: a height above the ground that follows the terrain (sidewalks, lots)
+function addDeck(T, poly, top, off) { const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]); T.hashItems.push([World.deckHash, World.deckHash.insert({ poly, top, off }, Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs))]); }
 function boxPoly(cx, cz, ux, uz, hl, hw) { const vx = -uz, vz = ux; return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [cx + ux * hl * s + vx * hw * t, cz + uz * hl * s + vz * hw * t]); }
 
 // ---- parking lots: painted stall lines laid out on the same rows buildParked fills with cars ----
@@ -230,7 +232,7 @@ function buildParkingLines(T, P, mk) {
   const W = T.W; let n = 0; const col = new THREE.Color('#dcdcd2');
   const put = (x0, z0, x1, z1, w) => {
     const dx = x1 - x0, dz = z1 - z0, l = Math.hypot(dx, dz) || 1; const nx = -dz / l * w / 2, nz = dx / l * w / 2;
-    const y0 = H(x0, z0) + 0.07, y1 = H(x1, z1) + 0.07;
+    const y0 = H(x0, z0) + 0.085, y1 = H(x1, z1) + 0.085; // just above the lot asphalt (buildLots)
     mk.quad([x0 + nx, y0, z0 + nz], [x0 - nx, y0, z0 - nz], [x1 - nx, y1, z1 - nz], [x1 + nx, y1, z1 + nz], [0, 0], [0, 0], [0, 0], [0, 0], UPN, col);
   };
   const ok = (x, z, ring) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1 && pointInPoly(x, z, ring) && !insideBuilding(x, z) && !onRoadSurface(x, z);
@@ -252,4 +254,87 @@ function buildParkingLines(T, P, mk) {
       }
     }
   }
+}
+
+// =====================================================================
+// PARKING LOTS & BUSINESS SIDEWALKS
+//   • every mapped surface lot becomes real asphalt (following the ground) with a concrete curb
+//     round the edge — the stall lines from buildParkingLines sit on top
+//   • shops, restaurants, offices and other businesses get a concrete sidewalk apron with a curb
+//     along their walls (not where a wall meets a road or another building)
+// =====================================================================
+function subdivTri(a, b, c, maxL, out) {
+  const l = Math.max(Math.hypot(a[0] - b[0], a[1] - b[1]), Math.hypot(b[0] - c[0], b[1] - c[1]), Math.hypot(c[0] - a[0], c[1] - a[1]));
+  if (l <= maxL || out.length > 40000) { out.push([a, b, c]); return; }
+  const ab = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], bc = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2], ca = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2];
+  subdivTri(a, ab, ca, maxL, out); subdivTri(ab, b, bc, maxL, out); subdivTri(ca, bc, c, maxL, out); subdivTri(ab, bc, ca, maxL, out);
+}
+function buildLots(T, P) {
+  const W = T.W, asph = new MB(), curb = new MB(); const LOT = 0.06;
+  for (const a of P.areas) {
+    if (a.kind !== 'parking' || !a.rings.length) continue; const ring = a.rings[0]; if (ring.length < 3) continue;
+    const t = a.tags || {}; if (t.parking === 'multi-storey' || t.parking === 'underground' || t.amenity === 'fuel' || /gravel|grass|dirt|unpaved|ground/.test(t.surface || '')) continue;
+    const [cx, cz] = centroid(ring); if (cx < W.x0 || cx >= W.x1 || cz < W.z0 || cz >= W.z1) continue; // each lot once, by the square it's centred in
+    const area = Math.abs(signedArea(ring)); if (area < 40 || area > 120000) continue;
+    const contour = ring.map(p => new THREE.Vector2(p[0], p[1])), holes = (a.holes || []).map(h => h.map(p => new THREE.Vector2(p[0], p[1])));
+    let tris; try { tris = THREE.ShapeUtils.triangulateShape(contour, holes); } catch (e) { continue; }
+    const all = contour.concat(...holes).map(v => [v.x, v.y]); const pieces = [];
+    for (const tr of tris) subdivTri(all[tr[0]], all[tr[1]], all[tr[2]], 7, pieces);
+    const Y = p => [p[0], H(p[0], p[1]) + LOT, p[1]], U = p => [p[0] / 12, p[1] / 12];
+    for (const [p, q, r] of pieces) asph.tri(Y(p), Y(q), Y(r), U(p), U(q), U(r), UPN);
+    addDeck(T, ring.slice(), null, LOT);
+    // curb round the edge, except where a road or driveway comes in
+    const sa = signedArea(ring);
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length]; const L = Math.hypot(q[0] - p[0], q[1] - p[1]); if (L < 0.8) continue;
+      let nx = (q[1] - p[1]) / L, nz = -(q[0] - p[0]) / L; if (sa < 0) { nx = -nx; nz = -nz; }
+      const k = Math.max(1, Math.round(L / 3));
+      for (let j = 0; j < k; j++) {
+        const a0 = [p[0] + (q[0] - p[0]) * j / k, p[1] + (q[1] - p[1]) * j / k], a1 = [p[0] + (q[0] - p[0]) * (j + 1) / k, p[1] + (q[1] - p[1]) * (j + 1) / k];
+        const m = [(a0[0] + a1[0]) / 2 + nx * 1.2, (a0[1] + a1[1]) / 2 + nz * 1.2]; if (onRoadSurface(m[0], m[1]) || nearestRoad(m[0], m[1], 3, r => r.paintOnly || (r.hw === 'service'))) continue;
+        const o = [nx * 0.28, nz * 0.28], t0 = H(a0[0], a0[1]) + 0.18, t1 = H(a1[0], a1[1]) + 0.18;
+        curb.quad([a0[0], t0, a0[1]], [a1[0], t1, a1[1]], [a1[0] + o[0], t1, a1[1] + o[1]], [a0[0] + o[0], t0, a0[1] + o[1]], [0, 0], [0.3, 0], [0.3, 0.1], [0, 0.1], UPN);
+        curb.quad([a0[0], t0 - 0.24, a0[1]], [a1[0], t1 - 0.24, a1[1]], [a1[0], t1, a1[1]], [a0[0], t0, a0[1]], [0, 0], [0.3, 0], [0.3, 0.1], [0, 0.1], [-nx, 0, -nz]);
+        curb.quad([a0[0] + o[0], t0 - 0.24, a0[1] + o[1]], [a1[0] + o[0], t1 - 0.24, a1[1] + o[1]], [a1[0] + o[0], t1, a1[1] + o[1]], [a0[0] + o[0], t0, a0[1] + o[1]], [0, 0], [0.3, 0], [0.3, 0.1], [0, 0.1], [nx, 0, nz]);
+      }
+    }
+  }
+  const add = (mb, mat) => { const g = mb.geo(); if (!g) return; const m = new THREE.Mesh(g, mat); m.receiveShadow = true; T.group.add(m); };
+  add(asph, MAT.road.plain || Object.values(MAT.road)[0]); add(curb, MAT.concrete);
+}
+const BIZ_BT = /^(retail|commercial|supermarket|kiosk|office|restaurant|fast_food|bank|hotel|hospital|civic|public|government|library|college|university|school|church|mall|shop|store|warehouse_store)$/;
+function buildBusinessWalks(T, P) {
+  const W = T.W, walk = new MB(); const TOP = 0.14;
+  for (const B of P.buildings) {
+    if (B.skip || B.part || !B.ring || B.ring.length < 3) continue;
+    const t = B.tags || {}, bt = t.building || 'yes';
+    const biz = B.food || B.units || B.fuel || BIZ_BT.test(bt) || t.shop || t.amenity || t.office || (bt === 'yes' && (t.name || '').length > 0 && !/house|residential|apartments/.test(bt));
+    if (!biz || /^(house|detached|residential|apartments|garage|garages|shed|roof|carport|barn|farm_auxiliary|hangar|industrial|manufacture|stadium|grandstand|parking)$/.test(bt)) continue;
+    const ring = B.ring; const area = Math.abs(signedArea(ring)); if (area < 60 || area > 60000) continue;
+    const [cx, cz] = centroid(ring); if (cx < W.x0 || cx >= W.x1 || cz < W.z0 || cz >= W.z1) continue;
+    const sa = signedArea(ring); const w = area < 400 ? 1.8 : 2.6;
+    const nrm = ring.map((p, i) => { const q = ring[(i + 1) % ring.length]; const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; let nx = (q[1] - p[1]) / L, nz = -(q[0] - p[0]) / L; if (sa < 0) { nx = -nx; nz = -nz; } return [nx, nz, L]; });
+    const Y = p => [p[0], H(p[0], p[1]) + TOP, p[1]], U = p => [p[0] / 2, p[1] / 2];
+    const edgeOk = []; 
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length]; const [nx, nz, L] = nrm[i]; if (L < 1.2) { edgeOk.push(false); continue; }
+      const m = [(p[0] + q[0]) / 2 + nx * w * 0.8, (p[1] + q[1]) / 2 + nz * w * 0.8];
+      const blocked = onRoadSurface(m[0], m[1]) || (() => { const b = insideBuilding(m[0], m[1]); return b && b.ring !== ring; })();
+      edgeOk.push(!blocked); if (blocked) continue;
+      const P2 = [p[0] + nx * w, p[1] + nz * w], Q2 = [q[0] + nx * w, q[1] + nz * w];
+      walk.quad(Y(p), Y(q), Y(Q2), Y(P2), U(p), U(q), U(Q2), U(P2), UPN);
+      // curb face on the outside edge
+      const yb = [P2[0], H(P2[0], P2[1]) - 0.08, P2[1]], yc = [Q2[0], H(Q2[0], Q2[1]) - 0.08, Q2[1]];
+      walk.quad(yb, yc, Y(Q2), Y(P2), [0, 0], [L / 2, 0], [L / 2, 0.1], [0, 0.1], [nx, 0, nz]);
+      addDeck(T, [p, q, Q2, P2], null, TOP);
+    }
+    // corners: fill the wedge between two walked edges
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + ring.length - 1) % ring.length; if (!edgeOk[i] || !edgeOk[j]) continue;
+      const p = ring[i], [ax, az] = nrm[j], [bx, bz] = nrm[i]; if (ax * bz - az * bx > 0 === sa > 0) continue; // concave corner: the strips already overlap
+      const A = [p[0] + ax * w, p[1] + az * w], Bp = [p[0] + bx * w, p[1] + bz * w];
+      walk.tri(Y(p), Y(A), Y(Bp), U(p), U(A), U(Bp), UPN); addDeck(T, [p, A, Bp], null, TOP);
+    }
+  }
+  const g = walk.geo(); if (g) { const m = new THREE.Mesh(g, MAT.sidewalk); m.receiveShadow = true; T.group.add(m); }
 }

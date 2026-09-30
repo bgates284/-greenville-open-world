@@ -894,6 +894,8 @@ async function buildTile(T) {
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
   TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
   await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
+  try { TT('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); }
+  try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();
   try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
   try { buildMailboxes(T); } catch (e) { }
   TT('buildTrees', () => buildTrees(T, P)); await yieldMaybe();

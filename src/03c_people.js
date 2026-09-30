@@ -247,13 +247,13 @@ function makePerson(seed, look) {
   { const n = new THREE.ConeGeometry(0.017, 0.045, 6); n.rotateX(-0.35); n.translate(0, 1.614, 0.1); part(n, BI.head, skin, skinC); part(sph(0.012, 0, 1.597, 0.11, 1.2, 0.9, 1, 8, 6), BI.head, skin, skinC); }
   // eyes: white, iris, pupil
   for (const s of [-1, 1]) {
-    part(sph(0.0145, s * 0.034, 1.641, 0.086, 1, 0.85, 1, 10, 8), BI.head, 0xf4f1ea, CELL.plain);
-    part(sph(0.0078, s * 0.034, 1.641, 0.0985, 1, 1, 0.5, 8, 6), BI.head, L.eyes, CELL.plain);
-    part(sph(0.0036, s * 0.034, 1.641, 0.1022, 1, 1, 0.4, 6, 4), BI.head, 0x050505, CELL.plain);
-    part(sph(0.016, s * 0.034, 1.651, 0.088, 1.05, 0.45, 1, 10, 6), BI.head, skin, skinC); // upper eyelid
+    part(sph(0.0145, s * 0.034, 1.641, 0.0905, 1, 0.85, 1, 10, 8), BI.head, 0xf4f1ea, CELL.plain);
+    part(sph(0.0078, s * 0.034, 1.641, 0.1032, 1, 1, 0.5, 8, 6), BI.head, L.eyes, CELL.plain);
+    part(sph(0.0036, s * 0.034, 1.641, 0.1072, 1, 1, 0.4, 6, 4), BI.head, 0x050505, CELL.plain);
+    part(sph(0.016, s * 0.034, 1.652, 0.0925, 1.05, 0.45, 1, 10, 6), BI.head, skin, skinC); // upper eyelid
   }
   // lips
-  part(sph(0.021, 0, 1.582, 0.093, 1, 0.33, 0.5, 10, 6), BI.head, new THREE.Color(skin).lerp(new THREE.Color(fem ? 0xb04050 : 0x9a5048), 0.45).getHex(), CELL.plain);
+  part(sph(0.021, 0, 1.582, 0.0975, 1, 0.33, 0.5, 10, 6), BI.head, new THREE.Color(skin).lerp(new THREE.Color(fem ? 0xb04050 : 0x9a5048), 0.45).getHex(), CELL.plain);
   // ears
   for (const s of [-1, 1]) { part(sph(0.024, s * 0.096, 1.625, -0.005, 0.45, 1, 0.75, 8, 6), BI.head, skin, skinC); if (L.earrings) part(sph(0.006, s * 0.1, 1.598, 0, 1, 1, 1, 6, 4), BI.head, 0xe8c860, CELL.plain); }
   // beard / mustache

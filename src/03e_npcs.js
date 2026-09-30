@@ -185,7 +185,7 @@ class NpcAvatar {
       const target = new THREE.Quaternion().setFromAxisAngle(up, yaw).multiply(new THREE.Quaternion().setFromAxisAngle(right, -pitch));
       this.lookQ.slerp(target, 1 - Math.exp(-ddt * 3.5));
       addWorldRotation(neck, new THREE.Quaternion().slerp(this.lookQ, 0.4)); this.g.updateMatrixWorld(true); addWorldRotation(head, new THREE.Quaternion().slerp(this.lookQ, 0.6));
-      if (B.LeftEye && B.RightEye) { this.eyeQ.slerp(new THREE.Quaternion().setFromAxisAngle(up, (Math.random() - .5) * 0.05), 0.2); this.g.updateMatrixWorld(true); addWorldRotation(B.LeftEye, this.eyeQ); addWorldRotation(B.RightEye, this.eyeQ); }
+      if (B.LeftEye && B.RightEye) { this.saccT = (this.saccT || 0) - ddt; if (this.saccT <= 0) { this.saccT = 0.6 + Math.random() * 2.2; this.saccQ = new THREE.Quaternion().setFromAxisAngle(up, (Math.random() - .5) * 0.12); } this.eyeQ.slerp(this.saccQ, 1 - Math.exp(-ddt * 18)); this.g.updateMatrixWorld(true); addWorldRotation(B.LeftEye, this.eyeQ); addWorldRotation(B.RightEye, this.eyeQ); }
     }
     // talking mouth (blend shapes) — syllable-like envelope
     if (B.Jaw) { const open = this.talk > 0 ? clamp(0.5 + 0.5 * Math.sin(t * 16) * Math.sin(t * 4.7 + 1), 0, 1) * 0.16 : 0; this.jaw = lerp(this.jaw || 0, open, 0.5); if (!this.morph.length) this.talk = Math.max(0, this.talk - ddt); if (this.jaw > 0.002) { this.g.updateMatrixWorld(true); addWorldRotation(B.Jaw, rotAxis(right, this.jaw)); } }

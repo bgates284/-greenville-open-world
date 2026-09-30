@@ -115,7 +115,7 @@ function foodBuilder(T, P, ctx) {
     for (const side of [-1, 1]) for (let k = 0; k < 3 && placed < 4; k++) {
       const s = side * (2.4 + k * 2.3); if (Math.abs(s) > len / 2 - 0.6) continue; const x = mid[0] + ux * s + n[0] * 2.3, z = mid[1] + uz * s + n[1] * 2.3;
       if (insideBuilding(x, z) || onRoadSurface(x, z) || onRoadSurface(x + n[0] * 1.2, z + n[1] * 1.2)) continue;
-      const g = H(x, z); box(x, z, ux, uz, 0.45, 0.45, g + 0.72, g + 0.76, wood); box(x, z, ux, uz, 0.05, 0.05, g, g + 0.72, metal);
+      const g = H(x, z) + 0.14; box(x, z, ux, uz, 0.45, 0.45, g + 0.72, g + 0.76, wood); box(x, z, ux, uz, 0.05, 0.05, g, g + 0.72, metal);
       for (const t of [-1, 1]) { box(x + ux * t * 0.75, z + uz * t * 0.75, ux, uz, 0.2, 0.2, g + 0.44, g + 0.48, metal); box(x + ux * t * 0.93, z + uz * t * 0.93, ux, uz, 0.03, 0.2, g + 0.48, g + 0.9, metal); }
       if (r() < 0.8) { box(x, z, ux, uz, 0.025, 0.025, g + 0.76, g + 2.35, C('#d9d9d6'));
         const R = 1.25, top = [x, g + 2.55, z], ring4 = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [x + (ux * a - uz * b) * R * 0.707, g + 2.05, z + (uz * a + ux * b) * R * 0.707]);

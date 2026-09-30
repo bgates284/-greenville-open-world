@@ -120,7 +120,7 @@ const RB = {
         if (ex) { const t = extraTex[ex]; const e = new THREE.MeshStandardMaterial({ name: m.name, map: t || null, roughness: 0.5, metalness: 0.2, alphaTest: 0.4, side: THREE.DoubleSide }); if (!t) e.visible = false; return e; } // accessories keep their own texture (or hide)
         const kind = /opacity/.test(m.name) ? 'opacity' : /head/.test(m.name) ? 'head' : 'body';
         const nm = new THREE.MeshStandardMaterial({ name: m.name, map: tex[kind], roughness: kind === 'head' ? 0.62 : 0.8, metalness: 0 });
-        if (kind === 'opacity') { nm.alphaTest = 0.45; nm.side = THREE.DoubleSide; nm.userData.isHair = true; if (!tex.opacity) nm.visible = false; }
+        if (kind === 'opacity') { nm.alphaTest = 0.45; nm.alphaToCoverage = true; nm.side = THREE.DoubleSide; nm.userData.isHair = true; nm.polygonOffset = true; nm.polygonOffsetFactor = -1; nm.polygonOffsetUnits = -2; if (!tex.opacity) nm.visible = false; }
         else { nm.userData.skinU = { value: new THREE.Color(1, 1, 1) }; nm.userData.maskKind = kind; }
         return nm;
       };
