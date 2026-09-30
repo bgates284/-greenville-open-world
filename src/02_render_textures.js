@@ -170,6 +170,22 @@ function buildTextures() {
     }
     g.fillStyle = 'rgba(233,228,216,.9)'; g.fillRect(0, 500, 512, 12);                                                             // stone water table
   });
+  // Pitt Community College: buff/tan brick, dark bronze ribbon windows, a precast band at each floor
+  mk('pcc', 3.6, 4.2, (g, ge, r) => {
+    g.fillStyle = '#bdb3a0'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0, row = 0; y < 512; y += 6, row++) for (let x = (row % 2) * -8; x < 512; x += 16) {
+      const t = r(); g.fillStyle = `rgb(${176 + t * 30 | 0},${146 + t * 24 | 0},${108 + t * 20 | 0})`; g.fillRect(x + 1, y + 1, 14, 4);
+    }
+    for (let f = 0; f < 4; f++) {
+      const y0 = 512 - (f + 1) * 128;
+      g.fillStyle = '#ddd6c6'; g.fillRect(0, y0 + 112, 512, 10);                                   // precast band
+      for (let b = 0; b < 4; b++) {
+        const x0 = b * 128;
+        win(g, ge, r, x0 + 10, y0 + 36, 108, 62, '#4a3a2c', '#2a3238', '#51606b', .34);          // bronze-framed ribbon window
+        g.fillStyle = '#4a3a2c'; for (const x of [46, 82]) g.fillRect(x0 + x, y0 + 36, 4, 62);    // mullions
+      }
+    }
+  });
   // Hospital: light precast panels with long ribbon windows
   mk('hospital', 3.3, 4.2, (g, ge, r) => {
     noiseFill(g, 512, 512, [214, 206, 190], 10, 71);

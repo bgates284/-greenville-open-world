@@ -97,6 +97,7 @@ const Food = {
   set(rows) {
     const L = [];
     if (typeof SMOKE_SHOPS !== 'undefined') rows = rows.concat(SMOKE_SHOPS.filter(x => !rows.some(r => r[0] === x[0] || r[6] === x[6])));
+    if (typeof WINTERVILLE_PLACES !== 'undefined') rows = rows.concat(WINTERVILLE_PLACES.filter(x => !rows.some(r => r[6] === x[6] || (r[0] === x[0] && Math.abs(r[4] - x[4]) < 0.0012 && Math.abs(r[5] - x[5]) < 0.0014))));
     for (const r of rows) {
       const f = { name: r[0], brand: !!r[1], amenity: r[2], cuisine: r[3], lat: r[4], lon: r[5], ref: r[6], drive: !!r[7], kind: placeKind(r[2]) };
       f.x = lonToX(f.lon); f.z = latToZ(f.lat);

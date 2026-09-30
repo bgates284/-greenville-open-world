@@ -29,7 +29,7 @@ function foodBuilder(T, P, ctx) {
   if (!MAT.foodGlass) MAT.foodGlass = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.08, metalness: 0.65, envMapIntensity: 1.2 });
 
   // ---- assign each place to the building that contains it ----
-  const cand = P.buildings.filter(B => !B.skip && !B.part && B.ring.length >= 3);
+  const cand = P.buildings.filter(B => !B.skip && !B.part && !B.civic && B.ring.length >= 3);
   for (const B of cand) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const p of B.ring) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); } B._bb = [x0, z0, x1, z1]; }
   for (const f of foods) {
     if (f.kind === 'centre') { f._alone = true; continue; } // shopping centres: a road-side sign only

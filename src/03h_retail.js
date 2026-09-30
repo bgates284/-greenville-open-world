@@ -123,6 +123,55 @@ const SMOKE_LOOKS = [
   { wall: '#e9e1d2', mat: 'shop', trim: '#3f2a5c', trim2: '#f2c230', awn: '#3f2a5c', sign: ['#140e1f', '#f2c230'], font: 'slab', neon: '#f2c230' },
 ];
 function smokeLook(f) { let h = 0; for (const c of f.name) h = (h * 31 + c.charCodeAt(0)) | 0; const L = Object.assign({ smoke: true }, SMOKE_LOOKS[Math.abs(h) % SMOKE_LOOKS.length]); if (/cigar/i.test(f.name)) Object.assign(L, SMOKE_LOOKS[3], { mat: 'brick', font: 'serif' }); return L; }
+// ---- Winterville ----
+// OpenStreetMap has only a handful of Winterville's businesses, so the rest come from business listings
+// (Yellow Pages, Yelp, the Winterville Chamber, brand store locators — Sep 2026). Each is placed on the
+// building of its county tax parcel (found by street address), spread along the building when several
+// share one. Rows use the restaurant layout: [name, brand?, type, cuisine, lat, lon, ref, drive-thru]
+const WINTERVILLE_PLACES = [
+  ["Main & Mill Oyster Bar & Tavern",0,"restaurant","seafood",35.527803,-77.402991,"y9101",0],["Nauti Dog Brewing Co.",0,"bar","",35.527903,-77.402988,"y9102",0],
+  ["Local Oak Brewing Co.",0,"bar","",35.529231,-77.402126,"y9103",0],["Tie Breakers Sports Bar & Grill",0,"bar","american",35.528738,-77.402344,"y9104",0],
+  ["Coopers Cup",0,"cafe","coffee_shop",35.528516,-77.402432,"y9105",0],["Marlins Bar",0,"bar","",35.528405,-77.402475,"y9106",0],
+  ["Taqueria Tere",0,"restaurant","mexican",35.528293,-77.402519,"y9107",0],["Dixie Queen Seafood Restaurant",0,"restaurant","seafood",35.526807,-77.403095,"y9108",0],
+  ["Mayflower Seafood Restaurant",1,"restaurant","seafood",35.543492,-77.406332,"y9109",0],["Meating Ground Cafe",0,"restaurant","american",35.531349,-77.385989,"y9110",0],
+  ["No 1 Chinese Restaurant",0,"restaurant","chinese",35.530686,-77.38609,"y9111",0],["Cucinella's Pizzeria & Italian Ice",0,"restaurant","pizza",35.550331,-77.383741,"y9112",0],
+  ["Taqueria El Kora",0,"restaurant","mexican",35.550067,-77.383706,"y9113",0],["Dunkin'",1,"cafe","donut",35.525343,-77.384419,"y9114",0],
+  ["Sweet Porpos Rolled Ice Cream & Bakeshop",0,"ice_cream","ice_cream",35.547706,-77.400749,"y9115",0],["Tropical Smoothie Cafe",1,"fast_food","juice",35.548563,-77.402958,"y9116",0],
+  ["Subway",1,"fast_food","sandwich",35.548571,-77.403997,"y9117",0],["Carolina Classic Catfish",0,"restaurant","seafood",35.550334,-77.393026,"y9118",0],
+  ["Burrito Shak",0,"fast_food","mexican",35.546168,-77.40245,"y9119",0],["Marco's Pizza",1,"fast_food","pizza",35.546168,-77.402119,"y9120",0],
+  ["Saladworks + Frutta Bowls",1,"fast_food","salad",35.546168,-77.401787,"y9121",0],["Pelican's SnoBalls",1,"ice_cream","ice_cream",35.546168,-77.402285,"y9122",0],
+  ["Grounded",0,"cafe","coffee_shop",35.55471,-77.372938,"y9123",0],["Tapped",0,"bar","",35.554869,-77.372606,"y9124",0],
+  ["El Pakas Mexican Restaurant",0,"restaurant","mexican",35.555029,-77.372274,"y9125",0],["Zaxby's",1,"fast_food","chicken",35.55025,-77.404769,"y9126",1],
+  ["Cook Out",1,"fast_food","burger",35.549857,-77.404776,"y9127",1],["DQ Grill & Chill",1,"fast_food","burger",35.549511,-77.404773,"y9128",1],
+  ["Burger King",1,"fast_food","burger",35.552472,-77.406343,"y9129",1],["Taco Bell",1,"fast_food","mexican",35.556798,-77.406752,"y9130",1],
+  ["Jersey Mike's Subs",1,"fast_food","sandwich",35.553239,-77.407486,"y9131",0],["Angus Grill",0,"restaurant","steak_house",35.553192,-77.407451,"y9132",0],
+  ["Mi Cabana Mexican Restaurant",0,"restaurant","mexican",35.553269,-77.407651,"y9133",0],["Anchalee Thai Restaurant",0,"restaurant","thai",35.553256,-77.407618,"y9134",0],
+  ["Starbucks",1,"cafe","coffee_shop",35.551666,-77.404991,"y9135",0],["Chipotle",1,"fast_food","mexican",35.551566,-77.404976,"y9136",0],
+  ["7 Brew",1,"cafe","coffee_shop",35.559981,-77.406463,"y9137",1],["Waffle House",1,"restaurant","breakfast",35.560815,-77.40646,"y9138",0],
+].concat([
+  ["Food Lion",1,"supermarket",35.530917,-77.385961,"n6157772663"],["Speedway",1,"fuel",35.525268,-77.384718,"n9380773560"],
+  ["Dollar General",1,"variety_store",35.528449,-77.403728,"w1144052972"],["Walgreens",1,"chemist",35.524354,-77.385294,"w1185823406"],
+  ["Lowes Foods",1,"supermarket",35.546168,-77.401953,"y9139"],["Dollar General",1,"variety_store",35.547749,-77.397042,"y9140"],
+  ["Family Dollar",1,"variety_store",35.525064,-77.382279,"y9141"],["Dollar Tree",1,"variety_store",35.544252,-77.40555,"y9142"],
+  ["Handy Mart",1,"fuel",35.543078,-77.405661,"y9143"],["Winterville Food Mart",0,"fuel",35.526352,-77.403215,"y9144"],
+  ["Exxon",1,"fuel",35.548518,-77.401152,"y9145"],["First Citizens Bank",1,"bank",35.528677,-77.402949,"y9146"],
+  ["Truist",1,"bank",35.551212,-77.384876,"y9147"],["State Employees' Credit Union",1,"bank",35.54212,-77.405757,"y9148"],
+  ["Southern Bank",1,"bank",35.545718,-77.404135,"y9149"],["Advance Auto Parts",1,"car_parts",35.545637,-77.405667,"y9150"],
+  ["Firestone Complete Auto Care",1,"car_repair",35.543765,-77.405455,"y9151"],["Meineke Car Care Center",1,"car_repair",35.548619,-77.402047,"y9152"],
+  ["Take 5 Oil Change",1,"car_repair",35.56045,-77.406324,"y9153"],["CD's Automotive",0,"car_repair",35.528774,-77.404771,"y9154"],
+  ["United Auto Paint",0,"car_repair",35.53535,-77.414841,"y9155"],["Winterville Flower Shop",0,"florist",35.528303,-77.402987,"y9156"],
+  ["Salon on Main",0,"hairdresser",35.527873,-77.401956,"y9157"],["Winterville Barber & Beauty",0,"hairdresser",35.528209,-77.407302,"y9158"],
+  ["Champagne Salon",0,"hairdresser",35.526206,-77.402534,"y9159"],["The Right Stuff",0,"hairdresser",35.528627,-77.402388,"y9160"],
+  ["Smooth Cutz",0,"hairdresser",35.524871,-77.403812,"y9161"],["TruImage Natural Hair & Beauty Salon",0,"hairdresser",35.531128,-77.386022,"y9162"],
+  ["Monroe Studio",0,"beauty",35.549803,-77.383671,"y9163"],["Studio Adore Mi",0,"hairdresser",35.53595,-77.416258,"y9164"],
+  ["Donnell's Hair Design",0,"hairdresser",35.530276,-77.417549,"y9165"],["Hair Network",0,"hairdresser",35.550706,-77.387806,"y9166"],
+  ["Tingen & Co Hair Studio",0,"hairdresser",35.551571,-77.382248,"y9167"],["Sport Clips",1,"hairdresser",35.551465,-77.40496,"y9168"],
+  ["Crystal Nail Spa",0,"beauty",35.550411,-77.38674,"y9169"],["JPQ Nail Spa",0,"beauty",35.548575,-77.403863,"y9170"],
+  ["Lux Nail Lounge",0,"beauty",35.547704,-77.401507,"y9171"],["Goodwill",1,"second_hand",35.551298,-77.403566,"y9172"],
+  ["PetSmart",1,"pet",35.551606,-77.387854,"y9173"],["Hoffman-Haus Pet Resort",0,"pet",35.517633,-77.367696,"y9174"],
+  ["Tractor Supply Co",1,"farm",35.55805,-77.404372,"y9175"],["Harbor Freight Tools",1,"hardware",35.536389,-77.408136,"y9176"],
+  ["Burlington",1,"clothes",35.561002,-77.408634,"y9177"],["The UPS Store",1,"copyshop",35.548579,-77.403728,"y9178"],
+].map(r => [r[0], r[1], r[2], '', r[3], r[4], r[5], 0]));
 // assemble the full list of places (restaurants + retail) — kept in one list so the map, the start menu
 // and the world builder treat them alike
 Food.set(FOOD_SNAPSHOT.concat(RETAIL_SNAPSHOT.map(r => [r[0], r[1], r[2], '', r[3], r[4], r[5], 0])));

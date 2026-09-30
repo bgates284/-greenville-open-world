@@ -23,7 +23,7 @@ const tileOfXZ = (x, z) => tileOfLL(zToLat(z), xToLon(x));
 const tileKey = (tx, ty) => tx + ',' + ty;
 function tileBBox(tx, ty) { const w = LON0 + tx * TLON, s = LAT0 + ty * TLAT; return { w, s, e: w + TLON, n: s + TLAT }; }
 function tileWorld(tx, ty) { const b = tileBBox(tx, ty); return { x0: lonToX(b.w), x1: lonToX(b.e), z0: latToZ(b.n), z1: latToZ(b.s) }; }
-const CITY = { s: 35.53, n: 35.675, w: -77.47, e: -77.28 };  // Greenville city limits + ETJ, Winterville edge, airport, Simpson
+const CITY = { s: 35.505, n: 35.675, w: -77.47, e: -77.28 }; // Greenville city limits + ETJ, Winterville, airport, Simpson
 const COUNTY = { s: 35.36, n: 35.84, w: -77.70, e: -77.05 }; // all of Pitt County: Bethel to Grifton, Farmville/Fountain to Grimesland
 
 const LANDMARKS = [
@@ -40,6 +40,8 @@ const LANDMARKS = [
   ['Greenville Convention Center', 35.5730, -77.3911],
   ['River Park North', 35.6277, -77.3561],
   ['Winterville · Main St', 35.5290, -77.4011],
+  ['Winterville · Fire-Rescue-EMS & Police', 35.5281, -77.4026],
+  ['Pitt Community College', 35.5500, -77.4060],
   ['Ayden · Downtown', 35.4727, -77.4155],
   ['Farmville · Main St', 35.5954, -77.5853],
   ['Bethel · Main St', 35.8071, -77.3786],

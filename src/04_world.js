@@ -549,7 +549,7 @@ const PAL = {
   metal: ['#ffffff', '#dfe6ea', '#e8e2d6', '#cfd8d0', '#d6d0e0'],
   shingle: ['#5a5a5c', '#3f4042', '#6b5a4a', '#4a4038', '#5d6468', '#7a6a58', '#3b4a3f', '#7a3b2c', '#48494b'],
   flat: ['#d8d8d6', '#bfc0bf', '#9a9b9c', '#e8e8e6', '#7d7f82', '#cfcac0'],
-  campus: ['#ffffff', '#fbeee8', '#f4e6de'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
+  campus: ['#ffffff', '#fbeee8', '#f4e6de'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
@@ -560,6 +560,7 @@ async function buildBuildings(T, P) {
   const FB = foodBuilder(T, P, { buckets, roofF, roofS }); // restaurants: branded buildings, storefronts, new buildings
   const decor = new MB(true), seats = new MB(true); const Z = P.zones || (P.zones = landmarkZones(P)); // landmark trim, grandstands
   const upt = (x, z) => Math.hypot(x - 0, z - 0);
+  const WV = [lonToX(-77.4024), latToZ(35.5283)]; const wvDown = (x, z) => Math.hypot(x - WV[0], z - WV[1]); // downtown Winterville (Main St & Railroad St)
   const luAt = (x, z) => { const u = Math.floor((x - W.x0) / (W.x1 - W.x0) * 512), v = Math.floor((z - W.z0) / (W.z1 - W.z0) * 512); if (u < 0 || v < 0 || u > 511 || v > 511) return 40; return decodeCls(T.luR[v * 512 + u]); };
   for (const B of P.buildings) {
     if ((++_cnt & 127) === 0) await yieldMaybe();
@@ -580,6 +581,8 @@ async function buildBuildings(T, P) {
     else if (/metal|steel/.test(mat)) fac = 'metal';
     else if (/glass|concrete|stone/.test(mat)) fac = 'office';
     else if (/wood|vinyl|plaster/.test(mat)) fac = 'siding';
+    // downtown Winterville: the storefront blocks on Main & Railroad St (some are mapped as "house")
+    else if (wvDown(cx, cz) < 150 && /^(yes|retail|commercial|house)$/.test(bt) && (area > 400 || (area > 120 && (B.units || lu !== 80)))) fac = 'shop';
     else if (HOUSEY.has(bt) || (bt === 'yes' && area < 280 && lu === 80)) fac = r1 < 0.36 ? 'brick' : 'siding';
     else if (bt === 'apartments' || bt === 'dormitory') fac = r1 < 0.62 ? 'brick' : 'siding';
     else if (/^(university|college|school|church|chapel|cathedral|civic|public|government|kindergarten|library|museum|fire_station|courthouse|townhall)$/.test(bt) || lu === 240) fac = 'brick';
@@ -611,6 +614,7 @@ async function buildBuildings(T, P) {
       else if (/^(garage|garages|shed|carport|service)$/.test(bt)) h = 2.8;
       else if (bt === 'roof') h = 5;
       else if (du < 650) h = area > 400 ? 9 + r2 * 5 : 7 + r2 * 3;
+      else if (fac === 'shop' && wvDown(cx, cz) < 150) h = area > 350 ? 7.6 : 5.4;
       else h = area < 250 ? (r2 < .7 ? 3.4 : 6) : area < 900 ? 6 : area < 3000 ? 7 : 8.5;
     }
     let minH = parseLen(t.min_height); if (!(minH > 0)) { const ml = parseFloat(t['building:min_level']); minH = ml > 0 ? ml * floorH : 0; }
@@ -950,6 +954,7 @@ async function buildTile(T) {
   T.aerial = await Promise.race([aerialP, late(15000)]); T.canopy = await Promise.race([canopyP, late(8000)]);
   if (T.state === 'gone') { if (T.aerial && T.aerial.close) T.aerial.close(); return; }
   try { T.parcelAdded = applyParcels(T, P, await Promise.race([parcelP, sleep(12000).then(() => null)])); } catch (e) { console.warn('parcels skipped', e); } await yieldMaybe();
+  try { prepCivic(T, P); } catch (e) { console.warn('stations skipped', e); }
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
   TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
@@ -959,6 +964,7 @@ async function buildTile(T) {
   try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();
   try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
   try { TT('buildHandmade', () => buildHandmade(T, P)); } catch (e) { console.warn('hand-built landmarks skipped', e); }
+  try { TT('buildCivic', () => buildCivic(T, P)); } catch (e) { console.warn('stations skipped', e); }
   try { buildMailboxes(T); } catch (e) { }
   TT('buildTrees', () => buildTrees(T, P)); await yieldMaybe();
   TT('buildSignals', () => buildSignals(T, P));

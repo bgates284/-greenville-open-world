@@ -21,6 +21,7 @@ function landmarkZones(P) {
     const t = a.tags || {}, n = t.name || '';
     if (/Health Sciences/i.test(n)) Z.push({ kind: 'medcampus', a });
     else if (t.amenity === 'hospital' || t.healthcare === 'hospital') Z.push({ kind: 'hospital', a });
+    else if ((t.amenity === 'university' || t.amenity === 'college') && /Pitt Community College/i.test(n)) Z.push({ kind: 'pcc', a });
     else if (t.amenity === 'university' || t.amenity === 'college') Z.push({ kind: /Athletic/i.test(n) ? 'athletic' : 'campus', a });
     else if (t.leisure === 'stadium') Z.push({ kind: 'stadium', a, football: /american_football/.test(t.sport || '') || /Dowdy/i.test(n), name: n });
   }
@@ -44,6 +45,12 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
     const glass = /Heart Institute|Cancer/i.test(n);
     let h = lv > 0 ? lv * 4.2 + 1 : /ECU Health Medical Center/.test(n) ? 30 : /Heart Institute/.test(n) ? 22 : /Children/.test(n) ? 18 : area > 6000 ? 22 : area > 2500 ? 17 : 12.5;
     return { kind: 'hospital', fac: glass ? 'medglass' : 'hospital', h, shape: 'flat', wall: glass ? '#ffffff' : pick(['#ffffff', '#f6f1e8', '#efe9de'], (B.id % 7) / 7), roof: '#cfcfca', main: /^ECU Health Medical Center$/.test(n) || (!n && bt === 'hospital' && area > 8000), name: n, er: t.emergency === 'yes' };
+  }
+  // Pitt Community College: buff brick with dark bronze window bands, flat roofs, names on the front
+  if (zoneAt(Z, 'pcc', cx, cz) || /Pitt Community College/.test(t.operator || '')) {
+    if (/^(roof|shed|garage|garages)$/.test(bt) || area < 40 || t.amenity === 'police') return null;
+    const h = lv > 0 ? lv * 4.2 + 1.2 : area < 150 ? 4.2 : area < 600 ? 5.8 : area < 2500 ? 9.2 : 10.4;
+    return { kind: 'pcc', fac: 'pcc', h, shape: 'flat', wall: pick(['#ffffff', '#f8f2ea', '#fbf6ef'], (B.id % 7) / 7), roof: '#b9b7b1', name: n };
   }
   const campus = zoneAt(Z, 'campus', cx, cz) || zoneAt(Z, 'athletic', cx, cz) || bt === 'university' || bt === 'college' || /\bECU\b|East Carolina/.test(n);
   if (campus) {
@@ -91,6 +98,20 @@ function landmarkExtras(LM, B, T, ctx) {
         const P = (u, v, y) => [mx + ux * u + e.nx * v, y, mz + uz * u + e.nz * v]; const pk = yT + 1.1 + Math.min(3.5, w * 0.16);
         decor.tri(P(-w / 2 - 0.4, depth + 0.2, yT + 1.1), P(w / 2 + 0.4, depth + 0.2, yT + 1.1), P(0, depth + 0.2, pk), [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], WHITE);
         for (const s of [-1, 1]) decor.quad(P(s * (w / 2 + 0.4), depth + 0.2, yT + 1.1), P(0, depth + 0.2, pk), P(0, 0, pk), P(s * (w / 2 + 0.4), 0, yT + 1.1), [0, 0], [0, 0], [0, 0], [0, 0], [s * ux * 0.5, 1, s * uz * 0.5], new THREE.Color('#4f5856'));
+      }
+    }
+  }
+  if (LM.kind === 'pcc') {
+    band(wallTop - 0.5, wallTop + 0.35, 0.12, new THREE.Color('#d9d2c2'));         // precast coping
+    band(base + 0.2, base + 0.8, 0.05, new THREE.Color('#8a6a52'));                 // darker brick base
+    if (LM.name && area > 300) {
+      const e = frontEdge(); if (e) {
+        const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz); const w = Math.min(e.L * 0.6, 13), sh = w * 96 / 1024;
+        const g0 = H(mx, mz), cw = Math.min(7, e.L * 0.35); // name above the entrance canopy
+        const s = signMesh(T, textTexture([[LM.name.toUpperCase(), 76, '#3a2c20', 50, 700]], { w: 1024, h: 96 }), w, sh, false);
+        s.position.set(mx + e.nx * 0.16, Math.min(wallTop - sh / 2 - 0.2, g0 + 3.6 + sh / 2), mz + e.nz * 0.16); s.rotation.y = yaw; T.group.add(s);
+        box(mx + e.nx * 1.6, mz + e.nz * 1.6, g0 + 3.1, g0 + 3.45, cw / 2, 1.6, yaw, new THREE.Color('#1f3f73'));
+        for (const sg of [-1, 1]) { const ux = Math.cos(yaw), uz = -Math.sin(yaw); box(mx + e.nx * 3.0 + ux * sg * (cw / 2 - 0.2), mz + e.nz * 3.0 + uz * sg * (cw / 2 - 0.2), g0, g0 + 3.1, 0.1, 0.1, yaw, new THREE.Color('#c9ccd0')); }
       }
     }
   }
