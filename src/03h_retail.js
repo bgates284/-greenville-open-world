@@ -175,4 +175,5 @@ const WINTERVILLE_PLACES = [
 // assemble the full list of places (restaurants + retail) — kept in one list so the map, the start menu
 // and the world builder treat them alike
 Food.set(FOOD_SNAPSHOT.concat(RETAIL_SNAPSHOT.map(r => [r[0], r[1], r[2], '', r[3], r[4], r[5], 0])));
+Food.loadExtra();
 // (Food.set always adds SMOKE_SHOPS that OpenStreetMap doesn't have yet)

@@ -94,8 +94,10 @@ function foodLook(f) {
 // ---- the list used by the world (projected to game coordinates, near-duplicates merged) ----
 const Food = {
   list: [],
+  extra: [], // the rest of Pitt County (public-data/places.json, from tools/fetch-places.mjs)
   set(rows) {
-    const L = [];
+    this.lastRows = rows; const L = [];
+    if (this.extra.length) { const refs = new Set(rows.map(r => r[6])); rows = rows.concat(this.extra.filter(x => !refs.has(x[6]))); }
     if (typeof SMOKE_SHOPS !== 'undefined') rows = rows.concat(SMOKE_SHOPS.filter(x => !rows.some(r => r[0] === x[0] || r[6] === x[6])));
     if (typeof WINTERVILLE_PLACES !== 'undefined') rows = rows.concat(WINTERVILLE_PLACES.filter(x => !rows.some(r => r[6] === x[6] || (r[0] === x[0] && Math.abs(r[4] - x[4]) < 0.0012 && Math.abs(r[5] - x[5]) < 0.0014))));
     for (const r of rows) {
@@ -109,6 +111,12 @@ const Food = {
   },
   inBox(x0, z0, x1, z1) { return this.list.filter(f => f.x >= x0 && f.x < x1 && f.z >= z0 && f.z < z1); },
   nearest(x, z, maxD) { let best = null, bd = maxD; for (const f of this.list) { const d = Math.hypot(f.x - x, f.z - z); if (d < bd) { bd = d; best = f; } } return best; },
+  // the county file (restaurants & stores in every Pitt County town) — loaded once at start
+  loadExtra() {
+    if (this.extraP) return this.extraP;
+    const url = (window.GV_DATA ? window.GV_DATA : 'public-data/') + 'places.json';
+    return this.extraP = fetch(url).then(r => r.ok ? r.json() : null).then(d => { if (d && d.rows && d.rows.length) { this.extra = d.rows; this.set(this.lastRows || []); } }).catch(e => console.warn('county places unavailable', e));
+  },
   // pick up newly-mapped places from OpenStreetMap, at most once a week (used for tiles built afterwards)
   async refresh() {
     try {

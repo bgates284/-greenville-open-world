@@ -553,6 +553,16 @@ const PAL = {
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
+// downtowns of the county's small towns: [x, z, radius in metres]
+const TOWN_CENTERS = [
+  [35.5283, -77.4024, 150], // Winterville · Main & Railroad St
+  [35.4727, -77.4155, 190], // Ayden · 2nd & 3rd St at Lee St
+  [35.5954, -77.5853, 230], // Farmville · Main & Wilson St
+  [35.3724, -77.4386, 150], // Grifton · Queen St & Highland Blvd
+  [35.8071, -77.3786, 140], // Bethel · Main St
+  [35.6721, -77.6358, 110], // Fountain
+  [35.5637, -77.1928, 110], // Grimesland · Pitt St
+].map(([la, lo, r]) => [lonToX(lo), latToZ(la), r]);
 const HOUSEY = new Set(['house', 'detached', 'semidetached_house', 'bungalow', 'residential', 'terrace', 'cabin', 'duplex', 'farm']);
 async function buildBuildings(T, P) {
   let _cnt = 0;
@@ -560,7 +570,8 @@ async function buildBuildings(T, P) {
   const FB = foodBuilder(T, P, { buckets, roofF, roofS }); // restaurants: branded buildings, storefronts, new buildings
   const decor = new MB(true), seats = new MB(true); const Z = P.zones || (P.zones = landmarkZones(P)); // landmark trim, grandstands
   const upt = (x, z) => Math.hypot(x - 0, z - 0);
-  const WV = [lonToX(-77.4024), latToZ(35.5283)]; const wvDown = (x, z) => Math.hypot(x - WV[0], z - WV[1]); // downtown Winterville (Main St & Railroad St)
+  // small-town downtowns: storefront blocks within this distance of Main Street (distance ÷ radius, < 1 = downtown)
+  const wvDown = (x, z) => { let m = 1e9; for (const [x0, z0, r] of TOWN_CENTERS) m = Math.min(m, Math.hypot(x - x0, z - z0) / r * 150); return m; };
   const luAt = (x, z) => { const u = Math.floor((x - W.x0) / (W.x1 - W.x0) * 512), v = Math.floor((z - W.z0) / (W.z1 - W.z0) * 512); if (u < 0 || v < 0 || u > 511 || v > 511) return 40; return decodeCls(T.luR[v * 512 + u]); };
   for (const B of P.buildings) {
     if ((++_cnt & 127) === 0) await yieldMaybe();
@@ -581,7 +592,7 @@ async function buildBuildings(T, P) {
     else if (/metal|steel/.test(mat)) fac = 'metal';
     else if (/glass|concrete|stone/.test(mat)) fac = 'office';
     else if (/wood|vinyl|plaster/.test(mat)) fac = 'siding';
-    // downtown Winterville: the storefront blocks on Main & Railroad St (some are mapped as "house")
+    // small-town downtowns (Winterville, Ayden, Farmville, Grifton, Bethel…): storefront blocks, some mapped as "house"
     else if (wvDown(cx, cz) < 150 && /^(yes|retail|commercial|house)$/.test(bt) && (area > 400 || (area > 120 && (B.units || lu !== 80)))) fac = 'shop';
     else if (HOUSEY.has(bt) || (bt === 'yes' && area < 280 && lu === 80)) fac = r1 < 0.36 ? 'brick' : 'siding';
     else if (bt === 'apartments' || bt === 'dormitory') fac = r1 < 0.62 ? 'brick' : 'siding';
@@ -944,6 +955,7 @@ async function buildTile(T) {
   const parcelP = Parcels.get(T.tx, T.ty).catch(() => null); // county parcels load alongside the map data
   const aerialP = Aerial.get(T.tx, T.ty).catch(() => null), ncP = NCBuildings.get(T.tx, T.ty).catch(() => null), canopyP = Canopy.get(T.tx, T.ty).catch(() => null); // real-world layers (03k_realdata.js)
   const data = await getTileData(T.tx, T.ty, T.prio);
+  if (Food.extraP) await Promise.race([Food.extraP, sleep(4000)]); // the county's restaurants & stores (places.json)
   await ensureDEM(tileBBox(T.tx, T.ty), T.prio);
   if (T.state === 'gone') return;
   _yieldT = performance.now();
