@@ -61,15 +61,15 @@ const Sound = {
     const P = Player;
     if (P.mode === 'heli') { const r = Heli.rpm, c = Heli.col, V = Heli.v.length(); // rotor thump + turbine whine
       this.o1.frequency.setTargetAtTime(14 + r * 12 + c * 4, t, 0.2); this.o2.frequency.setTargetAtTime(28 + r * 24, t, 0.2); this.lp.frequency.setTargetAtTime(300 + r * 900 + c * 500, t, 0.2);
-      this.eg.gain.setTargetAtTime(0.05 + r * 0.1 + c * 0.04, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.003), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
+      this.eg.gain.setTargetAtTime(Heli.onGround && c < 0.05 ? 0 : 0.012 + c * 0.018, t, 0.3); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.003), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     if (P.mode === 'fly') { const th = Plane.thr, V = Plane.v.length(); const rpm = 0.45 + th * 0.55;
       this.o1.frequency.setTargetAtTime(60 + rpm * 70, t, 0.2); this.o2.frequency.setTargetAtTime(30 + rpm * 35, t, 0.2); this.lp.frequency.setTargetAtTime(500 + rpm * 1400, t, 0.2);
-      this.eg.gain.setTargetAtTime(0.1 + th * 0.09, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.16, V * 0.0028), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
+      this.eg.gain.setTargetAtTime(th < 0.05 ? 0 : 0.01 + th * 0.022, t, 0.3); this.windG.gain.setTargetAtTime(Math.min(0.16, V * 0.0028), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     const drive = P.mode === 'drive'; const sp = Math.abs(P.car.speed);
     const rpm = 0.25 + (sp % 14) / 14 * 0.6 + Math.min(1, sp / 40) * 0.3; const thr = key('KeyW', 'ArrowUp') ? 1 : 0;
     this.o1.frequency.setTargetAtTime(38 + rpm * 90, t, 0.08); this.o2.frequency.setTargetAtTime(19 + rpm * 45, t, 0.08);
     this.lp.frequency.setTargetAtTime(350 + rpm * 900 + thr * 400, t, 0.1);
-    this.eg.gain.setTargetAtTime(drive ? 0.09 + thr * 0.05 : 0, t, 0.15);
+    this.eg.gain.setTargetAtTime(drive && (sp > 0.5 || thr) ? Math.min(0.03, 0.008 + sp * 0.0008 + thr * 0.01) : 0, t, 0.25); // idling engines are silent; running ones just a hum
     this.rainG.gain.setTargetAtTime(Env.rain * (drive ? 0.07 : 0.12), t, 0.5);
     this.windG.gain.setTargetAtTime(drive ? Math.min(0.12, sp * 0.004) : 0.015, t, 0.3);
     this.crOut.gain.setTargetAtTime(Env.night * (1 - Env.rain) * (drive ? 0.004 : 0.012), t, 1);
