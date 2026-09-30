@@ -132,7 +132,8 @@ class NpcAvatar {
     for (const c of T.clips) { const a = this.mixer.clipAction(c); if (c.name === 'agree' || c.name === 'headshake') { a.blendMode = THREE.AdditiveAnimationBlendMode; a.setLoop(THREE.LoopOnce, 1); } else { a.play(); a.setEffectiveWeight(c.name === 'idle' ? 1 : 0); a.time = r() * c.duration; } this.act[c.name] = a; }
     // bones no clip drives (eyes, jaw, face) — reset to rest each frame so procedural motion can't accumulate
     const driven = new Set(); for (const c of T.clips) for (const tr of c.tracks) driven.add(tr.name.split('.')[0]);
-    this.free = []; inst.traverse(o => { if (o.isBone && !driven.has(o.name)) this.free.push([o, o.quaternion.clone()]); });
+    // (eyes and jaw always: some rigs have a second node with the same name, so the clip track never reaches the real bone)
+    this.free = []; inst.traverse(o => { if (o.isBone && (!driven.has(o.name) || /Eye|Jaw/i.test(o.name))) this.free.push([o, o.quaternion.clone().normalize()]); });
     this.lookQ = new THREE.Quaternion(); this.eyeQ = new THREE.Quaternion(); this.t = r() * 20; this.talk = 0; this.acc = 0; this.phase = 0;
   }
   // body poses layered on top of the idle/walk animation, as world-space turns of the joints

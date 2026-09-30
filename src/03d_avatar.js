@@ -113,8 +113,10 @@ const Voice = {
 // ---- helpers: rotate a bone by a WORLD-space rotation (axis-agnostic additive offsets) ----
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 function addWorldRotation(bone, qWorld) { // local' = P^-1 * R * P * local
-  bone.parent.getWorldQuaternion(_q1); _q2.copy(_q1).invert();
-  bone.quaternion.premultiply(_q1).premultiply(qWorld).premultiply(_q2);
+  // a parent with non-uniform scale (people are scaled a little wider/narrower than tall) gives a
+  // slightly non-unit world quaternion; unnormalized, that scaled the bone — eyes ballooned
+  bone.parent.getWorldQuaternion(_q1); _q1.normalize(); _q2.copy(_q1).invert();
+  bone.quaternion.premultiply(_q1).premultiply(qWorld).premultiply(_q2).normalize();
 }
 function rotAxis(axis, ang, out = new THREE.Quaternion()) { return out.setFromAxisAngle(axis, ang); }
 // analytic two-bone IK (after Daniel Holden). a=root(thigh), b=mid(knee), c=end(foot), t=target world position
@@ -160,7 +162,7 @@ class Avatar {
     for (const n of names) restS[n] = restS[n].clone().invert(); // store inverse
     // bones the clips never drive (eyes, jaw, face) are reset to rest every frame, so the procedural
     // eye/jaw motion added on top can never accumulate
-    const driven = new Set(names); this.free = []; root.traverse(o => { if (o.isBone && !driven.has(stripMx(o.name))) this.free.push([o, o.quaternion.clone(), o.position.clone()]); });
+    const driven = new Set(names); this.free = []; root.traverse(o => { if (o.isBone && (!driven.has(stripMx(o.name)) || /Eye|Jaw/i.test(o.name))) this.free.push([o, o.quaternion.clone().normalize(), o.position.clone()]); });
     this.mouthMorph = [...this.morphs.keys()].some(k => /^(viseme_|jawOpen|mouthOpen)/.test(k)); this.jawV = 0;
     this.rt = { src, S, names, restT, restSInv: restS, cinv, hipS: posS.Hips, hipT: posT.Hips, ratio: posS.Hips ? posT.Hips.y / posS.Hips.y : 1, tw: {} };
     this.mixer = new THREE.AnimationMixer(src); this.actions = {};
