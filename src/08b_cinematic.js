@@ -1,11 +1,12 @@
 // =====================================================================
-// IDLE CINEMATIC — after 30 seconds with no input, the camera leaves the player and films the
-// city's people: a third-person follow of one NPC, with slow orbits, low tracking shots and crane
-// moves. Every minute it cuts to a different part of Greenville (another map square) and a new
-// person. Any key, click, touch or mouse movement brings you straight back to where you were.
+// IDLE CINEMATIC — after 30 seconds with no input, the camera leaves the player: first two minutes
+// of the ECU plane flying a sightseeing loop over Greenville (chase, wing, fly-by and wide shots),
+// then 30 seconds following one of the city's people (third-person follow, slow orbits, low tracking
+// shots and crane moves) somewhere else in town, then back up in the plane, and so on.
+// Any key, click, touch or mouse movement brings you straight back to where you were.
 // =====================================================================
 const Cine = {
-  IDLE_MS: 30000, SCENE_S: 60, SHOT_S: 13,
+  IDLE_MS: 30000, SCENE_S: 30, SHOT_S: 13, PLANE_S: 120, PLANE_SHOT_S: 15, next: 'plane',
   active: false, lastInput: performance.now(), focus: new THREE.Vector3(),
   spots: null, spotI: -1, subject: null, t: 0, shotT: 0, shot: 0, phase: 'off', fade: 0,
   camPos: new THREE.Vector3(), camLook: new THREE.Vector3(),
@@ -45,21 +46,29 @@ const Cine = {
 
   // ---------- start / stop ----------
   start() {
-    this.active = true; this.phase = 'fadeout'; this.fade = 0; this.home = Player.focus().clone(); this.focus.copy(this.home);
+    this.active = true; this.phase = 'fadeout'; this.next = 'plane'; this.fade = 0; this.home = Player.focus().clone(); this.focus.copy(this.home);
     this.hudWas = $('hud').hidden; $('hud').hidden = true; if (document.exitPointerLock) try { document.exitPointerLock(); } catch (e) { }
     this.ui(true); this.caption('', '');
   },
   stop() { // back to the player: wait for the map around them, then fade in
-    this.phase = 'return'; this.subject = null; this.focus.copy(Player.focus()); this.fadeTo = 1; this.caption('Welcome back', 'returning to where you left off…');
+    this.phase = 'return'; this.subject = null; if (this.fp) this.fp.g.visible = false; this.focus.copy(Player.focus()); this.fadeTo = 1; this.caption('Welcome back', 'returning to where you left off…');
   },
-  finish() { this.active = false; this.phase = 'off'; $('hud').hidden = this.hudWas; this.ui(false); Player.camPos.copy(Player.focus()).add(new THREE.Vector3(0, 3, 6)); },
+  finish() { if (this.fp) this.fp.g.visible = false; this.active = false; this.phase = 'off'; $('hud').hidden = this.hudWas; this.ui(false); Player.camPos.copy(Player.focus()).add(new THREE.Vector3(0, 3, 6)); },
 
   // ---------- per frame (called from Game.frame) ----------
   update(dt) {
     if (!this.active) { if (performance.now() - this.lastInput > this.IDLE_MS && this.eligible()) this.start(); return; }
     this.t += dt;
     const fadeSpeed = dt / 0.8;
-    if (this.phase === 'fadeout') { this.fade = Math.min(1, this.fade + fadeSpeed); if (this.fade >= 1) this.goto(this.nextSpot()); }
+    if (this.phase === 'fadeout') { this.fade = Math.min(1, this.fade + fadeSpeed); if (this.fade >= 1) { if (this.fp) this.fp.g.visible = false; if (this.next === 'plane') this.fly(); else this.goto(this.nextSpot()); } }
+    else if (this.phase === 'flyload') { // wait for the ground under the plane
+      this.fade = 1; this.flyStep(0); const P = this.fp.g.position;
+      if ((Tiles.readyAround(P.x, P.z, 1) && this.t > 1.5) || this.t > 20) { this.phase = 'fly'; this.t = 0; this.pshot = Math.floor(Math.random() * 4); this.newPlaneShot(true); }
+    }
+    else if (this.phase === 'fly') {
+      this.fade = Math.max(0, this.fade - fadeSpeed); this.flyStep(dt); this.filmPlane(dt);
+      if (this.t > this.PLANE_S) { this.phase = 'fadeout'; this.next = 'npc'; }
+    }
     else if (this.phase === 'load') { // waiting for the new map square
       this.fade = 1; const s = this.spot; this.focus.set(s.x, 0, s.z);
       if (Tiles.readyAround(s.x, s.z, 1) || this.t > 40) { if (!this.crowdDone) { this.crowdDone = true; this.seed(s); } if (this.t > 2.5) this.pick(); }
@@ -68,7 +77,7 @@ const Cine = {
       this.fade = Math.max(0, this.fade - fadeSpeed);
       if (!this.alive(this.subject)) this.pick();
       if (this.subject) this.film(dt);
-      if (this.t > this.SCENE_S) { this.phase = 'fadeout'; }
+      if (this.t > this.SCENE_S) { this.phase = 'fadeout'; this.next = 'plane'; }
     }
     else if (this.phase === 'return') {
       this.fade = Math.min(1, this.fade + fadeSpeed); const f = Player.focus(); this.focus.copy(f);
@@ -142,6 +151,55 @@ const Cine = {
     const s = this.snap ? 1 : 1 - Math.exp(-dt * (this.shot === 2 ? 20 : 2.5)); this.snap = false;
     this.camPos.lerp(want, s); if (s === 1) this.camLook.copy(look); else this.camLook.lerp(look, 1 - Math.exp(-dt * 4));
   },
+  // ---------- the plane: a sightseeing loop over Greenville ----------
+  route() {
+    if (this.curve) return this.curve;
+    const W = [[35.6117, -77.3718], [35.6175, -77.3690], [35.6300, -77.3790], [35.6352, -77.3854], [35.6290, -77.4010], [35.6120, -77.4080], [35.6073, -77.4022],
+      [35.5960, -77.3950], [35.5880, -77.3780], [35.5965, -77.3653], [35.6030, -77.3560], [35.6070, -77.3645]];
+    const pts = W.map(([la, lo], i) => { const x = lonToX(lo), z = latToZ(la); return new THREE.Vector3(x, 0, z); });
+    // cruise ~230 m above the highest ground along the way, with gentle climbs and descents
+    let top = 0; for (const p of pts) top = Math.max(top, H(p.x, p.z)); pts.forEach((p, i) => { p.y = top + 215 + Math.sin(i * 1.7) * 25; });
+    this.curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal', 0.5); this.curveLen = this.curve.getLength(); this.flyS = Math.random() * this.curveLen;
+    return this.curve;
+  },
+  fly() {
+    this.route(); if (!this.fp) { this.fp = buildPlaneModel(); dynRoot.add(this.fp.g); }
+    this.fp.g.visible = true; this.phase = 'flyload'; this.t = 0; this.subject = null; this.pvel = 52;
+    this.flyStep(0); const P = this.fp.g.position; this.focus.copy(P); Tiles.update(P.x, P.z);
+    this.caption('Over Greenville', 'the ECU plane out of Pitt-Greenville Airport');
+  },
+  flyStep(dt) { // move along the loop; nose along the path, banked into the turns
+    const C = this.curve, L = this.curveLen; this.flyS = (this.flyS + this.pvel * dt) % L; const u = this.flyS / L, du = 1.5 / L;
+    const P = C.getPointAt(u), F = C.getTangentAt(u).normalize(), F2 = C.getTangentAt((u + du) % 1).normalize();
+    const acc = F2.clone().sub(F).multiplyScalar(this.pvel * this.pvel / 1.5); acc.y = 0; // centripetal acceleration
+    const up = new THREE.Vector3(0, 1, 0).add(acc.multiplyScalar(1 / 9.81)).normalize();
+    const Lx = new THREE.Vector3().crossVectors(up, F).normalize(), U = new THREE.Vector3().crossVectors(F, Lx);
+    const m = new THREE.Matrix4().makeBasis(Lx, U, F); const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    const g = this.fp.g; g.position.copy(P); if (dt === 0) g.quaternion.copy(q); else g.quaternion.slerp(q, 1 - Math.exp(-dt * 3));
+    const M = this.fp; this.propA = (this.propA || 0) + 60 * dt; if (M.prop) { M.prop.rotation.z = this.propA; M.prop.visible = false; } if (M.disc) M.disc.material.opacity = 0.18;
+    this.pt = (this.pt || 0) + dt; if (M.strobes) for (const s of M.strobes) s.visible = (this.pt % 1.2) < 0.08; if (M.beacon) M.beacon.visible = (this.pt % 1.0) < 0.5;
+    this.focus.copy(P);
+  },
+  newPlaneShot(first) {
+    if (!first) this.pshot = (this.pshot + 1) % 4;
+    this.pshotT = 0; this.psnap = true; const g = this.fp.g;
+    if (this.pshot === 2) { // fly-by: a fixed spot ahead and off to one side
+      const u = ((this.flyS + this.pvel * 5) % this.curveLen) / this.curveLen; const A = this.curve.getPointAt(u), F = this.curve.getTangentAt(u);
+      const side = new THREE.Vector3(F.z, 0, -F.x).normalize().multiplyScalar(Math.random() < 0.5 ? 38 : -38); this.panchor = A.add(side); this.panchor.y -= 12;
+    }
+  },
+  filmPlane(dt) {
+    this.pshotT += dt; if (this.pshotT > this.PLANE_SHOT_S) this.newPlaneShot(false);
+    const g = this.fp.g, P = g.position; const F = new THREE.Vector3(0, 0, 1).applyQuaternion(g.quaternion), Lx = new THREE.Vector3(1, 0, 0).applyQuaternion(g.quaternion);
+    const Fh = new THREE.Vector3(F.x, 0, F.z).normalize(); const want = new THREE.Vector3(), look = P.clone(); let rate = 3;
+    if (this.pshot === 0) { want.copy(P).addScaledVector(Fh, -24).add(new THREE.Vector3(0, 6.5, 0)); look.addScaledVector(Fh, 30); }                      // chase
+    else if (this.pshot === 1) { const k = this.pshotT / this.PLANE_SHOT_S; const sd = Lx.clone().setY(0).normalize(); want.copy(P).addScaledVector(sd, 20).addScaledVector(Fh, 10 - k * 22).add(new THREE.Vector3(0, 2.5, 0)); } // alongside, drifting back
+    else if (this.pshot === 2) { want.copy(this.panchor); rate = 50; if (this.panchor.distanceTo(P) > 420 && this.pshotT > 4) this.newPlaneShot(false); } // fly-by
+    else { const a = this.pshotT * 0.05; want.copy(P).addScaledVector(Fh, -70).add(new THREE.Vector3(Math.sin(a) * 30, 55, Math.cos(a) * 30)); look.copy(P).addScaledVector(Fh, 70); look.y -= 30; } // wide, looking down over the city
+    const gy = H(want.x, want.z) + 3; if (want.y < gy) want.y = gy;
+    const s = this.psnap ? 1 : 1 - Math.exp(-dt * rate); this.psnap = false;
+    this.camPos.lerp(want, s); if (s === 1) this.camLook.copy(look); else this.camLook.lerp(look, 1 - Math.exp(-dt * 5));
+  },
   blocked(from, to) { // distance from the subject back toward the camera at which something solid blocks the view, or null
     const ray = this.ray || (this.ray = new THREE.Raycaster()); ray.camera = camera;
     const dir = new THREE.Vector3().subVectors(from, to); const d = dir.length(); if (d < 0.5) return null; dir.divideScalar(d);
@@ -150,7 +208,7 @@ const Cine = {
     return null;
   },
   apply() { // called right before rendering
-    if (!this.active || this.phase !== 'show') return;
+    if (!this.active || (this.phase !== 'show' && this.phase !== 'fly')) return;
     camera.position.copy(this.camPos); camera.lookAt(this.camLook);
   },
 
