@@ -105,7 +105,7 @@ const Player = {
     dynRoot.add(this.person.g); this.person.g.visible = vis; this.person.g.position.copy(this.pos); this.person.g.rotation.y = this.yaw;
     UI.toast('New look');
   },
-  focus() { return this.mode === 'drive' ? this.car.pos : this.mode === 'fly' ? Plane.pos : this.pos; },
+  focus() { return this.mode === 'drive' ? this.car.pos : this.mode === 'fly' ? Plane.pos : this.mode === 'heli' ? Heli.pos : this.pos; },
   unstick() { // Y key: back to the nearest street next to your car
     const f = this.focus(); const wasDriving = this.mode === 'drive';
     this.placeAt(f.x, f.z, false); if (wasDriving) this.toggleCar(); UI.toast('Moved to an open street nearby');
@@ -113,6 +113,13 @@ const Player = {
   update(dt) {
     Airport.tick(dt, this.focus());
     if (Airport.built && !Plane.placed) { Plane.placed = true; if (!(Plane.m && Plane.m.g.visible)) Plane.park(); }
+    if (Airport.built && !Heli.placed) { Heli.placed = true; if (!(Heli.m && Heli.m.g.visible)) Heli.park(); }
+    if (this.mode === 'heli') {
+      if (hit('KeyC')) { this.camMode = this.camMode === 0 ? 1 : this.camMode === 1 ? 2 : 0; UI.toast(['Chase camera', 'Far camera', 'Cockpit'][this.camMode]); }
+      Heli.update(dt);
+      if (this.mode === 'heli') { Heli.camera(dt); return; }
+      this.updateCamera(dt); return;
+    }
     if (this.mode === 'fly') {
       if (hit('KeyC')) { this.camMode = this.camMode === 0 ? 1 : this.camMode === 1 ? 2 : 0; UI.toast(['Chase camera', 'Far camera', 'Cockpit'][this.camMode]); }
       if (hit('KeyB')) { if (Voice.mode === 'babble') { Voice.stop(); } else Voice.startBabble(); }
@@ -126,6 +133,7 @@ const Player = {
     if (Mouse.wheel) { this.camDist = clamp(this.camDist * (1 + Mouse.wheel * 0.12), 2.5, 40); Mouse.wheel = 0; }
     if (hit('KeyC')) { this.camMode = this.camMode >= 2 ? 0 : this.camMode + 1; UI.toast(['Chase camera', 'Far camera', 'First person'][this.camMode]); }
     if (hit('KeyL')) { this.autoLights = false; this.headlights = !this.headlights; UI.toast(this.headlights ? 'Headlights on' : 'Headlights off'); }
+    if (this.mode === 'walk' && Heli.near(this.pos) && Pressed.has('KeyE')) { Pressed.delete('KeyE'); Heli.enter(); return; }
     if (hit('KeyE')) { if (this.mode === 'walk' && Plane.near(this.pos) && Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z) > Math.hypot(this.pos.x - Plane.pos.x, this.pos.z - Plane.pos.z) - 2) { Plane.enter(); return; } this.toggleCar(); }
     if (hit('KeyY')) this.unstick();
     if (hit('KeyF')) { this.camMode = this.camMode === 3 ? 0 : 3; UI.toast(this.camMode === 3 ? 'Face close-up (F to go back)' : 'Chase camera'); }
@@ -181,7 +189,7 @@ const Player = {
     animatePerson(this.person, sp, dt, !this.grounded);
     // hint near car
     const d = Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z);
-    UI.hint(Plane.near(this.pos) ? 'Press <kbd>E</kbd> to fly the plane' : d < 4.5 ? 'Press <kbd>E</kbd> to drive' : '');
+    UI.hint(Heli.near(this.pos) ? 'Press <kbd>E</kbd> to fly the helicopter' : Plane.near(this.pos) ? 'Press <kbd>E</kbd> to fly the plane' : d < 4.5 ? 'Press <kbd>E</kbd> to drive' : '');
   },
   updateDrive(dt) {
     const C = this.car;

@@ -58,7 +58,7 @@ const POLICY = {
   '03d_avatar.js': 'reload', '03e_npcs.js': 'reload', '03f_rocketbox.js': 'reload',
   '03g_food.js': 'tiles+setup', '03h_retail.js': 'tiles+setup', '03i_parcels.js': 'tiles',
   '03j_airport.js': 'plane', '04_world.js': 'tiles', '04b_food.js': 'tiles', '04c_neighborhoods.js': 'tiles', '04d_streets.js': 'tiles', '04e_overview.js': 'hot', '04f_landmarks.js': 'tiles',
-  '05_env.js': 'hot', '06_player.js': 'hot', '06b_plane.js': 'hot', '07_traffic.js': 'hot', '07b_hospital.js': 'hot', '07c_hangout.js': 'hot', '08_ui.js': 'hot', '08b_cinematic.js': 'hot', '08c_touch.js': 'reload', '09_main.js': 'hot',
+  '05_env.js': 'hot', '06_player.js': 'hot', '06b_plane.js': 'hot', '06c_heli.js': 'hot', '07_traffic.js': 'hot', '07b_hospital.js': 'hot', '07c_hangout.js': 'hot', '08_ui.js': 'hot', '08b_cinematic.js': 'hot', '08c_touch.js': 'reload', '09_main.js': 'hot',
 };
 const policyOf = f => POLICY[f] || (/^04/.test(f) ? 'tiles' : 'reload');
 
@@ -72,7 +72,7 @@ function saveState() {
   try {
     if (!window.Game || !Game.started) return;
     const P = Player; const pl = (typeof Plane !== 'undefined' && Plane.m && Plane.m.g.visible) ? { pos: Plane.pos.toArray(), q: Plane.q.toArray(), v: Plane.v.toArray(), thr: Plane.thr, onGround: Plane.onGround, trim: Plane.trim } : null;
-    sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), mode: P.mode, pos: P.pos.toArray(), yaw: P.yaw, cam: [P.camYaw, P.camPitch, P.camDist, P.camMode], car: { pos: P.car.pos.toArray(), yaw: P.car.yaw }, hour: Env.hour, plane: pl }));
+    sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), mode: P.mode === 'heli' ? 'walk' : P.mode, pos: P.pos.toArray(), yaw: P.yaw, cam: [P.camYaw, P.camPitch, P.camDist, P.camMode], car: { pos: P.car.pos.toArray(), yaw: P.car.yaw }, hour: Env.hour, plane: pl }));
   } catch (e) { console.warn('[hot] could not save state', e); }
 }
 addEventListener('beforeunload', saveState);

@@ -59,6 +59,9 @@ const Sound = {
   update(dt) {
     const A = this.ctx; if (!A) return; const t = A.currentTime;
     const P = Player;
+    if (P.mode === 'heli') { const r = Heli.rpm, c = Heli.col, V = Heli.v.length(); // rotor thump + turbine whine
+      this.o1.frequency.setTargetAtTime(14 + r * 12 + c * 4, t, 0.2); this.o2.frequency.setTargetAtTime(28 + r * 24, t, 0.2); this.lp.frequency.setTargetAtTime(300 + r * 900 + c * 500, t, 0.2);
+      this.eg.gain.setTargetAtTime(0.05 + r * 0.1 + c * 0.04, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.003), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     if (P.mode === 'fly') { const th = Plane.thr, V = Plane.v.length(); const rpm = 0.45 + th * 0.55;
       this.o1.frequency.setTargetAtTime(60 + rpm * 70, t, 0.2); this.o2.frequency.setTargetAtTime(30 + rpm * 35, t, 0.2); this.lp.frequency.setTargetAtTime(500 + rpm * 1400, t, 0.2);
       this.eg.gain.setTargetAtTime(0.1 + th * 0.09, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.16, V * 0.0028), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }

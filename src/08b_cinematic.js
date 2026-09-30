@@ -19,6 +19,7 @@ const Cine = {
     if (!Game.playing || Game.paused || !Game.started) return false;
     if (!$('bigmap').hidden) return false;
     if (Player.mode === 'fly' && typeof Plane !== 'undefined' && !Plane.onGround) return false; // never leave a plane in the air
+    if (Player.mode === 'heli' && typeof Heli !== 'undefined' && !Heli.onGround) return false;
     return true;
   },
 
