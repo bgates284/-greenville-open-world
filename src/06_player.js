@@ -30,18 +30,8 @@ const Player = {
     this.person = makePerson(1, { fem: false, top: 'tee', shirt: 0x8d9399, pantsKind: 'shorts', pants: 0xb59f76, skin: 0xc08a64, hair: 0x2e2018, hairStyle: 'cap', hatC: 0x1d2a47, face: 0, beard: false, glasses: false, backpack: false, shoe: 'sneakW', scale: 1, width: 1 });
     dynRoot.add(this.person.g);
     AvatarMgr.ensure().then(av => { if (av && AvatarMgr.want === 'realistic') this.useAvatar(av); }).finally(() => NPCKit.load().then(ok => { if (ok) Peds.upgradeCrowd(); if (localStorage.getItem('gv-pack') !== 'off') RB.start(); }));
-    // the player's car: ECU-purple sedan with gold pinstripes
-    const g = new THREE.Group(); const G = GEO.car.sedan;
-    const gold = new THREE.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.35, metalness: 0.6 });
-    g.add(new THREE.Mesh(G.body, carPaint(0x4a2178)), new THREE.Mesh(G.glass, MAT.carGlass), new THREE.Mesh(G.trim, MAT.carTrim), new THREE.Mesh(G.chrome, MAT.carChrome), new THREE.Mesh(G.plate, MAT.plate));
-    for (const sx of [1, -1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.03, 1.7), gold); st.position.set(sx * (G.wid / 2 + 0.02), CAR_SPECS.sedan.crease - 0.05, 0.08); g.add(st); }
-    const head = new THREE.Mesh(G.head, MAT.headlight), tail = new THREE.Mesh(G.tail, MAT.taillight.clone()); g.add(head, tail); this.tailMat = tail.material;
-    this.wheels = [];
-    for (const [x, z, front] of [[G.track, G.axle[0], 1], [-G.track, G.axle[0], 1], [G.track, G.axle[1], 0], [-G.track, G.axle[1], 0]]) {
-      const piv = new THREE.Group(); piv.position.set(x, G.wheelR, z);
-      const w = x > 0 ? wheelObj(G.oneLTyre, G.oneLRim) : wheelObj(G.oneRTyre, G.oneRRim);
-      const spin = new THREE.Group(); spin.add(w); piv.add(spin); g.add(piv); this.wheels.push({ piv, spin, front });
-    }
+    // the player's car: a low, blue mid-engine sports coupe (03_models.js buildSportsCar)
+    const SC = buildSportsCar(0x1745c4); const g = SC.g; this.tailMat = SC.tailMat; this.wheels = SC.wheels;
     g.traverse(o => { if (o.isMesh) o.castShadow = true; });
     // headlights (always present so shaders don't recompile)
     this.spots = [];
