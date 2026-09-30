@@ -13,7 +13,8 @@
     "pack-data": "node tools/pack-data.mjs",
     "site": "node tools/build-site.mjs",
     "fetch-city": "node tools/fetch-city.mjs --pack",
-    "fetch-canopy": "node tools/fetch-canopy.mjs"
+    "fetch-canopy": "node tools/fetch-canopy.mjs",
+    "fetch-transit": "node tools/fetch-transit.mjs"
   },
   "devDependencies": {
     "vite": "^6.3.5",

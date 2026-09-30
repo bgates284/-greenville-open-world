@@ -121,7 +121,7 @@ const Phys = {
 
   // ---------- traffic cars ----------
   dynCar(c, vx, vz) {
-    if (!this.ready || c.phys || c.removed) return;
+    if (!this.ready || c.phys || c.removed || c.bus) return;
     this.dropKin(c);
     const b = new CANNON.Body({ mass: 1400, linearDamping: 0.12, angularDamping: 0.35 });
     b.addShape(new CANNON.Box(new CANNON.Vec3(0.92, 0.6, c.len / 2 - 0.15)));

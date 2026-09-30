@@ -88,6 +88,8 @@ function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
     }
     for (const ln of lines) paintLine(R, Ry, ln, clearAt, mk);
   }
+  try { buildTurnArrows(T, J, R_of, mk); } catch (e) { console.warn('turn arrows skipped', e); }
+  try { buildMedians(T, J); } catch (e) { console.warn('medians skipped', e); }
   // ---- mapped pedestrian crossings away from junctions ----
   for (const c of P.crossings || []) {
     const adj = (World.nodeAdj.get(c.id) || []).filter(a => a.road.mesh && a.road.car && !a.road.bridge); if (!adj.length) continue;
@@ -337,4 +339,102 @@ function buildBusinessWalks(T, P) {
     }
   }
   const g = walk.geo(); if (g) { const m = new THREE.Mesh(g, MAT.sidewalk); m.receiveShadow = true; T.group.add(m); }
+}
+
+// ---- turn-lane arrows from OSM turn:lanes (e.g. "left|through|through;right") ----
+// painted in each lane a few metres before the stop line at the end of the way, and again further back
+function buildTurnArrows(T, J, R_of, mk) {
+  const kindOf = v => /left/.test(v) ? 'L' : /right/.test(v) ? 'R' : /through/.test(v) ? 'S' : '';
+  for (const id of T.roadIds) {
+    const road = World.roads.get(id); if (!road || !road.mesh || road.bridge) continue; const t = road.tags || {};
+    const RR = R_of.get(id); if (!RR) continue; const { R, Ry } = RR; const total = R[R.length - 1][2]; const L = roadLanes(road);
+    const at = s => { s = clamp(s, 0, total); let lo = 0, hi = R.length - 2; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (R[m][2] <= s) lo = m; else hi = m - 1; } const i = lo; const a = R[i], b = R[i + 1]; const k = clamp((s - a[2]) / ((b[2] - a[2]) || 1), 0, 1); let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; return { x: a[0] + (b[0] - a[0]) * k, z: a[1] + (b[1] - a[1]) * k, dx: dx / l, dz: dz / l, y: Ry[i] + (Ry[i + 1] - Ry[i]) * k }; };
+    const sets = []; // [tag value, travel sign, lane index for the driver's left-most lane, step]
+    if (road.oneway) { const v = t['turn:lanes']; if (v) sets.push([v, road.oneway, road.oneway > 0 ? 0 : L.N - 1, road.oneway > 0 ? 1 : -1]); }
+    else {
+      const f = t['turn:lanes:forward'] || (L.B === 0 ? t['turn:lanes'] : null), b = t['turn:lanes:backward'];
+      if (f) sets.push([f, 1, L.B + L.T, 1]); if (b) sets.push([b, -1, L.B - 1, -1]);
+    }
+    for (const [val, sg, j0, step] of sets) {
+      const lanes = val.split('|'); if (lanes.length < 1 || lanes.length > 8) continue;
+      // the junction this traffic drives toward
+      const endI = sg > 0 ? road.nodes.length - 1 : 0; const jn = J.get(road.nodes[endI]); if (!jn) continue;
+      const sStop = sg > 0 ? road.cum[endI] - jn.e - (jn.signal ? 5 : 1.5) : road.cum[endI] + jn.e + (jn.signal ? 5 : 1.5);
+      for (const back of [5, 28]) {
+        const s0 = sStop - sg * (back + 3); if (s0 < 2 || s0 > total - 2) continue;
+        const A = at(s0); const fx = A.dx * sg, fz = A.dz * sg, rx = -A.dz * sg, rz = A.dx * sg;
+        lanes.forEach((v, k) => {
+          const parts = v.split(';').map(kindOf).filter(Boolean); if (!parts.length) return;
+          const jj = j0 + k * step; if (jj < 0 || jj >= L.N) return; const o = L.pos(jj) * 1; // lateral offset in the drawing frame
+          const cx = A.x + -A.dz * o, cz = A.z + A.dx * o;
+          const P = (a, l) => { const x = cx + fx * a + rx * l, z = cz + fz * a + rz * l; return [x, A.y + 0.014, z]; };
+          const rect = (a0, l0, a1, l1) => mk.quad(P(a0, l0), P(a0, l1), P(a1, l1), P(a1, l0), [0, 0], [0, 0], [0, 0], [0, 0], UPN, MARK_W);
+          const tri = (p, q, r) => mk.tri(P(...p), P(...q), P(...r), [0, 0], [0, 0], [0, 0], UPN, MARK_W);
+          rect(0, -0.09, parts.includes('S') ? 2.0 : 1.45, 0.09);
+          if (parts.includes('S')) tri([2.0, -0.36], [2.0, 0.36], [2.95, 0]);
+          for (const d of ['L', 'R']) if (parts.includes(d)) { const m = d === 'L' ? -1 : 1; rect(1.25, 0, 1.47, m * 0.72); tri([0.95, m * 0.72], [1.77, m * 0.72], [1.36, m * 1.3]); }
+        });
+      }
+    }
+  }
+}
+
+// ---- raised medians between the two halves of divided roads (Greenville Blvd, Memorial Dr, 10th St…) ----
+// OSM maps a divided road as two one-way ways with the same name; where they run side by side a
+// curbed median fills the gap (grass when it's wide, concrete when narrow), with a nose at each junction.
+function buildMedians(T, J) {
+  const mb = new MB(true); const GRASS = new THREE.Color('#5c7a3a'), CONC = new THREE.Color('#aaa69c'), CURB = new THREE.Color('#bdb9b0');
+  const clearOf = new Map(); for (const j of J.values()) clearOf.set(j.id, j);
+  let built = 0;
+  for (const id of T.roadIds) {
+    const A = World.roads.get(id); if (!A || !A.mesh || A.bridge || !A.oneway || A.rank < 4) continue; const nm = (A.tags && (A.tags.name || A.tags.ref)) || ''; if (!nm) continue;
+    const blocks = []; for (let i = 0; i < A.nodes.length; i++) { const j = clearOf.get(A.nodes[i]) || (World.nodeAdj.get(A.nodes[i]) || []).length > 2 && { e: 8 }; if (j) blocks.push([A.cum[i] - (j.e || 8) - 2, A.cum[i] + (j.e || 8) + 2]); }
+    const total = A.cum[A.cum.length - 1]; const S = [];
+    for (let s = 2; s < total - 2; s += 4) {
+      if (blocks.some(b => s > b[0] && s < b[1])) { S.push(null); continue; }
+      let i = 0; while (i < A.cum.length - 2 && A.cum[i + 1] < s) i++;
+      const a = A.pts[i], b = A.pts[i + 1]; const L = A.cum[i + 1] - A.cum[i] || 1; const k = (s - A.cum[i]) / L; const px = a[0] + (b[0] - a[0]) * k, pz = a[1] + (b[1] - a[1]) * k;
+      const dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L; const tA = A.oneway;
+      let best = null, bd = 40;
+      for (const it of World.segHash.query(px - 40, pz - 40, px + 40, pz + 40)) {
+        const B = it.road; if (B === A || !B.oneway || B.bridge || !B.mesh) continue; const nb = (B.tags && (B.tags.name || B.tags.ref)) || ''; if (nb !== nm) continue;
+        const c = B.pts[it.i], e = B.pts[it.i + 1]; const sd = segDist(px, pz, c[0], c[1], e[0], e[1]); if (sd.d >= bd) continue;
+        const lb = Math.hypot(e[0] - c[0], e[1] - c[1]) || 1; const dot = ((e[0] - c[0]) / lb * B.oneway) * (dx * tA) + ((e[1] - c[1]) / lb * B.oneway) * (dz * tA);
+        if (dot > -0.85) continue; bd = sd.d; best = { B, cx: sd.cx, cz: sd.cz, d: sd.d };
+      }
+      if (!best || best.B.id < A.id && World.roads.has(best.B.id) && T.roadIds.includes(best.B.id)) { S.push(null); continue; } // the lower id builds it (once)
+      const nx = (best.cx - px) / (best.d || 1), nz = (best.cz - pz) / (best.d || 1);
+      const i0 = A.w / 2 + 0.15, i1 = best.d - best.B.w / 2 - 0.15; const mw = i1 - i0; if (mw < 1 || mw > 30) { S.push(null); continue; }
+      // a cross street through the gap: no median there
+      const mx = px + nx * (i0 + i1) / 2, mz = pz + nz * (i0 + i1) / 2; const other = nearestRoad(mx, mz, 20, r => r.car && r !== A && r !== best.B); if (other && other.d < other.road.w / 2 + 1) { S.push(null); continue; }
+      const y = H(px, pz) + 0.15 + A.rank * 0.012;
+      S.push({ p0: [px + nx * i0, pz + nz * i0], p1: [px + nx * i1, pz + nz * i1], y, mw });
+    }
+    // runs of consecutive samples → curbed slabs
+    let run = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        const top = q => q.y + 0.16, col = run.reduce((m, q) => Math.min(m, q.mw), 99) > 2.6 ? GRASS : CONC;
+        for (let k = 0; k < run.length - 1; k++) {
+          const a = run[k], b = run[k + 1];
+          const a0 = [a.p0[0], top(a), a.p0[1]], a1 = [a.p1[0], top(a), a.p1[1]], b0 = [b.p0[0], top(b), b.p0[1]], b1 = [b.p1[0], top(b), b.p1[1]];
+          // curb strips along both edges, fill between
+          const lerpP = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
+          const ta = 0.25 / Math.max(0.5, a.mw), tb = 0.25 / Math.max(0.5, b.mw);
+          const A0 = lerpP(a0, a1, ta), A1 = lerpP(a0, a1, 1 - ta), B0 = lerpP(b0, b1, tb), B1 = lerpP(b0, b1, 1 - tb);
+          mb.quad(a0, A0, B0, b0, [0, 0], [0, 0], [0, 0], [0, 0], UPN, CURB); mb.quad(A0, A1, B1, B0, [0, 0], [0, 0], [0, 0], [0, 0], UPN, col); mb.quad(A1, a1, b1, B1, [0, 0], [0, 0], [0, 0], [0, 0], UPN, CURB);
+          // curb faces down to the road
+          for (const [p, q, yp, yq] of [[a.p0, b.p0, a.y, b.y], [a.p1, b.p1, a.y, b.y]]) mb.quad([p[0], yp - 0.02, p[1]], [q[0], yq - 0.02, q[1]], [q[0], yq + 0.16, q[1]], [p[0], yp + 0.16, p[1]], [0, 0], [0, 0], [0, 0], [0, 0], null, CURB);
+          addDeck(T, [a.p0, b.p0, b.p1, a.p1], null, 0.15 + A.rank * 0.012 + 0.16);
+        }
+        // rounded-off noses at each end
+        for (const q of [run[0], run[run.length - 1]]) mb.quad([q.p0[0], q.y - 0.02, q.p0[1]], [q.p1[0], q.y - 0.02, q.p1[1]], [q.p1[0], q.y + 0.16, q.p1[1]], [q.p0[0], q.y + 0.16, q.p0[1]], [0, 0], [0, 0], [0, 0], [0, 0], null, CURB);
+        built++;
+      }
+      run = [];
+    };
+    for (const q of S) { if (q) run.push(q); else flush(); } flush();
+  }
+  const g = mb.geo(); if (g) { if (!MAT.median) MAT.median = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, side: THREE.DoubleSide }); const m = new THREE.Mesh(g, MAT.median); m.receiveShadow = true; T.group.add(m); }
+  T.medians = built;
 }

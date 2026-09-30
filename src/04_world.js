@@ -186,7 +186,7 @@ function parseTile(data, tx, ty) {
         if (e.nd && e.nd.length === pts.length) P.roads.push({ id: e.id, tags: t, nodes: e.nd, pts, own });
         continue;
       }
-      if (t.railway === 'rail' || t.railway === 'light_rail' || t.railway === 'disused' || t.railway === 'spur') { if (t.tunnel !== 'yes') P.lines.push({ kind: 'rail', pts }); }
+      if (t.railway === 'rail' || t.railway === 'light_rail' || t.railway === 'disused' || t.railway === 'spur') { if (t.tunnel !== 'yes') P.lines.push({ kind: 'rail', pts, bridge: t.bridge === 'yes' || t.bridge === 'viaduct', service: t.service || '' }); }
       if (t.waterway && !closed && t.tunnel !== 'culvert' && t.tunnel !== 'yes') P.lines.push({ kind: 'water', pts, w: t.waterway === 'river' ? 30 : t.waterway === 'canal' ? 8 : t.waterway === 'stream' ? 3.5 : 2.2 });
       if (t.natural === 'tree_row') P.treeRows.push(pts);
       if (t.barrier === 'fence' && !closed) P.fences.push(pts);
@@ -953,6 +953,7 @@ async function buildTile(T) {
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
   TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
+  try { TT('buildRails', () => buildRails(T, P)); } catch (e) { console.warn('railway track skipped', e); }
   await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
   try { TT('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); }
   try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();

@@ -13,6 +13,8 @@ html = html.replace('<script type="importmap">', '<script>window.GV_DATA = "data
 fs.writeFileSync(path.join(site, 'index.html'), html);
 const dataSrc = path.join(root, 'public-data', 'osm'); let n = 0;
 if (fs.existsSync(dataSrc)) for (const f of fs.readdirSync(dataSrc)) { fs.copyFileSync(path.join(dataSrc, f), path.join(site, 'data', 'osm', f)); if (f.endsWith('.gz')) n++; }
+// railways, level crossings, bus routes and stops (npm run fetch-transit)
+if (fs.existsSync(path.join(root, 'public-data', 'transit.json'))) fs.copyFileSync(path.join(root, 'public-data', 'transit.json'), path.join(site, 'data', 'transit.json'));
 // tree canopy heights per square (npm run fetch-canopy)
 const canSrc = path.join(root, 'public-data', 'canopy'); let nc = 0;
 if (fs.existsSync(canSrc)) { fs.mkdirSync(path.join(site, 'data', 'canopy'), { recursive: true }); for (const f of fs.readdirSync(canSrc)) { fs.copyFileSync(path.join(canSrc, f), path.join(site, 'data', 'canopy', f)); if (f.endsWith('.gz')) nc++; } }

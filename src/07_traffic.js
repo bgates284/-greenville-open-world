@@ -75,6 +75,7 @@ const Traffic = {
     const P = Player; const pc = P.car;
     for (let ci = this.cars.length - 1; ci >= 0; ci--) {
       const c = this.cars[ci];
+      if (c.bus) continue; // buses drive their routes (07e_transit.js)
       if (c.road.removed || Math.hypot(c.x - focus.x, c.z - focus.z) > 520 || (c.stuck > 40 && Math.hypot(c.x - focus.x, c.z - focus.z) > 80) || this.cars.length > want + 4 && Math.hypot(c.x - focus.x, c.z - focus.z) > 300) { this.remove(c); continue; }
       if (c.phys || c.wreck) { c.stuck += dt; c.speed = 0; continue; } // being shoved around by physics (07d_phys.js), or a wreck
       const sg = segOf(c); const remain = sg.L - c.s;
@@ -95,6 +96,8 @@ const Traffic = {
         const st = sigState(Math.abs(sg.dx * sig.ax + sg.dz * sig.az) > 0.7071, simT);
         const stopD = remain - (c.road.w / 2 + 5);
         if ((st === 0 || (st === 1 && stopD > 10)) && stopD > -1.5) vDes = Math.min(vDes, stopD < 0.4 ? 0 : Math.sqrt(2 * 3.2 * stopD));
+      } else if (World.levelX && World.levelX.get(nid) && World.levelX.get(nid).active && remain < 90) { // gates down: wait for the train
+        const stopD = remain - 7; if (stopD > -1.5) vDes = Math.min(vDes, stopD < 0.4 ? 0 : Math.sqrt(2 * 3.2 * stopD));
       } else if (World.stops.has(nid) && c.stopped !== nid && remain < 35) {
         const stopD = remain - 2.5; vDes = Math.min(vDes, stopD < 0.3 ? 0 : Math.sqrt(2 * 3 * stopD));
         if (c.speed < 0.3 && stopD < 1.5) { c.wait += dt; if (c.wait > 1.4) { c.stopped = nid; c.wait = 0; } }
@@ -137,7 +140,7 @@ const Traffic = {
         const dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz);
         if (d < 1.95 && d > 1e-3) {
           const imp = Math.abs(C.speed);
-          if (Phys.ready && imp > 3) { Phys.dynCar(c, fx * C.speed * 0.6, fz * C.speed * 0.6); C.speed *= 0.7; Sound.thud(imp); UI.shake(Math.min(1, imp / 25)); continue cars; } // shove it
+          if (Phys.ready && imp > 3 && !c.bus) { Phys.dynCar(c, fx * C.speed * 0.6, fz * C.speed * 0.6); C.speed *= 0.7; Sound.thud(imp); UI.shake(Math.min(1, imp / 25)); continue cars; } // shove it
           const push = 1.95 - d; C.pos.x += dx / d * push; C.pos.z += dz / d * push; C.speed *= 0.55; c.bump = 2.5; c.speed *= 0.3;
           if (imp > 4) { Sound.thud(imp); UI.shake(Math.min(1, imp / 25)); }
         }
