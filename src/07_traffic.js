@@ -67,7 +67,7 @@ const Traffic = {
     c.next = chooseNext(c, carAllow, r);
     this.cars.push(c);
   },
-  remove(c) { c.obj.removeFromParent(); this.cars.splice(this.cars.indexOf(c), 1); },
+  remove(c) { c.removed = true; Phys.forget(c); c.obj.removeFromParent(); this.cars.splice(this.cars.indexOf(c), 1); },
   update(dt, focus, simT) {
     this.t = simT;
     const want = Math.round(Q.traffic * (Env.night > 0.6 ? 0.6 : 1));
@@ -76,6 +76,7 @@ const Traffic = {
     for (let ci = this.cars.length - 1; ci >= 0; ci--) {
       const c = this.cars[ci];
       if (c.road.removed || Math.hypot(c.x - focus.x, c.z - focus.z) > 520 || (c.stuck > 40 && Math.hypot(c.x - focus.x, c.z - focus.z) > 80) || this.cars.length > want + 4 && Math.hypot(c.x - focus.x, c.z - focus.z) > 300) { this.remove(c); continue; }
+      if (c.phys || c.wreck) { c.stuck += dt; c.speed = 0; continue; } // being shoved around by physics (07d_phys.js), or a wreck
       const sg = segOf(c); const remain = sg.L - c.s;
       let vDes = c.road.v * c.drive;
       // look ahead: gap to the vehicle in front
@@ -127,15 +128,17 @@ const Traffic = {
   brakeMat() { if (!this._bm) { this._bm = MAT.taillight.clone(); } this._bm.emissiveIntensity = 4 + Env.night * 2; return this._bm; },
   collidePlayerCar(C) {
     const fx = Math.sin(C.yaw), fz = Math.cos(C.yaw);
-    for (const c of this.cars) {
+    cars: for (const c of this.cars) {
       if (Math.abs(c.x - C.pos.x) > 8 || Math.abs(c.z - C.pos.z) > 8) continue;
+      if (c.phys) continue; // physics already has it
       const cf = [Math.sin(c.yaw), Math.cos(c.yaw)]; const half = c.len / 2 - 0.9;
       for (const k of [1.35, -1.35]) for (const kk of [half, -half]) {
         const ax = C.pos.x + fx * k, az = C.pos.z + fz * k, bx = c.x + cf[0] * kk, bz = c.z + cf[1] * kk;
         const dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz);
         if (d < 1.95 && d > 1e-3) {
-          const push = 1.95 - d; C.pos.x += dx / d * push; C.pos.z += dz / d * push;
-          const imp = Math.abs(C.speed); C.speed *= 0.55; c.bump = 2.5; c.speed *= 0.3;
+          const imp = Math.abs(C.speed);
+          if (Phys.ready && imp > 3) { Phys.dynCar(c, fx * C.speed * 0.6, fz * C.speed * 0.6); C.speed *= 0.7; Sound.thud(imp); UI.shake(Math.min(1, imp / 25)); continue cars; } // shove it
+          const push = 1.95 - d; C.pos.x += dx / d * push; C.pos.z += dz / d * push; C.speed *= 0.55; c.bump = 2.5; c.speed *= 0.3;
           if (imp > 4) { Sound.thud(imp); UI.shake(Math.min(1, imp / 25)); }
         }
       }

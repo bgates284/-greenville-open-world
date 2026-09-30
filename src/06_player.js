@@ -212,7 +212,9 @@ const Player = {
       let nx = C.pos.x + fx * C.speed * dt / sub, nz = C.pos.z + fz * C.speed * dt / sub;
       let bumped = false;
       for (const k of [1.35, -1.35]) {
-        const ox = nx + fx * k, oz = nz + fz * k; const c = collideCircle(ox, oz, 0.98, C.pos.y);
+        const ox = nx + fx * k, oz = nz + fz * k;
+        if (k * C.speed > 0) { const m = Phys.knockAt(ox, oz, 0.98, fx * C.speed, fz * C.speed); if (m) { C.speed *= 1 - Math.min(0.4, m / (m + 1500) * 0.6); UI.shake(Math.min(0.8, m / 2000 + 0.15)); } } // knock it over (07d_phys.js)
+        const c = collideCircle(ox, oz, 0.98, C.pos.y);
         if (c.hit) { nx += c.x - ox; nz += c.z - oz; bumped = true; const into = -(c.nx * fx + c.nz * fz) * Math.sign(C.speed); if (into > 0.3 && Math.abs(C.speed) > 6) { UI.shake(Math.min(1, Math.abs(C.speed) / 25)); Sound.thud(Math.abs(C.speed)); } }
       }
       if (bumped) C.speed *= 0.86;

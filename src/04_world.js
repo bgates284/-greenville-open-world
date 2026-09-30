@@ -99,6 +99,8 @@ function classAt(x, z) {
   const W = T.W; const u = Math.floor((x - W.x0) / (W.x1 - W.x0) * 512), v = Math.floor((z - W.z0) / (W.z1 - W.z0) * 512);
   if (u < 0 || v < 0 || u > 511 || v > 511) return 0; return T.treeR[v * 512 + u];
 }
+// things a car can knock over: the obstacle circle remembers which instance(s) draw it (see 07d_phys.js)
+function knockable(T, o, k) { k.T = T; k.key = T.key; (k.obs = k.obs || []).push(o); o.k = k; return o; }
 // push a circle out of buildings / obstacles. returns {x,z,hit,nx,nz}
 function collideCircle(x, z, r, y, withObs = true) {
   let hit = false, nx = 0, nz = 0;
@@ -118,6 +120,7 @@ function collideCircle(x, z, r, y, withObs = true) {
       }
     }
     if (withObs) for (const o of World.obsHash.query(x - r, z - r, x + r, z + r)) {
+      if (o.dead) continue; // knocked over (07d_phys.js)
       const dx = x - o.x, dz = z - o.z, d = Math.hypot(dx, dz), m = r + o.r;
       if (d < m && d > 1e-4) { x += dx / d * (m - d); z += dz / d * (m - d); hit = true; nx = dx / d; nz = dz / d; }
     }
@@ -521,7 +524,8 @@ function buildRoadMeshes(T, P) {
     lampInst.forEach((L, i) => {
       o.position.set(L[0], L[1], L[2]); o.rotation.set(0, L[3], 0); o.updateMatrix(); pole.setMatrixAt(i, o.matrix); head.setMatrixAt(i, o.matrix);
       T.lampPos.push([L[0] + Math.sin(L[3]) * GEO.lampHeadZ, L[1] + GEO.lampHeadY, L[2] + Math.cos(L[3]) * GEO.lampHeadZ]);
-      T.hashItems.push([World.obsHash, World.obsHash.insert({ x: L[0], z: L[2], r: 0.2 }, L[0] - 0.2, L[2] - 0.2, L[0] + 0.2, L[2] + 0.2)]);
+      const ob = knockable(T, { x: L[0], z: L[2], r: 0.2 }, { kind: 'lamp', ims: [pole, head], idx: i, mass: 90, min: 4, f: 0.25, lamp: T.lampPos[T.lampPos.length - 1] });
+      T.hashItems.push([World.obsHash, World.obsHash.insert(ob, L[0] - 0.2, L[2] - 0.2, L[0] + 0.2, L[2] + 0.2)]);
     });
     pole.castShadow = true; T.group.add(pole, head);
   }
@@ -725,7 +729,8 @@ function buildTrees(T, P) {
       o.position.set(t[0], H(t[0], t[1]) - 0.1, t[1]); o.rotation.set(0, t[3], 0); o.scale.set(t[2], t[2] * (0.9 + (i % 7) * 0.04), t[2]); o.updateMatrix(); im.setMatrixAt(i, o.matrix);
       const k = 0.82 + ((i * 2654435761) >>> 0) % 1000 / 1000 * 0.36; col.setRGB(k, k * (0.96 + (i % 5) * 0.02), k * 0.95); im.setColorAt(i, col);
       const rr = sp === 'myrtle' ? 0.25 : 0.4 * t[2];
-      T.hashItems.push([World.obsHash, World.obsHash.insert({ x: t[0], z: t[1], r: rr }, t[0] - rr, t[1] - rr, t[0] + rr, t[1] + rr)]);
+      const ob = knockable(T, { x: t[0], z: t[1], r: rr }, { kind: 'tree', ims: [im], idx: i, mass: 160 * t[2] * t[2], min: t[2] > 1.1 ? 9 : 5.5, f: sp === 'myrtle' ? 0.4 : 0.28 });
+      T.hashItems.push([World.obsHash, World.obsHash.insert(ob, t[0] - rr, t[1] - rr, t[0] + rr, t[1] + rr)]);
     });
     im.castShadow = Q !== QUALITY.low; im.receiveShadow = true; im.computeBoundingSphere(); T.group.add(im);
   }
@@ -736,7 +741,7 @@ function buildSignals(T, P) {
   const body = [], lamps = { Ar: [], Ay: [], Ag: [], Br: [], By: [], Bg: [] };
   const box = (w, h, d, m) => { const g = new THREE.BoxGeometry(w, h, d); g.applyMatrix4(m); return prep(g); };
   const cyl = (r1, r2, h, m) => { const g = new THREE.CylinderGeometry(r1, r2, h, 6); g.applyMatrix4(m); return prep(g); };
-  const M = new THREE.Matrix4(), M2 = new THREE.Matrix4(), Q4 = new THREE.Quaternion();
+  const M = new THREE.Matrix4(), M2 = new THREE.Matrix4(), Q4 = new THREE.Quaternion(); const stops = [];
   for (const id of T.signalIds) {
     const s = World.signals.get(id); if (!s) continue;
     const adj = World.nodeAdj.get(id) || []; let wmax = 8; for (const a of adj) wmax = Math.max(wmax, a.road.w);
@@ -761,9 +766,17 @@ function buildSignals(T, P) {
     let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; if (idx > 0) { dx = -dx; dz = -dz; }
     // sign faces traffic that approaches the node along this way
     const sx = p[0] + dz * (road.w / 2 + 1.2) * (idx > 0 ? -1 : 1), sz = p[1] - dx * (road.w / 2 + 1.2) * (idx > 0 ? -1 : 1);
-    const gy = H(sx, sz); M.makeTranslation(sx, gy + 1.1, sz); body.push(cyl(0.04, 0.04, 2.2, M));
-    const oct = new THREE.CylinderGeometry(0.38, 0.38, 0.04, 8); oct.rotateX(Math.PI / 2); oct.rotateZ(Math.PI / 8); M.makeRotationY(Math.atan2(dx, dz)); M.setPosition(sx, gy + 2.2, sz); oct.applyMatrix4(M);
-    lamps.stop = lamps.stop || []; lamps.stop.push(prep(oct));
+    stops.push([sx, H(sx, sz), sz, Math.atan2(dx, dz)]);
+  }
+  if (stops.length) { // instanced so a car can knock one flat
+    if (!GEO.stopPole) { GEO.stopPole = new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6); GEO.stopPole.translate(0, 1.1, 0); const o = new THREE.CylinderGeometry(0.38, 0.38, 0.04, 8); o.rotateX(Math.PI / 2); o.rotateZ(Math.PI / 8); o.translate(0, 2.2, 0); GEO.stopOct = o; }
+    const pole = new THREE.InstancedMesh(GEO.stopPole, MAT.signalBody, stops.length), oct = new THREE.InstancedMesh(GEO.stopOct, MAT.stopRed, stops.length);
+    stops.forEach((s, i) => {
+      M.makeRotationY(s[3]); M.setPosition(s[0], s[1], s[2]); pole.setMatrixAt(i, M); oct.setMatrixAt(i, M);
+      const ob = knockable(T, { x: s[0], z: s[2], r: 0.1 }, { kind: 'stop', ims: [pole, oct], idx: i, mass: 25, min: 2, f: 0.5 });
+      T.hashItems.push([World.obsHash, World.obsHash.insert(ob, s[0] - 0.2, s[2] - 0.2, s[0] + 0.2, s[2] + 0.2)]);
+    });
+    pole.castShadow = true; pole.computeBoundingSphere(); oct.computeBoundingSphere(); T.group.add(pole, oct);
   }
   if (body.length) { const m = new THREE.Mesh(mergeGeometries(body), MAT.signalBody); m.castShadow = true; T.group.add(m); }
   for (const k in lamps) if (lamps[k].length) { const m = new THREE.Mesh(mergeGeometries(lamps[k]), k === 'stop' ? MAT.stopRed : MAT.sig[k]); T.group.add(m); }
@@ -797,7 +810,8 @@ function buildParked(T, P) {
     L.forEach((s, i) => {
       o.position.set(s[0], H(s[0], s[1]) + 0.05, s[1]); o.rotation.set(0, s[2], 0); o.updateMatrix();
       meshes.forEach(m => m.setMatrixAt(i, o.matrix)); col.setHex(CAR_COLORS[Math.floor(hashN(i * 7 + T.tx) * CAR_COLORS.length)]); meshes[0].setColorAt(i, col);
-      for (const k of [-1.2, 1.2]) { const x = s[0] + Math.sin(s[2]) * k, z = s[1] + Math.cos(s[2]) * k; T.hashItems.push([World.obsHash, World.obsHash.insert({ x, z, r: 1.0 }, x - 1, z - 1, x + 1, z + 1)]); }
+      const kk = { kind: 'car', ims: meshes, idx: i, mass: 1300, min: 3, f: 1 };
+      for (const k of [-1.2, 1.2]) { const x = s[0] + Math.sin(s[2]) * k, z = s[1] + Math.cos(s[2]) * k; T.hashItems.push([World.obsHash, World.obsHash.insert(knockable(T, { x, z, r: 1.0 }, kk), x - 1, z - 1, x + 1, z + 1)]); }
     });
     meshes[0].castShadow = true; meshes.forEach(m => { m.computeBoundingSphere(); T.group.add(m); });
   }
@@ -969,7 +983,7 @@ function buildStreetSigns(T, P) {
   MAT.signMats.add(mat); T.signMat = mat; T.signTex = tex;
   const mb = new MB(); const poles = [];
   for (const s of signs) {
-    const gy = H(s.x, s.z); poles.push(s);
+    const gy = H(s.x, s.z); poles.push(s); s.gy = gy; s.v0 = mb.p.length / 3;
     s.blades.forEach(([name, d], k) => {
       const sl = slot.get(name); if (!sl) return;
       const y = gy + 2.75 + k * 0.33; const L = sl.len, hx = d[0] * L / 2, hz = d[1] * L / 2;
@@ -982,10 +996,15 @@ function buildStreetSigns(T, P) {
         else mb.quad(a, b, c2, dd, [sl.u1, sl.v1], [sl.u0, sl.v1], [sl.u0, sl.v0], [sl.u1, sl.v0], [-nx, 0, -nz]);
       }
     });
+    s.v1 = mb.p.length / 3;
   }
-  const geo = mb.geo(); if (geo) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; T.group.add(m); }
+  const geo = mb.geo(); let plates = null; if (geo) { plates = new THREE.Mesh(geo, mat); plates.castShadow = true; T.group.add(plates); }
   const pg = new THREE.CylinderGeometry(0.04, 0.05, 3.4, 6); pg.translate(0, 1.7, 0);
   const im = new THREE.InstancedMesh(pg, MAT.lampPole, poles.length); const M = new THREE.Matrix4();
-  poles.forEach((s, i) => { M.makeTranslation(s.x, H(s.x, s.z), s.z); im.setMatrixAt(i, M); T.hashItems.push([World.obsHash, World.obsHash.insert({ x: s.x, z: s.z, r: 0.12 }, s.x - .2, s.z - .2, s.x + .2, s.z + .2)]); });
+  poles.forEach((s, i) => {
+    M.makeTranslation(s.x, s.gy, s.z); im.setMatrixAt(i, M);
+    const ob = knockable(T, { x: s.x, z: s.z, r: 0.12 }, { kind: 'sign', ims: [im], idx: i, mass: 40, min: 3, f: 0.6, plate: plates && s.v1 > s.v0 ? { mesh: plates, v0: s.v0, v1: s.v1 } : null });
+    T.hashItems.push([World.obsHash, World.obsHash.insert(ob, s.x - .2, s.z - .2, s.x + .2, s.z + .2)]);
+  });
   im.castShadow = true; T.group.add(im);
 }

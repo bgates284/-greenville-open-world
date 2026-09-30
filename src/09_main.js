@@ -51,7 +51,7 @@ const Game = {
       Player.pos.set(x, groundY(x, z, Plane.pos.y + 1), z); Player.yaw = Math.atan2(-L.x, -L.z); Player.camYaw = Math.atan2(L.x, L.z) + 0.5; Player.camPitch = 0.22; Player.camDist = 7;
       Player.camPos.set(x + Math.sin(Player.camYaw) * 7, Player.pos.y + 3, z + Math.cos(Player.camYaw) * 7);
     }
-    this.started = true;
+    this.started = true; setTimeout(() => Phys.load(), 1500);
     setTimeout(() => Prefetch.start(), 8000); // new players: save the whole county in the background
     $('menu').hidden = true; $('hud').hidden = false; this.playing = true; this.paused = false; canvasEl.focus();
     UI.toast(/your plane/.test(name) ? 'Welcome to Pitt-Greenville Airport — walk to the plane and press E to fly' : 'Welcome to ' + name + ' — press E to drive, M for the map', 5000);
@@ -59,6 +59,7 @@ const Game = {
   async teleport(x, z) { await this.goTo(x, z, 'this spot'); },
   async goTo(x, z, label) {
     UI.loading(true, 'Building Greenville', 'Finding ' + label + '…', 0.02);
+    if (Phys.ready) Phys.clear();
     for (const c of Traffic.cars.slice()) Traffic.remove(c);
     for (const p of Peds.list.slice()) Peds.remove(p); for (const c of Peds.crowd) disposePerson(c.person); Peds.crowd = []; HospitalLife.clear(); Hangouts.clear(); if (Cine.active) Cine.finish();
     this.menuFocus.set(x, 20, z);
@@ -104,7 +105,7 @@ const Game = {
     const f = sim ? (Cine.active ? Cine.focus : Player.focus()) : this.menuFocus;
     this._tu = (this._tu || 0) + dt; if (this._tu > 0.5) { this._tu = 0; Tiles.update(f.x, f.z); Env.updateLampLights(f); }
     Env.update(sim ? dt : 0, f);
-    if (sim) { Traffic.update(dt, f, this.simT); Peds.update(dt, f); Peds.updateCrowd(dt, f); try { HospitalLife.update(dt, f); } catch (e) { if (!HospitalLife.warned) { HospitalLife.warned = 1; console.warn('hospital people skipped', e); } } try { Hangouts.update(dt, f); } catch (e) { if (!Hangouts.warned) { Hangouts.warned = 1; console.warn('smoke-shop regulars skipped', e); } } updateSignalLights(this.simT); Grass.update(f); Sound.update(dt); UI.update(dt); }
+    if (sim) { Traffic.update(dt, f, this.simT); try { Phys.update(dt); } catch (e) { if (!Phys.warned) { Phys.warned = 1; console.warn('physics skipped', e); } } Peds.update(dt, f); Peds.updateCrowd(dt, f); try { HospitalLife.update(dt, f); } catch (e) { if (!HospitalLife.warned) { HospitalLife.warned = 1; console.warn('hospital people skipped', e); } } try { Hangouts.update(dt, f); } catch (e) { if (!Hangouts.warned) { Hangouts.warned = 1; console.warn('smoke-shop regulars skipped', e); } } updateSignalLights(this.simT); Grass.update(f); Sound.update(dt); UI.update(dt); }
     this.bloom.strength = 0.18 + Env.night * 0.55; this.bloom.threshold = lerp(0.92, 0.6, Env.night);
     if (sim) Cine.apply();
     if (Q.bloom) this.composer.render(dt); else renderer.render(scene, camera);
@@ -121,5 +122,5 @@ addEventListener('error', e => showErr((e.message || e.error) + (e.filename ? '\
 addEventListener('unhandledrejection', e => showErr(e.reason && (e.reason.stack || e.reason.message) || e.reason));
 
 // ---- boot ----
-try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, Heli, HospitalLife, Hangouts, Cine, RB, NPCKit, Food, nearestRoad, insideBuilding, onRoadSurface, groundY, Env, Store, Net, THREE, scene, renderer, camera, H }; }
+try { Game.init(); window.GV = { Game, World, Tiles, Player, Plane, Airport, Traffic, Peds, Heli, HospitalLife, Hangouts, Cine, Phys, RB, NPCKit, Food, nearestRoad, insideBuilding, onRoadSurface, groundY, Env, Store, Net, THREE, scene, renderer, camera, H }; }
 catch (e) { console.error(e); showErr('Startup error: ' + (e && e.stack || e)); }
