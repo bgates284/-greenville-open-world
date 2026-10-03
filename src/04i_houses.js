@@ -41,7 +41,7 @@ function houseCandidate(B, k) {
 }
 // builds the house into the map square's buckets; returns the roof top height, or 0 to fall back
 function buildHouse(B, k) {
-  const { obb, rng, gavg, buckets, roofS, roofF, detail, glass, glassLit } = k; const t = B.tags;
+  const { obb, rng, gavg, buckets, roofS, roofF, detail, glass, glassLit } = k; const t = B.tags; const lite = Q === QUALITY.low; // Low graphics: skip the finest trim
   const mat = (t['building:material'] || '').toLowerCase();
   const lvTag = parseFloat(t['building:levels']) || 0; const year = (B.parcel && B.parcel.year) || parseInt(t.start_date) || 0;
   const era = houseEra(year, rng, k.area, lvTag);
@@ -110,7 +110,7 @@ function buildHouse(B, k) {
   // ---- foundation (brick skirt from the ground up to the floor) ----
   const fb = gmin - 0.6;
   for (const F of Object.values(faces)) { const a = FP(F, 0, 0, 0.04), b = FP(F, F.len, 0, 0.04); quad(buckets.brickPlain, [a[0], fb, a[2]], [b[0], fb, b[2]], [b[0], floor, b[2]], [a[0], floor, a[2]], [F.n[0], 0, F.n[1]], fCol, [[0, fb / T], [F.len / T, fb / T], [F.len / T, floor / T], [0, floor / T]]); }
-  if (era === 'mill') for (const F of Object.values(faces)) for (let s = 1.2; s < F.len - 0.6; s += 2.4) fquad(detail, F, s - 0.02, s + 0.02, fb, floor - 0.05, 0.05, new THREE.Color('#5d5952')); // pier shadows/lattice hint
+  if (era === 'mill' && !lite) for (const F of Object.values(faces)) for (let s = 1.2; s < F.len - 0.6; s += 2.4) fquad(detail, F, s - 0.02, s + 0.02, fb, floor - 0.05, 0.05, new THREE.Color('#5d5952')); // pier shadows/lattice hint
   // ---- walls ----
   const wTop = wallTop;
   for (const F of Object.values(faces)) {
@@ -150,7 +150,7 @@ function buildHouse(B, k) {
         for (const side of [-1, 1]) { const p0 = R(s * (lenH + o) + s * 0.02, side * (half + o), eave), p1 = R(s * (lenH + o) + s * 0.02, 0, ridgeY + 0.02); const q0 = [p0[0], p0[1] - 0.2, p0[2]], q1 = [p1[0], p1[1] - 0.2, p1[2]]; quad(detail, q0, p0, p1, q1, rn(s, 0, 0), trim); }
         // gable vent
         const vc = R(s * (lenH + 0.03), 0, wTop + rise * 0.55); const va = R(s * (lenH + 0.03), -0.3, wTop + rise * 0.55 - 0.3), vb = R(s * (lenH + 0.03), 0.3, wTop + rise * 0.55 + 0.3);
-        if (rise > 1.4) box(detail, Math.min(va[0], vb[0]) - (ridgeX ? 0.02 : 0), Math.max(va[0], vb[0]) + (ridgeX ? 0.02 : 0), vc[1] - 0.3, vc[1] + 0.3, Math.min(va[2], vb[2]) - (ridgeX ? 0 : 0.02), Math.max(va[2], vb[2]) + (ridgeX ? 0 : 0.02), trim);
+        if (rise > 1.4 && !lite) box(detail, Math.min(va[0], vb[0]) - (ridgeX ? 0.02 : 0), Math.max(va[0], vb[0]) + (ridgeX ? 0.02 : 0), vc[1] - 0.3, vc[1] + 0.3, Math.min(va[2], vb[2]) - (ridgeX ? 0 : 0.02), Math.max(va[2], vb[2]) + (ridgeX ? 0 : 0.02), trim);
       }
     } else {
       const rr = Math.max(0, lenH - half); const R1 = R(-rr, 0, ridgeY), R2 = R(rr, 0, ridgeY); const wl = (2 * half + 2 * o) / 4;
@@ -183,8 +183,8 @@ function buildHouse(B, k) {
     for (const [s0, s1] of bays) {
       fbox(detail, F, s0 - 0.12, s0, gy0, gy0 + gdH + 0.12, 0, 0.04, trim); fbox(detail, F, s1, s1 + 0.12, gy0, gy0 + gdH + 0.12, 0, 0.04, trim); fbox(detail, F, s0, s1, gy0 + gdH, gy0 + gdH + 0.12, 0, 0.04, trim);
       fquad(detail, F, s0, s1, gy0, gy0 + gdH, 0.045, gCol);
-      { const gc2 = new THREE.Color('#cfcdc6'); for (let k = 1; k < 4; k++) fquad(detail, F, s0 + 0.05, s1 - 0.05, gy0 + k * gdH / 4 - 0.025, gy0 + k * gdH / 4 + 0.015, 0.05, gc2); }
-      if (era === 'new') for (let w = 0; w < 4; w++) { const ws = s0 + 0.2 + w * (s1 - s0 - 0.4) / 4; fquad(glass, F, ws + 0.05, ws + (s1 - s0 - 0.4) / 4 - 0.05, gy0 + gdH * 0.78, gy0 + gdH * 0.94, 0.07, trim); }
+      if (!lite) { const gc2 = new THREE.Color('#cfcdc6'); for (let k = 1; k < 4; k++) fquad(detail, F, s0 + 0.05, s1 - 0.05, gy0 + k * gdH / 4 - 0.025, gy0 + k * gdH / 4 + 0.015, 0.05, gc2); }
+      if (era === 'new' && !lite) for (let w = 0; w < 4; w++) { const ws = s0 + 0.2 + w * (s1 - s0 - 0.4) / 4; fquad(glass, F, ws + 0.05, ws + (s1 - s0 - 0.4) / 4 - 0.05, gy0 + gdH * 0.78, gy0 + gdH * 0.94, 0.07, trim); }
     }
     // foundation below the garage door is just a slab edge
     const ga = FP(F, gS0, 0, 0.05), gb = FP(F, gS1, 0, 0.05); quad(detail, [ga[0], fb, ga[2]], [gb[0], fb, gb[2]], [gb[0], gy0, gb[2]], [ga[0], gy0, ga[2]], [0, 0, 1], new THREE.Color(HOUSE_COL.concrete));
@@ -193,7 +193,7 @@ function buildHouse(B, k) {
   fbox(detail, F, doorS - doorW / 2 - 0.12, doorS - doorW / 2, floor, floor + doorH + 0.14, 0, 0.05, trim); fbox(detail, F, doorS + doorW / 2, doorS + doorW / 2 + 0.12, floor, floor + doorH + 0.14, 0, 0.05, trim);
   fbox(detail, F, doorS - doorW / 2, doorS + doorW / 2, floor + doorH + 0.12, floor + doorH + 0.14 + 0.06, 0, 0.05, trim);
   fquad(detail, F, doorS - doorW / 2, doorS + doorW / 2, floor, floor + doorH, 0.055, doorCol);
-  { const pc = doorCol.clone().multiplyScalar(0.85); for (const [a, b, c, d] of [[0.12, 0.42, 0.18, 1.0], [0.53, 0.83, 0.18, 1.0], [0.12, 0.42, 1.15, 1.95], [0.53, 0.83, 1.15, 1.95]]) fquad(detail, F, doorS - doorW / 2 + a * doorW, doorS - doorW / 2 + b * doorW, floor + c, floor + d, 0.062, pc); }
+  if (!lite) { const pc = doorCol.clone().multiplyScalar(0.85); for (const [a, b, c, d] of [[0.12, 0.42, 0.18, 1.0], [0.53, 0.83, 0.18, 1.0], [0.12, 0.42, 1.15, 1.95], [0.53, 0.83, 1.15, 1.95]]) fquad(detail, F, doorS - doorW / 2 + a * doorW, doorS - doorW / 2 + b * doorW, floor + c, floor + d, 0.062, pc); }
   fbox(detail, F, doorS + doorW / 2 - 0.14, doorS + doorW / 2 - 0.09, floor + 0.98, floor + 1.03, 0.06, 0.11, new THREE.Color('#c9a74a'));
   if (era === 'new' || era === 'suburb') fquad(glass, F, doorS - doorW / 2, doorS + doorW / 2, floor + doorH + 0.02, floor + doorH + 0.12, 0.052, trim);
   // ---- windows ----
@@ -207,8 +207,8 @@ function buildHouse(B, k) {
     fbox(detail, F, s - w / 2 - 0.16, s + w / 2 + 0.16, y0 - 0.12, y0 - 0.06, 0, 0.1, trim);    // sill
     const lt = rng() < lit * 0.8; fquad(lt ? glassLit : glass, F, s - w / 2, s + w / 2, y0, y0 + h, 0.03, trim);
     // sashes and muntins (colonial grids on newer houses, 2-over-2 on old ones)
-    fquad(detail, F, s - w / 2, s + w / 2, y0 + h / 2 - 0.03, y0 + h / 2 + 0.03, 0.045, trim);
-    const cols = opt.picture ? 4 : era === 'mill' ? 1 : era === 'ranch' ? 1 : 2; const rows = era === 'mill' ? 1 : era === 'ranch' ? 1 : 2;
+    if (!lite) fquad(detail, F, s - w / 2, s + w / 2, y0 + h / 2 - 0.03, y0 + h / 2 + 0.03, 0.045, trim);
+    const cols = lite ? 0 : opt.picture ? 4 : era === 'mill' ? 1 : era === 'ranch' ? 1 : 2; const rows = lite ? 1 : era === 'mill' ? 1 : era === 'ranch' ? 1 : 2;
     for (let c = 1; c <= cols; c++) fquad(detail, F, s - w / 2 + c * w / (cols + 1) - 0.012, s - w / 2 + c * w / (cols + 1) + 0.012, y0, y0 + h, 0.042, trim);
     if (rows > 1) for (const yy of [y0 + h * 0.25, y0 + h * 0.75]) fquad(detail, F, s - w / 2, s + w / 2, yy - 0.012, yy + 0.012, 0.042, trim);
     if (shutters && !opt.noShutter && F === faces.front) for (const sd of [-1, 1]) {
@@ -250,7 +250,7 @@ function buildHouse(B, k) {
       const ph = floor + (era === 'mill' ? 2.75 : 2.6); const postCol = trim; const nPosts = Math.max(2, Math.round((px1 - px0) / 2.4) + 1);
       for (let i = 0; i < nPosts; i++) { const x = px0 + 0.15 + i * (px1 - px0 - 0.3) / (nPosts - 1); const r = era === 'mill' ? 0.08 : 0.11; box(detail, x - r, x + r, floor, ph, pz1 - 0.3, pz1 - 0.3 + 2 * r, postCol); }
       box(detail, px0, px1, ph, ph + 0.22, pz1 - 0.34, pz1 - 0.06, trim); // beam
-      if (era === 'mill' || era === 'new') for (let i = 0; i < nPosts - 1; i++) { const xa = px0 + 0.15 + i * (px1 - px0 - 0.3) / (nPosts - 1) + 0.1, xb = px0 + 0.15 + (i + 1) * (px1 - px0 - 0.3) / (nPosts - 1) - 0.1; if (Math.abs((xa + xb) / 2 + W2 - doorS) < 1) continue; box(detail, xa, xb, floor + 0.85, floor + 0.92, pz1 - 0.26, pz1 - 0.18, trim); for (let x = xa + 0.1; x < xb; x += 0.2) { quad(detail, [x - 0.02, floor + 0.05, pz1 - 0.2], [x + 0.02, floor + 0.05, pz1 - 0.2], [x + 0.02, floor + 0.86, pz1 - 0.2], [x - 0.02, floor + 0.86, pz1 - 0.2], [0, 0, 1], trim); quad(detail, [x + 0.02, floor + 0.05, pz1 - 0.24], [x - 0.02, floor + 0.05, pz1 - 0.24], [x - 0.02, floor + 0.86, pz1 - 0.24], [x + 0.02, floor + 0.86, pz1 - 0.24], [0, 0, -1], trim); } }
+      if (era === 'mill' || era === 'new') for (let i = 0; i < nPosts - 1; i++) { const xa = px0 + 0.15 + i * (px1 - px0 - 0.3) / (nPosts - 1) + 0.1, xb = px0 + 0.15 + (i + 1) * (px1 - px0 - 0.3) / (nPosts - 1) - 0.1; if (Math.abs((xa + xb) / 2 + W2 - doorS) < 1) continue; box(detail, xa, xb, floor + 0.85, floor + 0.92, pz1 - 0.26, pz1 - 0.18, trim); for (let x = xa + 0.1; x < xb && !lite; x += 0.2) { quad(detail, [x - 0.02, floor + 0.05, pz1 - 0.2], [x + 0.02, floor + 0.05, pz1 - 0.2], [x + 0.02, floor + 0.86, pz1 - 0.2], [x - 0.02, floor + 0.86, pz1 - 0.2], [0, 0, 1], trim); quad(detail, [x + 0.02, floor + 0.05, pz1 - 0.24], [x - 0.02, floor + 0.05, pz1 - 0.24], [x - 0.02, floor + 0.86, pz1 - 0.24], [x + 0.02, floor + 0.86, pz1 - 0.24], [0, 0, -1], trim); } }
       const oy = 0.3; // roof overhang
       if (porchRoof === 'shed') {
         const yIn = Math.min(wTop - 0.1, ph + 0.9), yOut = ph + 0.2;

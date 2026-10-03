@@ -144,7 +144,9 @@ const UI = {
     if (silent || !Env.sun) return;
     renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr)); Game.resize();
     Env.sun.castShadow = Q.shadows > 0; if (Q.shadows) { Env.sun.shadow.mapSize.set(Q.shadows, Q.shadows); if (Env.sun.shadow.map) { Env.sun.shadow.map.dispose(); Env.sun.shadow.map = null; } }
-    Env.makeLampLights(); Game.bloom.enabled = Q.bloom; Grass.cx = 1e9;
+    Env.makeLampLights(); Game.bloom.enabled = Q.bloom; Grass.cx = 1e9; Game.resScale = 1;
+    { const p = Garage.pick(); if (p.id !== 'classic') Player.setCar(p.id, p.color); } // Low uses the lighter car model
+    for (const T of Tiles.map.values()) T.detailShown = undefined;
   },
   cacheDirty() { clearTimeout(this._cd); this._cd = setTimeout(() => this.refreshCache(), 800); },
   async refreshCache() {
@@ -253,7 +255,7 @@ const UI = {
       $('area').textContent = (parts.join(' · ') || 'Greenville, NC') + `  ·  ${zToLat(f.z).toFixed(4)}, ${xToLon(f.x).toFixed(4)}`;
     }
     const nl = Tiles.loadingCount() + Net.queue.length; const chip = $('netchip'); chip.textContent = `Loading map · ${nl} area${nl === 1 ? '' : 's'}`; chip.classList.toggle('on', nl > 0);
-    if (!$('dbg').hidden) { const i = renderer.info; $('dbg').textContent = `fps ${Math.round(Game.fps)}\ndraw calls ${i.render.calls}\ntriangles ${(i.render.triangles / 1000).toFixed(0)}k\ntiles ${Tiles.map.size}  roads ${World.roads.size}\ncars ${Traffic.cars.length}  people ${Peds.list.length}\ndownloaded ${Net.downloaded}  net errors ${Net.errors}`; }
+    if (!$('dbg').hidden) { const i = renderer.info; $('dbg').textContent = `fps ${Math.round(Game.fps)}  resolution ${Math.round((Game.resScale || 1) * 100)}%\ndraw calls ${i.render.calls}\ntriangles ${(i.render.triangles / 1000).toFixed(0)}k\ntiles ${Tiles.map.size}  roads ${World.roads.size}\ncars ${Traffic.cars.length}  people ${Peds.list.length}\ndownloaded ${Net.downloaded}  net errors ${Net.errors}`; }
     this.drawMini(f);
   },
   drawMini(f) {

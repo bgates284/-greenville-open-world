@@ -55,9 +55,9 @@ const LANDMARKS = [
 ];
 
 const QUALITY = {
-  low:    { pr: 0.75, shadows: 0,    bloom: false, trees: 1500, tufts: 0,    traffic: 12, peds: 12, radius: 1, lampLights: 0, canvas: 512,  grid: 40, parked: 80 },
-  medium: { pr: 1.0,  shadows: 2048, bloom: true,  trees: 4000, tufts: 3500, traffic: 26, peds: 26, radius: 1, lampLights: 4, canvas: 1024, grid: 64, parked: 200 },
-  high:   { pr: 1.5,  shadows: 4096, bloom: true,  trees: 8000, tufts: 8000, traffic: 40, peds: 40, radius: 2, lampLights: 8, canvas: 1024, grid: 96, parked: 350 },
+  low:    { pr: 0.75, shadows: 0,    bloom: false, detailD: 550, trees: 1000, tufts: 0,    traffic: 12, peds: 12, radius: 1, lampLights: 0, canvas: 512,  grid: 40, parked: 80 },
+  medium: { pr: 1.0,  shadows: 2048, bloom: true,  detailD: 900, trees: 4000, tufts: 3500, traffic: 26, peds: 26, radius: 1, lampLights: 4, canvas: 1024, grid: 64, parked: 200 },
+  high:   { pr: 1.5,  shadows: 4096, bloom: true,  detailD: 1500, trees: 8000, tufts: 8000, traffic: 40, peds: 40, radius: 2, lampLights: 8, canvas: 1024, grid: 96, parked: 350 },
 };
 let Q = QUALITY.low; // every game starts on Low graphics (switch up in the menu)
 

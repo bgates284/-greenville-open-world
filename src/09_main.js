@@ -93,6 +93,13 @@ const Game = {
     requestAnimationFrame(t => this.frame(t));
     let dt = Math.min(0.05, Math.max(0, (now - this.last) / 1000)); this.last = now;
     this.fps = lerp(this.fps, 1 / Math.max(dt, 1e-3), 0.05);
+    // automatic resolution: draw fewer pixels while the frame rate is low, more when there's headroom
+    this._rs = (this._rs || 0) + dt;
+    if (this._rs > 2 && this.playing && !this.paused && !document.hidden) {
+      this._rs = 0; const s0 = this.resScale || 1; let s = s0;
+      if (this.fps < 38) s = Math.max(0.55, s0 - 0.1); else if (this.fps > 56) s = Math.min(1, s0 + 0.05);
+      if (s !== s0) { this.resScale = s; renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr) * s); this.resize(); }
+    }
     U.uTime.value += dt;
     const sim = this.playing && !this.paused;
     if (sim) { this.simT += dt; if (!Cine.active) Player.update(dt); } // the idle cinematic (08b_cinematic.js) holds the player still

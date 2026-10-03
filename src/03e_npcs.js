@@ -203,6 +203,7 @@ const SKIN_TARGET = { W: ['#f1caa9', '#e8b996', '#dcaa89', '#f3d0b5'], B: ['#5e3
 function makeNpc(seed, x, z) {
   if (!NPCKit.ready && !RB.count()) return null;
   const rr = mulberry32(seed * 131 + 7); const r = rr();
+  if (Q === QUALITY.low && rr() < 0.6) return null; // Low graphics: most people use the light built-in figures
   const hosp = nearHospital(x, z);
   if (RB.count() > 0 && rr() < 0.92) {
     let u = rr(), eth = 'W'; for (const [k, w] of DEMO) { if (u < w) { eth = k; break; } u -= w; }

@@ -87,8 +87,9 @@ const Garage = {
   // builds { g, wheels: [{piv, spin, front}], tailMat, wheelR } for the player (same shape as buildSportsCar)
   async build(id, color) {
     if (id === 'classic' || !CAR_MODELS[id]) { const SC = buildSportsCar(color || 0x1745c4); SC.wheelR = 0.36; return SC; }
-    const M = CAR_MODELS[id]; await CarModels.load(M.file);
-    const I = CarModels.instance(M.file, color || M.paint); const { g, W, info } = I;
+    const M = CAR_MODELS[id]; const file = Q === QUALITY.low ? M.file + '_lod' : M.file; // Low graphics: the simplified copy
+    await CarModels.load(file);
+    const I = CarModels.instance(file, color || M.paint); const { g, W, info } = I;
     const wheels = [];
     for (const k of ['fl', 'fr', 'rl', 'rr']) { const w = W[k]; if (!w) continue; const piv = new THREE.Group(); piv.position.copy(w.position); w.removeFromParent(); w.position.set(0, 0, 0); const spin = new THREE.Group(); spin.add(w); piv.add(spin); g.add(piv); wheels.push({ piv, spin, front: k[0] === 'f' }); }
     // brake/tail lights: a clone of the model's own tail-light material (or a light bar) that the game can brighten

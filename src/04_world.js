@@ -728,7 +728,7 @@ async function buildBuildings(T, P) {
   const gs = roofS.geo(); if (gs) { const m = new THREE.Mesh(gs, MAT.shingle); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   const gf = roofF.geo(); if (gf) { const m = new THREE.Mesh(gf, MAT.flatroof); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   addMB(T, decor, lmPlainMat()); addMB(T, seats, standsMat());
-  { const g = houseDetail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.houseTrim); m.castShadow = true; m.receiveShadow = true; T.group.add(m); } }
+  { const g = houseDetail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.houseTrim); m.castShadow = true; m.receiveShadow = true; m.userData.detail = true; T.group.add(m); } }
 }
 
 // ---------- trees ----------
@@ -758,7 +758,7 @@ function buildTrees(T, P) {
   const o = new THREE.Object3D(); const col = new THREE.Color();
   for (const sp in lists) {
     const L = lists[sp]; if (!L.length) continue;
-    const im = new THREE.InstancedMesh(GEO[sp], MAT.tree, L.length);
+    const im = new THREE.InstancedMesh(sp === 'oak' && Q === QUALITY.low ? GEO.oakLo : GEO[sp], MAT.tree, L.length); im.userData.detail = true;
     L.forEach((t, i) => {
       o.position.set(t[0], H(t[0], t[1]) - 0.1, t[1]); o.rotation.set(0, t[3], 0); o.scale.set(t[2], t[2] * (0.9 + (i % 7) * 0.04), t[2]); o.updateMatrix(); im.setMatrixAt(i, o.matrix);
       const k = 0.82 + ((i * 2654435761) >>> 0) % 1000 / 1000 * 0.36; col.setRGB(k, k * (0.96 + (i % 5) * 0.02), k * 0.95); im.setColorAt(i, col);
@@ -877,7 +877,7 @@ function buildParked(T, P) {
       const kk = { kind: 'car', ims: meshes, idx: i, mass: 1300, min: 3, f: 1 };
       for (const k of [-1.2, 1.2]) { const x = s[0] + Math.sin(s[2]) * k, z = s[1] + Math.cos(s[2]) * k; T.hashItems.push([World.obsHash, World.obsHash.insert(knockable(T, { x, z, r: 1.0 }, kk), x - 1, z - 1, x + 1, z + 1)]); }
     });
-    meshes[0].castShadow = true; meshes.forEach(m => { m.computeBoundingSphere(); T.group.add(m); });
+    meshes[0].castShadow = true; meshes.forEach(m => { m.computeBoundingSphere(); m.userData.detail = true; T.group.add(m); });
   }
 }
 
@@ -929,6 +929,17 @@ const Tiles = {
     for (const T of this.map.values()) {
       const d = Math.max(Math.abs(T.tx - tx), Math.abs(T.ty - ty));
       if (d > R + 1 && (T.state === 'ready' || T.state === 'queued')) this.unload(T);
+    }
+    this.detailLOD(px, pz);
+  },
+  // trees, parked cars and house trim only in squares near you (farther ones are mostly in the fog anyway)
+  detailLOD(px, pz) {
+    const D = (Q.detailD || 900) * (Player.mode === 'fly' || Player.mode === 'heli' ? 1.6 : 1);
+    for (const T of this.map.values()) {
+      if (T.state !== 'ready' || !T.W) continue;
+      const dx = Math.max(T.W.x0 - px, 0, px - T.W.x1), dz = Math.max(T.W.z0 - pz, 0, pz - T.W.z1); const show = Math.hypot(dx, dz) < D;
+      if (T.detailShown === show) continue; T.detailShown = show;
+      for (const o of T.group.children) if (o.userData.detail) o.visible = show;
     }
   },
   unload(T) {

@@ -47,6 +47,18 @@ function buildModels() {
     }
     GEO.oak = mergeGeometries(parts); GEO.oak.computeVertexNormals();
   }
+  // --- lighter oak for Low graphics (same silhouette, 1/4 of the triangles) ---
+  {
+    const parts = [];
+    const trunk = new THREE.CylinderGeometry(0.22, 0.4, 5, 5); trunk.translate(0, 2.5, 0); parts.push(colorGeo(prep(trunk), 0x4f3d2e));
+    const r = mulberry32(9);
+    for (let i = 0; i < 7; i++) {
+      const s = new THREE.IcosahedronGeometry(2.0 + r() * 1.2, 0); jitter(s, 0.5, i + 20);
+      const a = r() * 6.28, d = i === 0 ? 0 : 1.6 + r() * 1.2; s.translate(Math.cos(a) * d, 6.2 + r() * 2.2 + (i === 0 ? 1.2 : 0), Math.sin(a) * d);
+      parts.push(colorGeo(prep(s), pick([0x3f6a2a, 0x4a7430, 0x3a5f26, 0x557a34], r())));
+    }
+    GEO.oakLo = mergeGeometries(parts); GEO.oakLo.computeVertexNormals();
+  }
   // --- Crape myrtle / ornamental ---
   {
     const parts = [];
