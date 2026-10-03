@@ -122,6 +122,16 @@ function buildTextures() {
       g.fillStyle = 'rgba(80,40,30,.6)'; g.fillRect(x0 + 34, y0 + 18, 60, 6);
     }
   });
+  // plain lap siding and plain brick for the 3D houses (04i_houses.js): 512 px = 4 m, no painted windows
+  mk('sidingPlain', 4, 4, (g) => {
+    g.fillStyle = '#ecebe6'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0; y < 512; y += 16) { const gr = g.createLinearGradient(0, y, 0, y + 16); gr.addColorStop(0, 'rgba(255,255,255,.28)'); gr.addColorStop(0.8, 'rgba(0,0,0,.03)'); gr.addColorStop(1, 'rgba(0,0,0,.2)'); g.fillStyle = gr; g.fillRect(0, y, 512, 16); }
+    g.fillStyle = 'rgba(0,0,0,.05)'; for (let i = 0; i < 40; i++) g.fillRect((i * 97) % 512, ((i * 53) % 32) * 16, 1, 16);
+  });
+  mk('brickPlain', 4, 4, (g, ge, r) => {
+    g.fillStyle = '#cfc9bf'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0, row = 0; y < 512; y += 8, row++) for (let x = (row % 2) * -13; x < 512; x += 26) { const t = r(), u = r(); g.fillStyle = `rgb(${142 + t * 46 | 0},${60 + t * 22 + u * 8 | 0},${42 + t * 14 | 0})`; g.fillRect(x + 1, y + 1, 24, 6); }
+  });
   // Uptown brick storefront: ground floor glass, brick above
   mk('shop', 4.2, 3.8, (g, ge, r) => {
     g.fillStyle = '#bdb6aa'; g.fillRect(0, 0, 512, 512);
@@ -292,6 +302,10 @@ function buildMaterials() {
   MAT.facade = {};
   for (const k in TEX.facade) MAT.facade[k] = new THREE.MeshStandardMaterial({ map: TEX.facade[k].map, emissiveMap: TEX.facade[k].emi, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true, roughness: 0.88 });
   if (MAT.facade.medglass) { MAT.facade.medglass.roughness = 0.22; MAT.facade.medglass.metalness = 0.45; }
+  // house windows (04i_houses.js): dark glass, and the same glass with a warm lamp behind it at night
+  MAT.facade.houseGlass = new THREE.MeshStandardMaterial({ color: 0x1b232c, vertexColors: true, roughness: 0.18, metalness: 0.1, envMapIntensity: 0.45, emissive: 0x000000 });
+  MAT.facade.houseGlassLit = new THREE.MeshStandardMaterial({ color: 0x1b232c, vertexColors: true, roughness: 0.18, metalness: 0.1, envMapIntensity: 0.45, emissive: 0xffc888 });
+  MAT.houseTrim = new THREE.MeshStandardMaterial({ name: 'houseTrim', vertexColors: true, roughness: 0.72 });
   MAT.shingle = new THREE.MeshStandardMaterial({ map: TEX.shingle, vertexColors: true, roughness: 0.95 });
   MAT.flatroof = new THREE.MeshStandardMaterial({ map: TEX.flatroof, vertexColors: true, roughness: 0.9 });
   MAT.tree = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });

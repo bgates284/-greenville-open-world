@@ -21,8 +21,8 @@ the game keeps running on the old code until it's fixed).
 |---|---|
 | `05_env`, `06_player`, `06b_plane`, `07_traffic`, `07b_hospital`, `07c_hangout`, `08_ui`, `08b_cinematic`, `09_main`, `04e_overview` | New code swaps in instantly; you keep your position, speed and everything else |
 | `03j_airport` | Swaps in, then the plane model and airport are rebuilt around you |
-| `04_world`, `04b_food`, `04c_neighborhoods`, `04d_streets`, `04f_landmarks`, `03g_food`, `03h_retail`, `03i_parcels` | Swaps in, then the map squares around you are rebuilt with the new code |
-| `01_core`, `02_render_textures`, `03_models`, `03c`–`03f` (people/avatars), `template.html` | The page reloads and puts you back where you were (walking, driving or flying) |
+| `04_world`, `04b_food`, `04c_neighborhoods`, `04d_streets`, `04f_landmarks`, `04i_houses`, `03g_food`, `03h_retail`, `03i_parcels` | Swaps in, then the map squares around you are rebuilt with the new code |
+| `01_core`, `02_render_textures`, `03_models`, `03c`–`03f` (people/avatars), `03l_cars`, `template.html` | The page reloads and puts you back where you were (walking, driving or flying) |
 
 Pressing F5 also brings you back to where you were.
 
@@ -67,6 +67,23 @@ npm run pack-data    → copies downloaded squares into public-data/osm/
 git add public-data && git commit -m "More map squares" && git push
 ```
 `npm run site` builds the hosted version locally into `site/` if you want to check it first.
+
+## Cars
+
+Pick your car in the menu under **Your car** (and its paint): a Ferrari 458 Spider, Porsche 911 Carrera 4S,
+a concept supercar, a Lexus RX SUV, or the original blue coupe. On Medium and High graphics, Lexus SUVs and
+the occasional sports car also drive around in traffic (simplified copies, so the frame rate holds up).
+The models live in `public-data/vehicles/` (authors and licences in `CREDITS.md`). Each is downloaded once
+and then kept in the browser with the saved map data.
+
+## Houses
+
+Detached houses are built as real houses, styled by the year the county says they were built: frame
+mill houses with full-width porches (before 1945), brick ranches with picture windows and stoops
+(1945–79), brick-front or vinyl houses with attached garages (1980–99), and two-storey vinyl houses with
+double garages and porches (2000 on). Each faces its street with a front door and steps, framed windows
+with shutters, a brick crawlspace foundation, chimney and gable vents, and windows light up at night
+(`src/04i_houses.js`). Houses on odd-shaped footprints keep the simpler look.
 
 ## Real-world layers
 

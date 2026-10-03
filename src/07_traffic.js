@@ -62,7 +62,10 @@ const Traffic = {
     for (const o of this.cars) if (Math.hypot(o.x - px, o.z - pz) < 16) return;
     c.speed = road.v * 0.7; c.yaw = Math.atan2(sg.dx, sg.dz);
     const type = pick(CAR_TYPES, r()); const col = pick(CAR_COLORS, r());
-    c.obj = makeCarMesh(type, col); c.len = GEO.car[type].len; dynRoot.add(c.obj);
+    // part of the traffic is detailed 3D models (03l_cars.js) on Medium/High graphics
+    let det = null; if (Q.traffic > 12) { CarModels.preloadTraffic(); const id = CarModels.pickTraffic(r()); if (id) det = CarModels.trafficMesh(id, id === 'lexus' ? col : pick([0xb3121a, 0x1745c4, 0x0d0e10, 0xefefec, 0xa7acb1, 0xd9a520, 0x1f4a32, 0xe2621b], r())); }
+    if (det) { c.obj = det.obj; c.len = det.len; } else { c.obj = makeCarMesh(type, col); c.len = GEO.car[type].len; }
+    dynRoot.add(c.obj);
     const lo = this.laneOffset(c); c.ox = -sg.dz * lo; c.oz = sg.dx * lo; c.x = px + c.ox; c.z = pz + c.oz;
     c.next = chooseNext(c, carAllow, r);
     this.cars.push(c);

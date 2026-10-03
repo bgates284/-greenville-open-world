@@ -109,6 +109,14 @@ const UI = {
     $('parcelChk').addEventListener('change', e => { Parcels.enabled = e.target.checked; try { localStorage.setItem('gv-parcels', e.target.checked ? 'on' : 'off'); } catch (x) { } this.toast('Applies to areas loaded from now on'); });
     $('playBtn').addEventListener('click', () => { const v = $('startSel').value; if (v[0] === 'f') { const [la, lo] = v.slice(1).split(',').map(Number); const o = $('startSel').selectedOptions[0]; Game.play([o.textContent, la, lo]); } else Game.play(parseInt(v)); });
     $('resumeBtn').addEventListener('click', () => Game.resume());
+    { // garage (03l_cars.js)
+      const sel = $('carSel'), colSel = $('carColor'), cur = Garage.pick();
+      for (const [id, name] of Garage.choices) { const o = document.createElement('option'); o.value = id; o.textContent = name; sel.appendChild(o); }
+      for (const [name, hex] of Garage.colors) { const o = document.createElement('option'); o.value = String(hex); o.textContent = name; colSel.appendChild(o); }
+      sel.value = cur.id; colSel.value = String(cur.color); if (colSel.selectedIndex < 0) colSel.value = '0';
+      const apply = () => { const id = sel.value, col = +colSel.value; Garage.save(id, col); this.toast(id === 'classic' ? 'Your car: the original blue coupe' : 'Loading your ' + (CAR_MODELS[id] ? CAR_MODELS[id].name : 'car') + '…'); Player.setCar(id, col); };
+      sel.addEventListener('change', apply); colSel.addEventListener('change', apply);
+    }
     $('realBtn').addEventListener('click', () => Player.realistic('casual')); $('glbBtn').addEventListener('click', () => $('glbFile').click()); $('glbFile').addEventListener('change', e => { if (e.target.files[0]) Player.loadAvatarFile(e.target.files[0]); e.target.value = ''; }); $('lookBtn').addEventListener('click', () => Player.newLook()); $('lookEcuBtn').addEventListener('click', () => Player.realistic('ecu'));
     try { const n = parseInt(localStorage.getItem('gv-pack-n')); if (n) { RB.target = n; $('packSize').value = String(n); } } catch (e) { }
     $('packSize').addEventListener('change', e => { RB.target = parseInt(e.target.value); try { localStorage.setItem('gv-pack-n', e.target.value); } catch (x) { } if (RB.state === 'done' && Game.started) RB.start(); this.peoplePack(); });

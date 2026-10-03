@@ -568,7 +568,7 @@ async function buildBuildings(T, P) {
   let _cnt = 0;
   const W = T.W; const buckets = {}; for (const k in MAT.facade) buckets[k] = new MB(true); const roofS = new MB(true), roofF = new MB(true);
   const FB = foodBuilder(T, P, { buckets, roofF, roofS }); // restaurants: branded buildings, storefronts, new buildings
-  const decor = new MB(true), seats = new MB(true); const Z = P.zones || (P.zones = landmarkZones(P)); // landmark trim, grandstands
+  const decor = new MB(true), seats = new MB(true), houseDetail = new MB(true); const Z = P.zones || (P.zones = landmarkZones(P)); // landmark trim, grandstands
   const upt = (x, z) => Math.hypot(x - 0, z - 0);
   // small-town downtowns: storefront blocks within this distance of Main Street (distance ÷ radius, < 1 = downtown)
   const wvDown = (x, z) => { let m = 1e9; for (const [x0, z0, r] of TOWN_CENTERS) m = Math.min(m, Math.hypot(x - x0, z - z0) / r * 150); return m; };
@@ -658,6 +658,11 @@ async function buildBuildings(T, P) {
     if (LM) { wallCol = new THREE.Color(LM.wall); if (!t['roof:colour']) roofCol = new THREE.Color(shape === 'flat' ? '#b9b7b1' : LM.roof); }
     const tf = TEX.facade[fac]; const texW = tf.bayW * 4, texH = tf.floorH * 4; const uOff = Math.floor(r2 * 4) / 4;
     const mbw = buckets[fac];
+    // --- detached houses: built as real houses (04i_houses.js) ---
+    if (!LM && houseCandidate(B, { fac, bt, lu, area, obb, rect })) {
+      let topY = 0; try { topY = buildHouse(B, { obb, area, rng, gavg, buckets, roofS, roofF, detail: houseDetail, glass: buckets.houseGlass, glassLit: buckets.houseGlassLit }); } catch (e) { if (!buildBuildings._hw) { buildBuildings._hw = 1; console.warn('house builder failed, using plain walls', B.id, e); } topY = 0; }
+      if (topY) { register(gavg, -1e9, topY); return; }
+    }
     // --- walls ---
     const rings = [ring, ...B.holes];
     rings.forEach((rg, ri) => {
@@ -708,19 +713,22 @@ async function buildBuildings(T, P) {
     }
     if (LM) try { landmarkExtras(LM, B, T, { ring, base, wallTop, gavg, obb, decor, area }); } catch (e) { console.warn('landmark details skipped', e); }
     // --- register for collision / names ---
-    const bb = ring.reduce((m, p) => [Math.min(m[0], p[0]), Math.min(m[1], p[1]), Math.max(m[2], p[0]), Math.max(m[3], p[1])], [1e9, 1e9, -1e9, -1e9]);
-    const item = { ring, holes: B.holes, minY: minH > 0 ? minH : 0, maxY: base + (wallTop - base) + rise + 50, name: t.name || '', cx, cz, h: wallTop + rise };
-    item.minY = minH > 0 ? gavg + minH : -1e9; item.maxY = wallTop + rise;
-    T.hashItems.push([World.bldHash, World.bldHash.insert(item, bb[0], bb[1], bb[2], bb[3])]);
-    T.hashItems.push([World.mmHash, World.mmHash.insert({ bld: ring }, bb[0], bb[1], bb[2], bb[3])]);
+    register(gavg, minH > 0 ? gavg + minH : -1e9, wallTop + rise);
     if (B.units) try { FB.storefronts(B, base, wallTop); } catch (e) { console.warn('storefront skipped', e); }
     if (B.fuel) try { FB.canopy(B, base, wallTop); } catch (e) { console.warn('canopy skipped', e); }
+    function register(gavg, minY, maxY) {
+      const bb = ring.reduce((m, p) => [Math.min(m[0], p[0]), Math.min(m[1], p[1]), Math.max(m[2], p[0]), Math.max(m[3], p[1])], [1e9, 1e9, -1e9, -1e9]);
+      const item = { ring, holes: B.holes, minY, maxY, name: t.name || '', cx, cz, h: maxY };
+      T.hashItems.push([World.bldHash, World.bldHash.insert(item, bb[0], bb[1], bb[2], bb[3])]);
+      T.hashItems.push([World.mmHash, World.mmHash.insert({ bld: ring }, bb[0], bb[1], bb[2], bb[3])]);
+    }
   }
   if (!FB.none) { try { FB.standalone(); } catch (e) { console.warn('restaurant placement skipped', e); } FB.finish(); }
   for (const k in buckets) { const g = buckets[k].geo(); if (g) { const m = new THREE.Mesh(g, MAT.facade[k]); m.castShadow = true; m.receiveShadow = true; T.group.add(m); } }
   const gs = roofS.geo(); if (gs) { const m = new THREE.Mesh(gs, MAT.shingle); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   const gf = roofF.geo(); if (gf) { const m = new THREE.Mesh(gf, MAT.flatroof); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   addMB(T, decor, lmPlainMat()); addMB(T, seats, standsMat());
+  { const g = houseDetail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.houseTrim); m.castShadow = true; m.receiveShadow = true; T.group.add(m); } }
 }
 
 // ---------- trees ----------

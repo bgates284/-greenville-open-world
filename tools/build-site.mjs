@@ -20,6 +20,9 @@ if (fs.existsSync(path.join(root, 'public-data', 'places.json'))) fs.copyFileSyn
 // tree canopy heights per square (npm run fetch-canopy)
 const canSrc = path.join(root, 'public-data', 'canopy'); let nc = 0;
 if (fs.existsSync(canSrc)) { fs.mkdirSync(path.join(site, 'data', 'canopy'), { recursive: true }); for (const f of fs.readdirSync(canSrc)) { fs.copyFileSync(path.join(canSrc, f), path.join(site, 'data', 'canopy', f)); if (f.endsWith('.gz')) nc++; } }
+// detailed car models (03l_cars.js)
+const vehSrc = path.join(root, 'public-data', 'vehicles');
+if (fs.existsSync(vehSrc)) { fs.mkdirSync(path.join(site, 'data', 'vehicles'), { recursive: true }); for (const f of fs.readdirSync(vehSrc)) fs.copyFileSync(path.join(vehSrc, f), path.join(site, 'data', 'vehicles', f)); }
 if (!fs.existsSync(path.join(site, 'data', 'osm', 'index.json'))) fs.writeFileSync(path.join(site, 'data', 'osm', 'index.json'), '[]');
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
 console.log(`Built site/ — game ${Math.round(html.length / 1024)} KB, ${n} packed map squares, ${nc} canopy squares`);

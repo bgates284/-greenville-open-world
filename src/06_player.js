@@ -30,16 +30,27 @@ const Player = {
     this.person = makePerson(1, { fem: false, top: 'tee', shirt: 0x8d9399, pantsKind: 'shorts', pants: 0xb59f76, skin: 0xc08a64, hair: 0x2e2018, hairStyle: 'cap', hatC: 0x1d2a47, face: 0, beard: false, glasses: false, backpack: false, shoe: 'sneakW', scale: 1, width: 1 });
     dynRoot.add(this.person.g);
     AvatarMgr.ensure().then(av => { if (av && AvatarMgr.want === 'realistic') this.useAvatar(av); }).finally(() => NPCKit.load().then(ok => { if (ok) Peds.upgradeCrowd(); if (localStorage.getItem('gv-pack') !== 'off') RB.start(); }));
-    // the player's car: a low, blue mid-engine sports coupe (03_models.js buildSportsCar)
-    const SC = buildSportsCar(0x1745c4); const g = SC.g; this.tailMat = SC.tailMat; this.wheels = SC.wheels;
-    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    // the player's car: chosen in the menu's garage (03l_cars.js). The original blue coupe stands in
+    // while a detailed model loads.
+    const g = new THREE.Group(); this.carObj = g;
+    this.useCarVisual(buildSportsCar(0x1745c4)); const pick = Garage.pick(); if (pick.id !== 'classic') this.setCar(pick.id, pick.color);
     // headlights (always present so shaders don't recompile)
     this.spots = [];
     for (const x of [-0.6, 0.6]) {
       const s = new THREE.SpotLight(0xfff2dc, 0, 70, 0.5, 0.55, 1.4); s.position.set(x, 0.75, 2.2); const t = new THREE.Object3D(); t.position.set(x * 1.4, -1.5, 22); g.add(s, t); s.target = t; this.spots.push(s);
     }
-    this.carObj = g; dynRoot.add(g);
+    dynRoot.add(g);
     this.car = { pos: new THREE.Vector3(), yaw: 0, speed: 0, steer: 0, vy: 0, pitch: 0, roll: 0, wheelRot: 0, gear: 'P' };
+  },
+  useCarVisual(SC) {
+    if (this.carVis) { this.carVis.removeFromParent(); }
+    this.carVis = SC.g; this.tailMat = SC.tailMat; this.wheels = SC.wheels; this.wheelR = SC.wheelR || 0.34; this.carInfo = SC.info || null;
+    SC.g.traverse(o => { if (o.isMesh) o.castShadow = true; }); this.carObj.add(SC.g);
+  },
+  async setCar(id, color) {
+    const want = (this._carReq = id + ':' + color);
+    try { const SC = await Garage.build(id, color); if (this._carReq !== want) return; this.useCarVisual(SC); Garage.save(id, color); if (this.car) this.syncCar(0); }
+    catch (e) { console.warn('car unavailable', id, e); if (typeof UI !== 'undefined' && UI.toast) UI.toast('Could not load that car — keeping the current one'); }
   },
   placeAt(x, z, crowd) {
     // find an OPEN stretch of real street near (x,z): far from building walls, not on a bridge
@@ -229,7 +240,7 @@ const Player = {
   syncCar(dt, braking) {
     const C = this.car, g = this.carObj;
     g.position.copy(C.pos); g.rotation.set(0, 0, 0); g.rotateY(C.yaw); g.rotateX(C.pitch); g.rotateZ(C.roll);
-    C.wheelRot += C.speed * dt / 0.34;
+    C.wheelRot += C.speed * dt / (this.wheelR || 0.34);
     for (const w of this.wheels) { w.spin.rotation.x = C.wheelRot; w.piv.rotation.y = w.front ? -C.steer : 0; }
     if (this.autoLights) this.headlights = Env.night > 0.35 || Env.rain > 0.5;
     const on = this.headlights && this.mode === 'drive' || (this.headlights && Env.night > 0.5);
