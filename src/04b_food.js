@@ -38,6 +38,7 @@ function foodBuilder(T, P, ctx) {
     let host = null;
     if (f.ref[0] === 'w') host = cand.find(B => 'w' + B.id === f.ref) || null;
     if (!host) { let best = 1e12; for (const B of cand) { const b = B._bb; if (f.x < b[0] || f.x > b[2] || f.z < b[1] || f.z > b[3]) continue; if (pointInPoly(f.x, f.z, B.ring)) { const a = Math.abs(signedArea(B.ring)); if (a < best) { best = a; host = B; } } } }
+    if (host && ((typeof HANDBUILT !== 'undefined' && HANDBUILT[host.id]) || (typeof CIVIC_LOOK !== 'undefined' && CIVIC_LOOK[host.id]))) { f._alone = false; continue; } // hand-built buildings carry their own signs
     if (f.kind === 'fuel') { // a mapped canopy gets branded; otherwise build one (never re-skin the store itself)
       const canopy = host && (/^(roof|canopy|carport)$/.test(host.tags.building || '') || host.tags.amenity === 'fuel');
       f._alone = !canopy; if (canopy) host.fuel = f; continue;

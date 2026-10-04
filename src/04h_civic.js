@@ -56,6 +56,7 @@ const Civic = {
 
 // ---- before the buildings are built: find each station's building (or add one) ----
 function prepCivic(T, P) {
+  for (const B of P.buildings) { const L = CIVIC_LOOK[B.id]; if (L && L.ring && !B._reRing) { B.ring = L.ring.map(([la, lo]) => [lonToX(lo), latToZ(la)]); B.holes = []; B._reRing = true; } }
   const W = T.W; const here = Civic.inBox(W.x0, W.z0, W.x1, W.z1); if (!here.length) return;
   const cand = P.buildings.filter(B => !B.part && B.ring.length >= 3);
   for (const s of here) {
@@ -272,7 +273,12 @@ function makePoliceCar() {
 // entry pavilion with a low hip roof at the Main Street end, a metal canopy hung on diagonal rods,
 // a corner plaza with three flagpoles, three big terracotta planters and a memorial stone, red mulch
 // beds with shrubs along the front, and the apparatus bays at the far end with red-framed glass doors.
-const CIVIC_LOOK = { 666185236: { fac: 'tanbrick', h: 5.6, plaza: [35.52866, -77.40196] }, 1185828767: { kind: 'library', fac: 'brick', h: 4.8, wall: '#ffffff', roof: '#8f979c' }, 1185828764: { kind: 'mainmill', fac: 'shop', h: 8.4, wall: '#ffffff' } };
+const CIVIC_LOOK = { 666185236: { fac: 'tanbrick', h: 5.6, plaza: [35.52866, -77.40196] }, 1185828767: { kind: 'library', fac: 'brick', h: 4.8, wall: '#ffffff', roof: '#8f979c' }, 1185828764: { kind: 'mainmill', fac: 'shop', h: 8.4, wall: '#ffffff' },
+  // Nauti Dog Brewing Co.: the east half of the same two-storey brick block, sharing a wall with Main & Mill
+  // (the mapped outline stops short, so it's redrawn to meet Main & Mill's east wall)
+  1185828765: { kind: 'mainmill', fac: 'shop', h: 8.4, wall: '#d9c7c0', noSide: true, signAt: 0.5,
+    sign: [['NAUTI DOG', 112, '#f1ece0', 60, 700], ['BREWING CO.', 64, '#d8b45a', 140, 700]],
+    ring: [[35.5279747, -77.4028459], [35.5279762, -77.4025292], [35.5278195, -77.4025388], [35.5278232, -77.4026324], [35.5276447, -77.4026434], [35.5276488, -77.402745], [35.5277337, -77.4028531]] } };
 function flagTex(kind) {
   const key = 'flag_' + kind; if (MAT[key]) return MAT[key];
   const c = cnv(190, 100), g = c.getContext('2d');
@@ -427,11 +433,12 @@ function dressWintervilleLibrary(T, B, mb) {
 // above) with a black storefront cornice, brick pilasters and dentils under the corbelled cornice,
 // the name over the Main Street storefront, and a round-arched doorway with dark doors on Mill Street.
 function dressMainMill(T, B, mb) {
-  const { g, top } = bldTop(B); const wallH = Math.max(6, top - g); const C = h => new THREE.Color(h);
+  const look = CIVIC_LOOK[B.id] || {}; const { g, top } = bldTop(B); const wallH = Math.max(6, top - g); const C = h => new THREE.Color(h);
   const E = HM.edgesOf(B.ring).filter(e => e.L >= 3); for (const e of E) { const n = nearestRoad(e.mx + e.nx * 7, e.mz + e.nz * 7, 30, r => r.car); e.rn = n ? n.road.name || '' : ''; e.rd = n ? n.d : 99; e.tx = (e.b[0] - e.a[0]) / e.L; e.tz = (e.b[1] - e.a[1]) / e.L; }
   const byLen = a => a.slice().sort((p, q) => q.L - p.L);
-  const main = byLen(E.filter(e => /Main/.test(e.rn)))[0] || byLen(E.filter(e => e.rd < 20))[0] || byLen(E)[0]; if (!main) return;
-  const mill = byLen(E.filter(e => e !== main && /Mill/.test(e.rn)))[0] || byLen(E.filter(e => e !== main && Math.abs(e.nx * main.nx + e.nz * main.nz) < 0.3 && e.rd < 20))[0];
+  const byRoad = a => a.slice().sort((p, q) => p.rd - q.rd || q.L - p.L); // the wall that faces the street, not just the longest one near it
+  const main = byRoad(E.filter(e => /Main/.test(e.rn) && e.L >= 8))[0] || byLen(E.filter(e => e.rd < 20))[0] || byLen(E)[0]; if (!main) return;
+  const mill = look.noSide ? null : byRoad(E.filter(e => e !== main && /Mill/.test(e.rn) && e.L >= 8))[0] || byLen(E.filter(e => e !== main && Math.abs(e.nx * main.nx + e.nz * main.nz) < 0.3 && e.rd < 20))[0];
   const BLACK = C('#1d1d1f'), PIL = C('#8e4632'), DENT = C('#7a3526');
   for (const e of [main, mill].filter(Boolean)) {
     const yaw = Math.atan2(e.nx, e.nz); const EP = (s, o) => [e.a[0] + e.tx * s + e.nx * o, e.a[1] + e.tz * s + e.nz * o];
@@ -440,8 +447,8 @@ function dressMainMill(T, B, mb) {
     for (let s = 0.3; s < e.L - 0.2; s += 0.55) { const [x, z] = EP(s, 0.16); HM.box(mb, x, z, top - 0.95, top - 0.78, 0.12, 0.1, yaw, DENT); } // dentils
   }
   // the name over the Main Street storefront
-  { const e = main, yaw = Math.atan2(e.nx, e.nz); const w = Math.min(e.L * 0.55, 7.5); const [x, z] = [e.a[0] + e.tx * e.L * 0.45 + e.nx * 0.24, e.a[1] + e.tz * e.L * 0.45 + e.nz * 0.24];
-    const s = signMesh(T, textTexture([['MAIN & MILL', 112, '#f1ece0', 60, 700], ['OYSTER BAR & TAVERN', 60, '#f1ece0', 140, 600]], { w: 1024, h: 180, bg: '#1d1d1f' }), w, w * 180 / 1024, true); s.position.set(x, g + 3.95, z); s.rotation.y = yaw; T.group.add(s); }
+  { const e = main, yaw = Math.atan2(e.nx, e.nz); const w = Math.min(e.L * 0.55, 7.5); const at = look.signAt || 0.45; const [x, z] = [e.a[0] + e.tx * e.L * at + e.nx * 0.24, e.a[1] + e.tz * e.L * at + e.nz * 0.24];
+    const s = signMesh(T, textTexture(look.sign || [['MAIN & MILL', 112, '#f1ece0', 60, 700], ['OYSTER BAR & TAVERN', 60, '#f1ece0', 140, 600]], { w: 1024, h: 180, bg: '#1d1d1f' }), w, w * 180 / 1024, true); s.position.set(x, g + 3.95, z); s.rotation.y = yaw; T.group.add(s); }
   // round-arched doorway on Mill Street, near the corner
   if (mill) { const e = mill, yaw = Math.atan2(e.nx, e.nz); const dMain = Math.hypot(e.a[0] - main.mx, e.a[1] - main.mz) < Math.hypot(e.b[0] - main.mx, e.b[1] - main.mz) ? 3.2 : e.L - 3.2;
     const EP = (s, o) => [e.a[0] + e.tx * s + e.nx * o, e.a[1] + e.tz * s + e.nz * o]; const ds = Math.min(e.L - 1.4, Math.max(1.4, dMain)); const y0 = H(...EP(ds, 0)); const hw = 0.95, hS = 2.35;

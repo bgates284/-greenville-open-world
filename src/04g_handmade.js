@@ -162,7 +162,7 @@ function hmMall(T, B, mb) {
 function buildHandmade(T, P) {
   const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const mb = new MB(true);
   for (const B of P.buildings) {
-    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); } catch (e) { console.warn('Local Oak skipped', e); } continue; }
+    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
     const n = (B.tags && B.tags.name) || ''; if (!n) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
     try {
       if (n === 'The Cupola') hmCupola(T, B, mb);
@@ -176,12 +176,83 @@ function buildHandmade(T, P) {
   addMB(T, mb, lmPlainMat());
 }
 
+// ---------- the Main Street row across the tracks from the police station, Winterville ----------
+// One long one-storey block of shops behind their own false fronts, facing the tracks with angled
+// parking in front. North to south: Tie Breakers Sports Bar & Grill (wide, white with black pilasters,
+// black bands and dark windows), Railroad Cigar (narrow, wood slats), Coopers Cup (charcoal board and
+// batten over a cream shopfront), a sage-green board-and-batten front, Marlins Bar (khaki lap siding),
+// Taqueria Tere (brown brick with a corbelled cornice over a cream shopfront), a white shop with big
+// windows and a green awning, then plain red brick to the end of the block.
+const WV_ROW = [
+  { w: 24, h: 5.4, up: '#f2f1ed', low: '#f2f1ed', trim: '#141517', style: 'tiebreakers', name: 'TIE BREAKERS' },
+  { w: 5, h: 6.1, up: '#9a6a43', low: '#86593a', trim: '#2a2420', style: 'slats', name: 'RAILROAD CIGAR', bg: '#141414' },
+  { w: 10, h: 6.7, up: '#3d4044', low: '#e2d6bd', trim: '#18191b', style: 'batten', name: 'COOPERS CUP', bg: '#141414' },
+  { w: 7, h: 6.3, up: '#93a594', low: '#4a4f55', trim: '#24272a', style: 'batten' },
+  { w: 6, h: 5.9, up: '#a89c7c', low: '#a89c7c', trim: '#1e1f21', style: 'siding', name: 'MARLINS BAR', bg: '#1e2f4a' },
+  { w: 7, h: 6.5, up: '#8b5a3c', low: '#efe7dc', trim: '#6b3e27', style: 'cornice', name: 'TAQUERIA TERE', bg: '#7a1f1f', awn: '#f4f1ec' },
+  { w: 8, h: 6.0, up: '#ece7dc', low: '#ece7dc', trim: '#c9c2b4', style: 'plain', awn: '#3f6b4a' },
+  { w: 999, h: 5.6, up: '#a4513d', low: '#a4513d', trim: '#7a3526', style: 'brick' },
+];
+function hmWvRow(T, B, mb) {
+  const ring = B.ring; const E = HM.edgesOf(ring); if (!E.length) return; const C = h => new THREE.Color(h);
+  const fe = E.slice().sort((p, q) => q.L - p.L)[0];                       // the long street front (faces the tracks)
+  const north = fe.a[1] < fe.b[1]; const st = north ? fe.a : fe.b, en = north ? fe.b : fe.a; const L = fe.L;
+  const tx = (en[0] - st[0]) / L, tz = (en[1] - st[1]) / L, nx = fe.nx, nz = fe.nz, yaw = Math.atan2(nx, nz);
+  const P2 = (sv, o) => [st[0] + tx * sv + nx * o, st[1] + tz * sv + nz * o];
+  let g0 = 1e9; for (const [x, z] of ring) g0 = Math.min(g0, H(x, z)); const body = 4.6;
+  const GLASS = C('#2b3640'), BLACK = C('#151618');
+  // --- the block behind the fronts: brick walls, flat roof ---
+  const wb = new MB(true); const W1 = C('#ffffff');
+  for (const e of E) { if (e === fe) continue; const nearN = Math.hypot(e.a[0] - st[0], e.a[1] - st[1]) < 1 || Math.hypot(e.b[0] - st[0], e.b[1] - st[1]) < 1;
+    if (nearN) { HM.box(mb, e.mx - e.nx * 0.12, e.mz - e.nz * 0.12, g0 - 0.3, g0 + 5.4, e.L / 2 + 0.12, 0.14, Math.atan2(e.nx, e.nz), C('#f2f1ed')); HM.box(mb, e.mx, e.mz, g0 + 5.0, g0 + 5.45, e.L / 2 + 0.15, 0.06, Math.atan2(e.nx, e.nz), BLACK); continue; } // Tie Breakers' white side wall
+    wb.quad([e.a[0], g0 - 0.3, e.a[1]], [e.b[0], g0 - 0.3, e.b[1]], [e.b[0], g0 + body, e.b[1]], [e.a[0], g0 + body, e.a[1]], [0, 0], [e.L / 2.6, 0], [e.L / 2.6, (body + 0.3) / 2.6], [0, (body + 0.3) / 2.6], [e.nx, 0, e.nz], W1); }
+  { const m = new THREE.Mesh(wb.geo(), hmRedBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m); }
+  { const ct = ring.map(p => new THREE.Vector2(p[0], p[1])); let tris = []; try { tris = THREE.ShapeUtils.triangulateShape(ct, []); } catch (e) { }
+    const rc = C('#8d8f91'); for (const t of tris) { const [A, Bv, Cc] = t.map(i => ct[i]); mb.tri([A.x, g0 + body, A.y], [Bv.x, g0 + body, Bv.y], [Cc.x, g0 + body, Cc.y], [0, 0], [0, 0], [0, 0], [0, 1, 0], rc); } }
+  HM.solid(T, ring, g0 + body, 'Main Street shops');
+  // --- the false fronts ---
+  let s0 = 0;
+  for (const sg of WV_ROW) {
+    const s1 = Math.min(s0 + sg.w, L); if (s1 - s0 < 1.5) break; const sc = (s0 + s1) / 2, hw = (s1 - s0) / 2; const g = H(...P2(sc, 1)); const top = g + sg.h, mid = g + 3.35;
+    const up = C(sg.up), low = C(sg.low), trim = C(sg.trim), dark = up.clone().multiplyScalar(0.8);
+    const bx = (sv, o, y0, y1, a, d, col) => { const [x, z] = P2(sv, o); HM.box(mb, x, z, y0, y1, a, d, yaw, col); };
+    bx(sc, 0.16, mid, top, hw - 0.01, 0.16, up);                                     // upper false front
+    bx(sc, 0.06, g0 - 0.3, mid, hw - 0.01, 0.07, low);                               // shopfront wall
+    bx(sc, 0.2, top - 0.22, top, hw, 0.22, trim);                                     // cap
+    // shopfront: big windows either side of a glass door, black frames
+    const dS = sg.style === 'tiebreakers' ? s0 + hw * 1.55 : sc + hw * 0.35; const ww0 = s0 + 0.6, ww1 = s1 - 0.6;
+    const pane = (a, b, y0, y1) => { if (b - a < 0.6) return; bx((a + b) / 2, 0.15, y0 - 0.06, y1 + 0.06, (b - a) / 2 + 0.06, 0.03, BLACK); bx((a + b) / 2, 0.17, y0, y1, (b - a) / 2, 0.03, GLASS); const k = Math.max(1, Math.round((b - a) / 1.8)); for (let i = 1; i < k; i++) bx(a + (b - a) * i / k, 0.2, y0, y1, 0.035, 0.03, BLACK); };
+    if (sg.style === 'tiebreakers') { // dark screened windows between black pilasters, black bands
+      const nb = Math.max(3, Math.round(hw * 2 / 3.6)); for (let i = 0; i <= nb; i++) bx(s0 + 0.3 + (hw * 2 - 0.6) * i / nb, 0.3, g - 0.3, top + (i === Math.round(nb * 0.62) ? 1.6 : 0), i === Math.round(nb * 0.62) ? 0.45 : 0.28, 0.3, BLACK);
+      for (let i = 0; i < nb; i++) { const a = s0 + 0.3 + (hw * 2 - 0.6) * i / nb + 0.35, b = s0 + 0.3 + (hw * 2 - 0.6) * (i + 1) / nb - 0.35; if (Math.abs((a + b) / 2 - dS) < 1.8) { bx((a + b) / 2, 0.17, g, g + 2.5, 0.95, 0.03, GLASS); bx((a + b) / 2, 0.19, g, g + 2.5, 0.03, 0.03, BLACK); continue; } bx((a + b) / 2, 0.17, g + 0.25, g + 2.95, (b - a) / 2, 0.03, C('#3a3d41')); }
+      bx(sc, 0.22, mid - 0.05, mid + 0.3, hw, 0.22, BLACK);
+      // the logo sign on the tall pilaster
+      const ps = s0 + 0.3 + (hw * 2 - 0.6) * Math.round(nb * 0.62) / nb; const [x, z] = P2(ps, 0.66);
+      const sm = signMesh(T, textTexture([['TIE', 120, '#f4efe4', 70, 800], ['BREAKERS', 120, '#f4efe4', 190, 800]], { w: 512, h: 256, bg: '#b3202a' }), 2.6, 1.3, true); sm.position.set(x, top + 0.2, z); sm.rotation.y = yaw; T.group.add(sm);
+    } else {
+      pane(ww0, dS - 0.75, g + 0.55, g + 2.85); pane(dS + 0.75, ww1, g + 0.55, g + 2.85);
+      bx(dS, 0.15, g, g + 2.6, 0.6, 0.03, BLACK); bx(dS, 0.17, g + 0.05, g + 2.5, 0.5, 0.03, GLASS);   // door
+      bx(sc, 0.18, mid - 0.12, mid + 0.04, hw, 0.18, trim);                                           // band over the shopfront
+    }
+    // texture of the upper front
+    if (sg.style === 'batten' || sg.style === 'slats') { const step = sg.style === 'slats' ? 0.16 : 0.45; for (let sv = s0 + 0.2; sv < s1 - 0.1; sv += step) bx(sv, 0.34, mid + 0.1, top - 0.22, sg.style === 'slats' ? 0.035 : 0.03, 0.03, dark);
+      for (const sv of [s0 + 0.08, s1 - 0.08]) bx(sv, 0.34, mid, top, 0.08, 0.04, trim); }
+    if (sg.style === 'siding') for (let y = mid + 0.25; y < top - 0.3; y += 0.24) bx(sc, 0.33, y, y + 0.03, hw - 0.05, 0.02, dark);
+    if (sg.style === 'cornice') { bx(sc, 0.36, top - 0.9, top - 0.75, hw, 0.06, trim); for (let sv = s0 + 0.25; sv < s1 - 0.1; sv += 0.5) bx(sv, 0.38, top - 0.75, top - 0.45, 0.12, 0.07, trim); bx(sc, 0.4, top - 0.45, top - 0.22, hw, 0.08, trim); }
+    if (sg.style === 'brick') for (let sv = s0 + 3; sv < s1 - 1; sv += 6) bx(sv, 0.25, g - 0.3, top - 0.2, 0.25, 0.1, trim); // brick piers
+    if (sg.awn) bx(sc, 0.75, g + 2.95, g + 3.12, hw - 0.4, 0.7, C(sg.awn));
+    if (sg.name && sg.style !== 'tiebreakers') { const sw = Math.min(hw * 2 * 0.8, 6), sh = sw * 180 / 1024; const [x, z] = P2(sc, 0.4);
+      const sm = signMesh(T, textTexture([[sg.name, sg.name.length > 12 ? 92 : 110, '#f4efe4', 92, 800]], { w: 1024, h: 180, bg: sg.bg || '#141414' }), sw, sh, true); sm.position.set(x, (mid + top) / 2 + 0.1, z); sm.rotation.y = yaw; T.group.add(sm); }
+    s0 = s1; if (s0 >= L - 0.5) break;
+  }
+}
+
 // ---------- Local Oak Brewing Co., 2564 Railroad St, Winterville ----------
 // One-storey white-painted brick with a flat roof, black canvas awning over black-framed glass doors
 // and a big storefront window, a lantern, "2564", a whiskey-barrel planter, the name painted on the
 // side wall (plain lettering), and the fenced beer garden beside it: a big live oak strung with
 // lights over a gravel yard, Adirondack chairs around the tree and picnic tables along the fence.
-const HANDBUILT = { 1144052978: 'localOak' }; // OSM building id → builder (the generic building is skipped)
+const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow' }; // OSM building id → builder (the generic building is skipped)
 function hmWhiteBrickMat() {
   if (MAT.hmWhiteBrick) return MAT.hmWhiteBrick;
   const c = cnv(256, 256), g = c.getContext('2d'); g.fillStyle = '#dcdcd6'; g.fillRect(0, 0, 256, 256);
