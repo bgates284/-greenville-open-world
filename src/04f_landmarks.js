@@ -208,7 +208,7 @@ function makeAmbulance() {
     _ambGeo = mb.geo(); _ambGeo.userData.shared = true;
   }
   const m = new THREE.Mesh(_ambGeo, MAT.amb || (MAT.amb = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1 }))); m.castShadow = true;
-  const cross = new THREE.Group(); cross.add(m); return cross;
+  const cross = new THREE.Group(); cross.add(m); if (typeof Rides !== 'undefined') Rides.add(cross, 'ambulance'); return cross;
 }
 
 // ---------- grandstands: stepped seating facing the nearest field ----------

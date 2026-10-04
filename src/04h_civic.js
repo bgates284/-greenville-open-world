@@ -220,7 +220,7 @@ function cvVehicle(key, build) {
     const wheel = (x, z, r = 0.5, w = 0.34) => { const g = new THREE.CylinderGeometry(r, r, w, 16); g.rotateZ(Math.PI / 2); g.translate(x, r, z); addGeoTo(mb, g, new THREE.Color('#1a1c1e')); const h = new THREE.CylinderGeometry(r * 0.5, r * 0.5, w + 0.02, 12); h.rotateZ(Math.PI / 2); h.translate(x, r, z); addGeoTo(mb, h, new THREE.Color('#b8bcc0')); };
     build(bx, wheel); _cvGeo[key] = mb.geo(); _cvGeo[key].userData.shared = true; }
   const m = new THREE.Mesh(_cvGeo[key], MAT.cvVeh || (MAT.cvVeh = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.15 }))); m.castShadow = true; m.receiveShadow = true;
-  const grp = new THREE.Group(); grp.add(m); return grp;
+  const grp = new THREE.Group(); grp.add(m); if (typeof Rides !== 'undefined') Rides.add(grp, key); return grp; // anyone can drive it (07f_rides.js)
 }
 function makeFireEngine() {
   return cvVehicle('engine', (bx, wheel) => {

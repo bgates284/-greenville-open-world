@@ -49,7 +49,7 @@ const Player = {
   },
   async setCar(id, color) {
     const want = (this._carReq = id + ':' + color);
-    try { const SC = await Garage.build(id, color); if (this._carReq !== want) return; this.useCarVisual(SC); Garage.save(id, color); if (this.car) this.syncCar(0); }
+    try { const SC = await Garage.build(id, color); if (this._carReq !== want) return; this.useCarVisual(SC); this.carKind = 'car'; this.carName = 'car'; this.car.vmax = null; Garage.save(id, color); if (this.car) this.syncCar(0); }
     catch (e) { console.warn('car unavailable', id, e); if (typeof UI !== 'undefined' && UI.toast) UI.toast('Could not load that car — keeping the current one'); }
   },
   placeAt(x, z, crowd) {
@@ -115,7 +115,7 @@ const Player = {
     this.placeAt(f.x, f.z, false); if (wasDriving) this.toggleCar(); UI.toast('Moved to an open street nearby');
   },
   update(dt) {
-    Airport.tick(dt, this.focus()); Chute.tick(dt);
+    Airport.tick(dt, this.focus()); Chute.tick(dt); Rides.tick(dt);
     if (Airport.built && !Plane.placed) { Plane.placed = true; if (!(Plane.m && Plane.m.g.visible)) Plane.park(); }
     if (Airport.built && !Heli.placed) { Heli.placed = true; if (!(Heli.m && Heli.m.g.visible)) Heli.park(); }
     if (this.mode === 'heli') {
@@ -137,6 +137,7 @@ const Player = {
     if (Mouse.wheel) { this.camDist = clamp(this.camDist * (1 + Mouse.wheel * 0.12), 2.5, 40); Mouse.wheel = 0; }
     if (hit('KeyC')) { this.camMode = this.camMode >= 2 ? 0 : this.camMode + 1; UI.toast(['Chase camera', 'Far camera', 'First person'][this.camMode]); }
     if (this.mode === 'para') { Pressed.delete('KeyE'); Chute.update(dt); this.updateCamera(dt); return; }
+    if (this.mode === 'drive' && hit('KeyN') && /^(police|engine|rescue|ambulance)$/.test(this.carKind || '')) { Rides.toggleSiren(); UI.toast(Rides.siren ? 'Lights & siren on' : 'Lights & siren off'); }
     if (hit('KeyL')) { this.autoLights = false; this.headlights = !this.headlights; UI.toast(this.headlights ? 'Headlights on' : 'Headlights off'); }
     if (this.mode === 'walk' && Heli.near(this.pos) && Pressed.has('KeyE')) { Pressed.delete('KeyE'); Heli.enter(); return; }
     if (hit('KeyE')) { if (this.mode === 'walk' && Plane.near(this.pos) && Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z) > Math.hypot(this.pos.x - Plane.pos.x, this.pos.z - Plane.pos.z) - 2) { Plane.enter(); return; } this.toggleCar(); }
@@ -174,14 +175,15 @@ const Player = {
     if (hips) { g.updateMatrixWorld(true); const hp = hips.getWorldPosition(new THREE.Vector3()); g.position.add(seat.sub(hp)); }
   },
   unseat() { const p = this.person; if (!p || !p._seated) return; p._seated = false; if (p.avatar) p.avatar.seat = false; if (p.npc) p.npc.pose = null; p.g.rotation.set(0, this.yaw, 0); },
+  enterCar() { this.mode = 'drive'; this.person.g.visible = false; this.camYaw = this.car.yaw + Math.PI; this.camPitch = 0.18; this.camDist = Math.max(this.camDist, 7 + Math.max(0, ((this.carInfo && this.carInfo.len) || 4.6) - 5) * 0.6); Sound.door(); },
   toggleCar() {
     if (this.mode === 'walk') {
       const d = Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z);
-      if (d < 4.5) { this.mode = 'drive'; this.person.g.visible = false; this.camYaw = this.car.yaw + Math.PI; this.camPitch = 0.18; this.camDist = Math.max(this.camDist, 7); Sound.door(); }
-      else UI.toast('Your car is ' + Math.round(d) + ' m away — the purple dot on the minimap');
+      if (d < 4.5) this.enterCar();
+      else { const r = Rides.nearest(this.pos); if (r) Rides.take(r); else UI.toast('Your car is ' + Math.round(d) + ' m away — the purple dot on the minimap · or walk up to any car or truck and press E'); }
     } else {
       if (Math.abs(this.car.speed) > 4) { UI.toast('Slow down to get out'); return; }
-      const yaw = this.car.yaw; let x = this.car.pos.x + Math.cos(yaw) * 1.6, z = this.car.pos.z - Math.sin(yaw) * 1.6;
+      const yaw = this.car.yaw, side = ((this.carInfo && this.carInfo.width) || 1.9) / 2 + 0.7; let x = this.car.pos.x + Math.cos(yaw) * side, z = this.car.pos.z - Math.sin(yaw) * side;
       const c = collideCircle(x, z, 0.35); x = c.x; z = c.z;
       this.pos.set(x, groundY(x, z, this.car.pos.y + 1), z); this.vel.set(0, 0, 0); this.yaw = yaw; this.mode = 'walk'; this.person.g.visible = true; this.car.speed = 0; this.car.gear = 'P'; this.camDist = 5; Sound.door();
     }
@@ -218,14 +220,15 @@ const Player = {
     animatePerson(this.person, sp, dt, !this.grounded);
     // hint near car
     const d = Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z);
-    UI.hint(Heli.near(this.pos) ? 'Press <kbd>E</kbd> to fly the helicopter' : Plane.near(this.pos) ? 'Press <kbd>E</kbd> to fly the plane' : d < 4.5 ? 'Press <kbd>E</kbd> to drive' : '');
+    this._rideT = (this._rideT || 0) - dt; if (this._rideT <= 0) { this._rideT = 0.25; this._ride = d < 4.5 ? null : Rides.nearest(this.pos); }
+    UI.hint(Heli.near(this.pos) ? 'Press <kbd>E</kbd> to fly the helicopter' : Plane.near(this.pos) ? 'Press <kbd>E</kbd> to fly the plane' : d < 4.5 ? 'Press <kbd>E</kbd> to drive' : this._ride ? 'Press <kbd>E</kbd> to take the ' + Rides.label(this._ride) : '');
   },
   updateDrive(dt) {
     const C = this.car;
     const thr = key('KeyW', 'ArrowUp') ? 1 : 0, brk = key('KeyS', 'ArrowDown') ? 1 : 0;
     const steerIn = (key('KeyD', 'ArrowRight') ? 1 : 0) - (key('KeyA', 'ArrowLeft') ? 1 : 0);
     const hb = key('Space');
-    const vmax = 52, spd = C.speed;
+    const vmax = C.vmax || 52, spd = C.speed;
     if (thr) { if (spd < -0.3) C.speed += 16 * dt; else C.speed += 7.5 * (1 - clamp(spd / vmax, 0, 1) ** 1.6) * dt; }
     if (brk) { if (spd > 0.3) C.speed -= 16 * dt; else C.speed = Math.max(-11, C.speed - 5 * dt); }
     if (!thr && !brk) C.speed -= Math.sign(C.speed) * Math.min(Math.abs(C.speed), (0.55 + Math.abs(C.speed) * 0.018) * dt * 2);
