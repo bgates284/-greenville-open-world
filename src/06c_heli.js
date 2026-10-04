@@ -26,16 +26,17 @@ const Heli = {
     if (!this.pad) { this.pad = makeHelipad(); dynRoot.add(this.pad); } this.pad.position.set(S.x, H(S.x, S.z), S.z); this.pad.rotation.y = S.yaw;
   },
   ground(x, z) { const a = Airport.surf(x, z); const s = surfaceY(x, z); return a !== null ? Math.max(a, s) : s; },
-  near(p) { return this.m && this.m.g.visible && Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < 6.5; },
+  near(p) { return this.m && this.m.g.visible && !this.abandoned && Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < 6.5; },
   quat() { return new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, this.roll, 'YXZ')); },
   enter() {
     const P = Player; P.mode = 'heli'; P.person.g.visible = false; this.parked = false; this.hud.style.display = 'flex';
     P.camDist = 13; this.look = { yaw: 0, pitch: 0.18 }; Sound.door();
-    if (!this._helped) { this._helped = true; UI.toast('Helicopter: R climb · F descend (let go to hover) · W/S forward/back · A/D bank · Z/X turn · Space hover in place · E to get out when landed', 10000); }
+    if (!this._helped) { this._helped = true; UI.toast('Helicopter: R climb · F descend (let go to hover) · W/S forward/back · A/D bank · Z/X turn · Space hover in place · E to get out when landed, or to jump with a parachute in the air', 10000); }
   },
   exit() {
     const P = Player;
-    if (!this.onGround || this.v.length() > 1.5) { UI.toast('Land first to get out (F to descend)'); return; }
+    if (!this.onGround && this.pos.y - this.ground(this.pos.x, this.pos.z) > 25) { Chute.bail('heli'); return; } // jump out and parachute down
+    if (!this.onGround || this.v.length() > 1.5) { UI.toast('Too low to jump — climb above 100 ft, or land first (F to descend)'); return; }
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw); let x = this.pos.x + c * 2.6, z = this.pos.z - s * 2.6; const cc = collideCircle(x, z, 0.35); x = cc.x; z = cc.z;
     P.pos.set(x, groundY(x, z, this.pos.y + 1), z); P.vel.set(0, 0, 0); P.yaw = this.yaw; P.mode = 'walk'; P.person.g.visible = true; P.camDist = 5.5;
     this.parked = true; this.col = 0; this.hud.style.display = 'none'; Sound.door();

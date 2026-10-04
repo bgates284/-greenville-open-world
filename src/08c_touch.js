@@ -67,6 +67,8 @@ const Touch = {
       add(B, 'Turn ◀', 'hold:KeyZ', 'small'); add(B, 'Turn ▶', 'hold:KeyX', 'small'); add(B, 'E', 'tap:KeyE', 'small');
       add(B, 'Down', 'hold:KeyF', 'big'); add(B, 'Up', 'hold:KeyR', 'big'); add(B, 'Hover', 'hold:Space', 'small');
       add(T, 'Cam', 'tap:KeyC', 'small'); add(T, 'Map', 'map', 'small');
+    } else if (mode === 'para') {
+      add(B, 'Open /\nFlare', 'hold:Space', 'big'); add(T, 'Cam', 'tap:KeyC', 'small'); add(T, 'Map', 'map', 'small');
     } else if (mode === 'fly') {
       add(B, 'Rud ◀', 'hold:KeyZ', 'small'); add(B, 'Rud ▶', 'hold:KeyX', 'small'); add(B, 'E', 'tap:KeyE', 'small');
       add(B, 'Thr −', 'hold:KeyF', 'big'); add(B, 'Thr +', 'hold:KeyR', 'big'); add(B, 'Brake', 'hold:Space', 'small');
@@ -78,7 +80,7 @@ const Touch = {
     if (!this.root) return;
     const show = Game.playing && !Game.paused && $('bigmap').hidden && !(typeof Cine !== 'undefined' && Cine.active);
     this.root.style.display = show ? 'block' : 'none'; if (!show) { this.clearAll(); return; }
-    const m = Player.mode === 'fly' ? 'fly' : Player.mode === 'heli' ? 'heli' : Player.mode === 'drive' ? 'drive' : 'walk'; if (m !== this.mode) { this.clearAll(); this.layout(m); }
+    const m = Player.mode === 'para' ? 'para' : Player.mode === 'fly' ? 'fly' : Player.mode === 'heli' ? 'heli' : Player.mode === 'drive' ? 'drive' : 'walk'; if (m !== this.mode) { this.clearAll(); this.layout(m); }
     if (m === 'fly' && typeof Plane !== 'undefined') this.thrEl.firstChild.style.height = Math.round((Plane.thr || 0) * 100) + '%';
   },
   clearAll() { for (const c of [...this.owned]) this.release(c); this.stick = null; this.looks.clear(); this.pinch = null; if (this.stickEl) this.stickEl.style.display = 'none'; },

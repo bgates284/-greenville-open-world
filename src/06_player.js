@@ -115,7 +115,7 @@ const Player = {
     this.placeAt(f.x, f.z, false); if (wasDriving) this.toggleCar(); UI.toast('Moved to an open street nearby');
   },
   update(dt) {
-    Airport.tick(dt, this.focus());
+    Airport.tick(dt, this.focus()); Chute.tick(dt);
     if (Airport.built && !Plane.placed) { Plane.placed = true; if (!(Plane.m && Plane.m.g.visible)) Plane.park(); }
     if (Airport.built && !Heli.placed) { Heli.placed = true; if (!(Heli.m && Heli.m.g.visible)) Heli.park(); }
     if (this.mode === 'heli') {
@@ -136,6 +136,7 @@ const Player = {
     this.camYaw -= Mouse.dx * sens; this.camPitch = clamp(this.camPitch + Mouse.dy * sens, -0.35, 1.25); Mouse.dx = Mouse.dy = 0;
     if (Mouse.wheel) { this.camDist = clamp(this.camDist * (1 + Mouse.wheel * 0.12), 2.5, 40); Mouse.wheel = 0; }
     if (hit('KeyC')) { this.camMode = this.camMode >= 2 ? 0 : this.camMode + 1; UI.toast(['Chase camera', 'Far camera', 'First person'][this.camMode]); }
+    if (this.mode === 'para') { Pressed.delete('KeyE'); Chute.update(dt); this.updateCamera(dt); return; }
     if (hit('KeyL')) { this.autoLights = false; this.headlights = !this.headlights; UI.toast(this.headlights ? 'Headlights on' : 'Headlights off'); }
     if (this.mode === 'walk' && Heli.near(this.pos) && Pressed.has('KeyE')) { Pressed.delete('KeyE'); Heli.enter(); return; }
     if (hit('KeyE')) { if (this.mode === 'walk' && Plane.near(this.pos) && Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z) > Math.hypot(this.pos.x - Plane.pos.x, this.pos.z - Plane.pos.z) - 2) { Plane.enter(); return; } this.toggleCar(); }
@@ -280,7 +281,7 @@ const Player = {
       const want = C.yaw + (C.speed < -1 ? 0 : Math.PI); this.camYaw += angleDiff(this.camYaw, want) * Math.min(1, dt * 3);
       this.camPitch += (0.2 - this.camPitch) * Math.min(1, dt * 1.5);
     }
-    const tgt = drive ? new THREE.Vector3(C.pos.x, C.pos.y + 1.5, C.pos.z) : new THREE.Vector3(this.pos.x, this.pos.y + 1.6, this.pos.z);
+    const tgt = drive ? new THREE.Vector3(C.pos.x, C.pos.y + 1.5, C.pos.z) : new THREE.Vector3(this.pos.x, this.pos.y + (this.mode === 'para' && Chute.state === 'open' ? 1.6 + 2.6 * Chute.open : 1.6), this.pos.z);
     if (this.camMode === 3 && !drive) { // face close-up: stand in front of the character
       const hb = this.person.avatar?.B?.Head; const hp = hb ? hb.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(this.pos.x, this.pos.y + 1.62, this.pos.z);
       const fy = this.yaw; const want = new THREE.Vector3(hp.x + Math.sin(fy) * 1.15 + Math.cos(fy) * 0.25, hp.y + 0.04, hp.z + Math.cos(fy) * 1.15 - Math.sin(fy) * 0.25);

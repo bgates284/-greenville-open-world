@@ -31,16 +31,17 @@ const Plane = {
     const S = Airport.carSpot; C.pos.set(S.x, surfaceY(S.x, S.z) + 0.22, S.z); C.yaw = S.yaw; C.speed = 0; C.vy = 0; Player.syncCar(0);
   },
   ground(x, z) { const a = Airport.surf(x, z); const s = surfaceY(x, z); return a !== null ? Math.max(a, s) : s; },
-  near(p) { return this.m && this.m.g.visible && Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < 7; },
+  near(p) { return this.m && this.m.g.visible && !this.abandoned && Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < 7; },
   axes() { const F = new THREE.Vector3(0, 0, 1).applyQuaternion(this.q), U = new THREE.Vector3(0, 1, 0).applyQuaternion(this.q), L = new THREE.Vector3(1, 0, 0).applyQuaternion(this.q); return { F, U, L }; },
   enter() {
     const P = Player; P.mode = 'fly'; P.person.g.visible = false; this.parked = false; this.hud.style.display = 'flex';
     P.camDist = 14; this.look = { yaw: 0, pitch: 0.12 }; Sound.door();
-    if (!this._helped) { this._helped = true; UI.toast('Flying: R/F throttle · W/S pitch · A/D roll · Z/X rudder · Space brakes · C camera · E to get out when stopped', 9000); }
+    if (!this._helped) { this._helped = true; UI.toast('Flying: R/F throttle · W/S pitch · A/D roll · Z/X rudder · Space brakes · C camera · E to get out when stopped, or to jump with a parachute in the air', 9000); }
   },
   exit() {
     const P = Player; const spd = this.v.length();
-    if (!this.onGround || spd > 3) { UI.toast(this.onGround ? 'Stop the plane first (Space brakes, F to idle)' : 'Land first to get out'); return; }
+    if (!this.onGround && this.pos.y - this.ground(this.pos.x, this.pos.z) > 25) { Chute.bail('plane'); return; } // jump out and parachute down
+    if (!this.onGround || spd > 3) { UI.toast(this.onGround ? 'Stop the plane first (Space brakes, F to idle)' : 'Too low to jump — climb above 100 ft, or land first'); return; }
     const { L } = this.axes(); let x = this.pos.x + L.x * 2.2, z = this.pos.z + L.z * 2.2; const c = collideCircle(x, z, 0.35); x = c.x; z = c.z;
     P.pos.set(x, groundY(x, z, this.pos.y + 1), z); P.vel.set(0, 0, 0); P.yaw = Math.atan2(L.x, L.z); P.mode = 'walk'; P.person.g.visible = true; P.camDist = 5.5;
     this.thr = 0; this.parked = true; this.hud.style.display = 'none'; Sound.door();
