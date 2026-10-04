@@ -77,6 +77,9 @@ const Player = {
     const px = cx - Math.cos(yaw) * side, pz = cz + Math.sin(yaw) * side; // curb side of the car
     const c = freeSpot(px, pz, cx, cz);
     this.pos.set(c[0], groundY(c[0], c[1], H(c[0], c[1]) + 1), c[1]); this.vel.set(0, 0, 0); this.yaw = yaw;
+    if (this.mode === 'fly' && Plane.hud) { Plane.hud.style.display = 'none'; Plane.parked = true; Plane.thr = 0; } // traveling away from the plane / helicopter: leave it parked
+    if (this.mode === 'heli' && Heli.hud) { Heli.hud.style.display = 'none'; Heli.parked = true; }
+    this.unseat();
     this.mode = 'walk'; this.camPitch = 0.3; this.camDist = 5.5;
     // point the camera from the most open direction so you can see yourself
     { let best = yaw + Math.PI, bs = -1; for (let k = 0; k < 16; k++) { const a = yaw + Math.PI + k / 16 * Math.PI * 2; let free = 0; for (let d = 1; d <= 12; d++) { const qx = this.pos.x + Math.sin(a) * d, qz = this.pos.z + Math.cos(a) * d; if (insideBuilding(qx, qz)) break; free = d; } if (free > bs + 0.5) { bs = free; best = a; } } this.camYaw = best; }
