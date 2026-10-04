@@ -56,6 +56,7 @@ const Radio = {
       '<div class="rv"><button class="rb sm" data-v="-1" title="Volume down (-)" aria-label="Volume down">−</button><div class="rvb"><i></i></div><button class="rb sm" data-v="1" title="Volume up (=)" aria-label="Volume up">+</button></div>' +
       '<select class="rl" title="All stations" aria-label="Choose a station">' + RADIO_STATIONS.map((s, i) => `<option value="${i}">${s[0]} ${s[1]} · ${s[2]} ${s[3]}</option>`).join('') + '</select>';
     (document.getElementById('hud') || document.body).appendChild(el);
+    el.querySelectorAll('button').forEach(b => b.addEventListener('mousedown', e => e.preventDefault())); // don't take keyboard focus (Space must stay the brake)
     el.querySelector('.pw').onclick = () => this.power();
     el.querySelectorAll('[data-t]').forEach(b => b.onclick = () => this.tune(+b.dataset.t));
     el.querySelectorAll('[data-v]').forEach(b => b.onclick = () => this.volume(+b.dataset.v * 0.1));
@@ -105,11 +106,12 @@ const Radio = {
   onKey(e) {
     if (!this.inVeh || (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA'))) return;
     if (typeof Game !== 'undefined' && Game.paused) return;
-    if (e.code === 'KeyO') this.power();
-    else if (e.code === 'Comma') this.tune(-1);
-    else if (e.code === 'Period') this.tune(1);
-    else if (e.code === 'Minus' || e.code === 'NumpadSubtract') this.volume(-0.1);
-    else if (e.code === 'Equal' || e.code === 'NumpadAdd') this.volume(0.1);
+    const c = e.code, k = (e.key || '').toLowerCase(); if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (c === 'KeyO' || k === 'o') this.power();
+    else if (c === 'Comma' || k === ',' || k === '<') this.tune(-1);
+    else if (c === 'Period' || k === '.' || k === '>') this.tune(1);
+    else if (c === 'Minus' || c === 'NumpadSubtract' || k === '-' || k === '_') this.volume(-0.1);
+    else if (c === 'Equal' || c === 'NumpadAdd' || k === '=' || k === '+') this.volume(0.1);
   },
 };
 Radio.init();
