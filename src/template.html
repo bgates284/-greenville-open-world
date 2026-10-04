@@ -92,6 +92,25 @@ select{background:var(--panel-solid);border:1px solid var(--line);border-radius:
 #packchip.on{opacity:1}
 #dbg{position:absolute;right:16px;top:100px;font:11px/1.4 var(--mono);background:rgba(0,0,0,.55);padding:6px 8px;border-radius:4px;white-space:pre}
 #dbg[hidden]{display:none!important}
+#radio{position:absolute;right:16px;top:72px;display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(18,14,28,.8);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#radio[hidden]{display:none!important}
+#radio .rb{width:28px;height:28px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.06);color:var(--text);font:600 13px/1 var(--sans);cursor:pointer;padding:0}
+#radio .rb:hover{background:rgba(255,255,255,.14)}
+#radio .rb.sm{width:22px;height:22px;font-size:14px}
+#radio .pw{color:var(--gold);font-size:15px}
+#radio.off .pw{color:var(--muted)}
+#radio .rd{min-width:150px;max-width:190px;text-align:center;cursor:default;padding:0 2px}
+#radio .rf{font:800 22px/1 var(--display);color:var(--gold);letter-spacing:.02em}
+#radio.off .rf{color:var(--muted)}
+#radio .rn{font:600 11px/1.3 var(--mono);color:#e4dcf2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#radio .rs{font:10px/1.2 var(--mono);color:var(--muted);min-height:12px}
+#radio .rs.live{color:var(--ok)} #radio .rs.nosignal{color:var(--warn)} #radio .rs.tap{color:var(--gold);cursor:pointer}
+#radio .rv{display:flex;align-items:center;gap:4px}
+#radio .rvb{width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+#radio .rvb i{display:block;height:100%;background:var(--gold)}
+#radio .rl{width:24px;height:28px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M1 3h10M1 6h10M1 9h10' stroke='%23efebf5' stroke-width='1.5'/%3E%3C/svg%3E") center/12px no-repeat;color:transparent;cursor:pointer;appearance:none;-webkit-appearance:none}
+#radio .rl option{color:#111;background:#fff}
+@media (max-width:700px){#radio{top:auto;bottom:220px;right:8px}#radio .rv{display:none}#radio .rd{min-width:110px}}
 #toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);font:600 13px/1.3 var(--sans);background:rgba(18,14,28,.8);border:1px solid var(--line);padding:8px 14px;border-radius:6px;opacity:0;transition:opacity .3s;max-width:80vw;text-align:center}
 #toast.on{opacity:1}
 
@@ -247,6 +266,9 @@ select{background:var(--panel-solid);border:1px solid var(--line);border-radius:
         <kbd>V</kbd><span>Talk through your microphone — your character lip-syncs</span>
         <kbd>G</kbd><span>Smile · <b>1</b> nod yes · <b>2</b> shake head</span>
         <kbd>Y</kbd><span>Stuck? Jump back to the nearest street</span>
+        <kbd>O</kbd><span>Radio on / off (in the car, plane or helicopter)</span>
+        <kbd>, .</kbd><span>Radio: tune down / up through the local stations</span>
+        <kbd>- =</kbd><span>Radio volume</span>
         <kbd>T</kbd><span>Skip ahead 1 hour</span>
         <kbd>R</kbd><span>Cycle weather</span>
         <kbd>F3</kbd><span>Performance stats</span>
