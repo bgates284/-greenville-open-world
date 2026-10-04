@@ -146,6 +146,7 @@ class NpcAvatar {
     const k = P.k == null ? 1 : P.k;
     const legs = (th, kn, side = 0) => { for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) { R(n + 'UpLeg', lat, -th); if (side) R(n + 'UpLeg', fwd, s * side); R(n + 'Leg', lat, kn); } };
     switch (P.name) {
+      case 'drive': legs(1.55, 0.65, 0.06); R('LeftArm', lat, -0.85); R('RightArm', lat, -0.85); R('LeftForeArm', lat, -0.55); R('RightForeArm', lat, -0.55); break;
       case 'sit': legs(1.5, 1.45, 0.05); R('LeftArm', lat, -0.35); R('RightArm', lat, -0.35); R('LeftForeArm', lat, -0.95); R('RightForeArm', lat, -0.95); break;
       case 'curb': R('Spine', lat, 0.3); legs(1.95, 2.3, 0.14); R('LeftArm', lat, -0.75); R('RightArm', lat, -0.75); R('LeftForeArm', lat, -0.8); R('RightForeArm', lat, -0.8); break;
       case 'push': R('Spine', lat, 0.12); R('LeftArm', lat, -0.95); R('RightArm', lat, -0.95); R('LeftForeArm', lat, -0.5); R('RightForeArm', lat, -0.5); break;

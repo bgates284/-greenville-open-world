@@ -118,14 +118,14 @@ const Player = {
     if (this.mode === 'heli') {
       if (hit('KeyC')) { this.camMode = this.camMode === 0 ? 1 : this.camMode === 1 ? 2 : 0; UI.toast(['Chase camera', 'Far camera', 'Cockpit'][this.camMode]); }
       Heli.update(dt);
-      if (this.mode === 'heli') { Heli.camera(dt); return; }
+      if (this.mode === 'heli') { Heli.camera(dt); this.seatPerson(dt); return; }
       this.updateCamera(dt); return;
     }
     if (this.mode === 'fly') {
       if (hit('KeyC')) { this.camMode = this.camMode === 0 ? 1 : this.camMode === 1 ? 2 : 0; UI.toast(['Chase camera', 'Far camera', 'Cockpit'][this.camMode]); }
       if (hit('KeyB')) { if (Voice.mode === 'babble') { Voice.stop(); } else Voice.startBabble(); }
       Plane.update(dt);
-      if (this.mode === 'fly') { Plane.camera(dt); return; }
+      if (this.mode === 'fly') { Plane.camera(dt); this.seatPerson(dt); return; }
       this.updateCamera(dt); return;
     }
     // camera input
@@ -146,7 +146,30 @@ const Player = {
     if (this.mode === 'walk') this.updateWalk(dt); else this.updateDrive(dt);
     if (this.mode === 'walk') this.syncCar(0);
     this.updateCamera(dt);
+    if (this.mode === 'drive') this.seatPerson(dt);
   },
+  // your character rides along: sitting in the driver's seat (or the pilot's), visible through the
+  // windows, hidden only in the first-person / cockpit camera
+  seatPerson(dt) {
+    const p = this.person; if (!p || !p.g) return; const g = p.g;
+    let q, base; const off = this._seatOff || (this._seatOff = new THREE.Vector3());
+    if (this.mode === 'drive') { const I = this.carInfo || {}; q = this.carObj.quaternion; base = this.car.pos; off.set(Math.min(0.42, (I.width || 2.2) * 0.17), (I.height || 1.3) * 0.35, -0.3); }
+    else if (this.mode === 'fly') { q = Plane.q; base = Plane.pos; off.set(0.3, 0.98, 0.0); }
+    else if (this.mode === 'heli') { q = Heli.quat(); base = Heli.pos; off.set(-0.35, 0.8, 0.82); }
+    else return;
+    g.visible = this.camMode !== 2; if (!g.visible) return;
+    if (!p._seated) { p._seated = true; if (p.avatar) p.avatar.seat = true; if (p.npc) p.npc.pose = { name: 'drive' }; }
+    const seat = off.clone().applyQuaternion(q).add(base);
+    g.quaternion.copy(q); g.position.copy(seat); g.position.y -= 0.95 * g.scale.y;
+    animatePerson(p, 0, dt);
+    const B = p.B; if (!p.avatar && !p.npc && B && B.uLegL) { // simple people
+      B.uLegL.rotation.set(-1.55, 0, 0.08); B.uLegR.rotation.set(-1.55, 0, -0.08); B.lLegL.rotation.x = B.lLegR.rotation.x = 0.65; if (B.footL) B.footL.rotation.x = B.footR.rotation.x = -0.25;
+      B.uArmL.rotation.set(-0.9, 0, 0.12); B.uArmR.rotation.set(-0.9, 0, -0.12); B.lArmL.rotation.x = B.lArmR.rotation.x = -0.55; }
+    // line the hips up with the seat cushion, whatever the rig
+    const hips = (p.avatar && p.avatar.B && p.avatar.B.Hips) || (p.npc && p.npc.bones && p.npc.bones.Hips) || (B && B.hips);
+    if (hips) { g.updateMatrixWorld(true); const hp = hips.getWorldPosition(new THREE.Vector3()); g.position.add(seat.sub(hp)); }
+  },
+  unseat() { const p = this.person; if (!p || !p._seated) return; p._seated = false; if (p.avatar) p.avatar.seat = false; if (p.npc) p.npc.pose = null; p.g.rotation.set(0, this.yaw, 0); },
   toggleCar() {
     if (this.mode === 'walk') {
       const d = Math.hypot(this.pos.x - this.car.pos.x, this.pos.z - this.car.pos.z);
@@ -181,6 +204,7 @@ const Player = {
     if (ny <= gy) { this.pos.y = gy; this.vel.y = 0; this.grounded = true; } else { this.pos.y = ny; this.grounded = ny - gy < 0.05; }
     this.pos.x = nx; this.pos.z = nz;
     const sp = Math.hypot(this.vel.x, this.vel.z);
+    if (this.person._seated) this.unseat();
     this.person.g.position.copy(this.pos); this.person.g.rotation.y = this.yaw;
     if (this.person.avatar) { // pick someone nearby to glance at
       let best = null, bd = 7; const fx0 = Math.sin(this.yaw), fz0 = Math.cos(this.yaw);

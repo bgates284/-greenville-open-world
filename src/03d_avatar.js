@@ -206,6 +206,12 @@ class Avatar {
     if (B.RightShoulder) addWorldRotation(B.RightShoulder, rotAxis(fwd, -Math.sin(t * 1.25 + 1.2) * 0.02 * idle));
     if (B.Hips && idle > 0.01) { addWorldRotation(B.Hips, rotAxis(fwd, Math.sin(t * 0.37) * 0.025 * idle)); if (B.Spine) addWorldRotation(B.Spine, rotAxis(fwd, -Math.sin(t * 0.37) * 0.02 * idle)); }
     this.root.updateMatrixWorld(true);
+    if (this.seat) { // sitting in a car / plane / helicopter: thighs forward, knees bent, hands out to the wheel or yoke
+      const R = (n, ax, a) => { const b = B[n]; if (b) { b.updateMatrixWorld(true); addWorldRotation(b, rotAxis(ax, a)); } };
+      for (const s of ['Left', 'Right']) { R(s + 'UpLeg', right, -1.55); R(s + 'Leg', right, 0.65); R(s + 'Foot', right, -0.25); R(s + 'Arm', right, -0.85); R(s + 'ForeArm', right, -0.55); }
+      R('LeftUpLeg', fwd, -0.06); R('RightUpLeg', fwd, 0.06); R('LeftArm', fwd, 0.18); R('RightArm', fwd, -0.18);
+      this.root.updateMatrixWorld(true);
+    }
     // --- head / neck / eye tracking toward the camera (clamped, slerped) ---
     const head = B.Head, neck = B.Neck;
     if (head && neck && cam) {
@@ -231,7 +237,7 @@ class Avatar {
       for (const e of [B.LeftEye, B.RightEye]) if (e) addWorldRotation(e, this.eyeQ);
     }
     // --- two-bone foot IK: plant each foot on the actual ground under it ---
-    if (!air && B.LeftUpLeg && B.LeftLeg && B.LeftFoot && B.RightUpLeg) {
+    if (!air && !this.seat && B.LeftUpLeg && B.LeftLeg && B.LeftFoot && B.RightUpLeg) {
       this.root.updateMatrixWorld(true);
       const rootY = this.root.position.y; const legs = [[B.LeftUpLeg, B.LeftLeg, B.LeftFoot], [B.RightUpLeg, B.RightLeg, B.RightFoot]];
       const deltas = legs.map(([, , f]) => { const p = f.getWorldPosition(new THREE.Vector3()); const g = groundY(p.x, p.z, rootY + 0.5); return clamp(g - rootY, -0.35, 0.35); });
