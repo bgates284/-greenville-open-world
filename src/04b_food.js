@@ -173,6 +173,36 @@ function foodBuilder(T, P, ctx) {
     });
   }
 
+  // supermarket front (Food Lion): red brick with a row of big windows between brick piers, a cream EIFS sign
+  // panel across the upper facade that rises above the roof line, with a stepped cornice and big blue letters.
+  // Used for a stand-alone store and for the grocery anchor of a strip centre.
+  function grocerFront(f, L, a, b, n, g0, gBase, wallTop, frame, doorGap, withDoor) {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]); const ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len; const [fnx, fnz] = n;
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const cream = C(L.panel || '#ece5d6'), cream2 = cream.clone().multiplyScalar(0.92), pier = C('#9a4a37');
+    const pTop = Math.max(wallTop + 1.25, g0 + 6.6), pBot = g0 + 3.45, pc = [mid[0] + fnx * 0.2, mid[1] + fnz * 0.2];
+    box(pc[0], pc[1], ux, uz, len / 2 + 0.2, 0.36, pBot, pTop, cream);                                              // panel
+    box(pc[0] + fnx * 0.12, pc[1] + fnz * 0.12, ux, uz, len / 2 + 0.3, 0.42, pTop - 0.18, pTop, cream2);          // cornice, two steps
+    box(pc[0] + fnx * 0.16, pc[1] + fnz * 0.16, ux, uz, len / 2 + 0.34, 0.46, pTop, pTop + 0.26, cream);
+    box(pc[0] + fnx * 0.06, pc[1] + fnz * 0.06, ux, uz, len / 2 + 0.22, 0.4, pBot - 0.12, pBot + 0.06, cream2);    // sill band
+    for (const sd of [-1, 1]) box(mid[0] + ux * sd * (len / 2 - 0.4) + fnx * 0.25, mid[1] + uz * sd * (len / 2 - 0.4) + fnz * 0.25, ux, uz, 0.4, 0.3, gBase - 0.3, pBot, pier); // end piers
+    // window bays between brick piers, leaving the middle for the entrance
+    const bayW = 6.4, half = len / 2 - 1.4;
+    for (let s0 = -half; s0 + 2 < half; s0 += bayW) { const s1 = Math.min(s0 + bayW - 0.9, half); if (s1 - s0 < 2) continue; if (s1 > -doorGap && s0 < doorGap) continue;
+      const a2 = [mid[0] + ux * s0, mid[1] + uz * s0], b2 = [mid[0] + ux * s1, mid[1] + uz * s1]; glassPane(a2, b2, n, g0 + 0.85, g0 + 3.05, 0.2, frame, Math.max(2, Math.round((s1 - s0) / 1.6)));
+      if (s1 + 0.9 < half) box(mid[0] + ux * (s1 + 0.45) + fnx * 0.25, mid[1] + uz * (s1 + 0.45) + fnz * 0.25, ux, uz, 0.42, 0.18, gBase - 0.3, pBot, pier); }
+    if (withDoor) { // automatic sliding doors under a cream entrance canopy
+      const dw = Math.min(doorGap - 0.6, 2.2); const d0 = [mid[0] - ux * dw, mid[1] - uz * dw], d1 = [mid[0] + ux * dw, mid[1] + uz * dw];
+      glassPane(d0, d1, n, g0, g0 + 2.7, 0.2, frame, 2); faceQ(d0, d1, g0 + 2.7, g0 + 3.2, n, 0.21, frame);
+      box(mid[0] + fnx * 1.2, mid[1] + fnz * 1.2, ux, uz, dw + 1.2, 1.0, g0 + 3.15, g0 + 3.45, cream2);
+      f._front = { x: mid[0], z: mid[1], nx: fnx, nz: fnz, w: len };
+    }
+    // the name in big letters on the panel
+    const gw = Math.min(len * 0.6, Math.min(pTop - pBot - 0.4, 3.4) * 4.4, 26), gh = gw / 4.4, gy = (pBot + pTop) / 2;
+    const i0 = slot(L.upper ? f.name.toUpperCase() : f.name, L, 'let'); signQuad(i0, [mid[0] - ux * gw / 2, mid[1] - uz * gw / 2], [mid[0] + ux * gw / 2, mid[1] + uz * gw / 2], gy - gh / 2, gy + gh / 2, n, 0.6);
+    return pTop + 0.26;
+  }
+
   // ---- a whole building in the brand's look ----
   function themedBuilding(ring, f, id, tagsH) {
     const L = f.look; const nrm = outwardNormals(ring);
@@ -198,13 +228,13 @@ function foodBuilder(T, P, ctx) {
       const contour = ring.map(p => new THREE.Vector2(p[0], p[1])); let tris = []; try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch (e) { }
       const rc = new THREE.Color(0.55, 0.56, 0.57);
       for (const tr of tris) { const A = contour[tr[0]], Bv = contour[tr[1]], Cc = contour[tr[2]]; ctx.roofF.tri([A.x, wallTop, A.y], [Bv.x, wallTop, Bv.y], [Cc.x, wallTop, Cc.y], [A.x / 8, A.y / 8], [Bv.x / 8, Bv.y / 8], [Cc.x / 8, Cc.y / 8], UPN, rc); }
-      const bh = L.style === 'diner' ? 0.6 : 1.0; band(ring, nrm, wallTop, wallTop + bh, L); topY = wallTop + bh;
-      ring.forEach((a, i) => { const b = ring[(i + 1) % ring.length]; const [nx, nz, len] = nrm[i]; if (len < 0.3) return; ledge(a, b, [nx, nz], topY, topY + 0.16, 0.22, C(L.cap || '#e8e6e1')); }); // metal coping
+      const bh = L.style === 'diner' ? 0.6 : 1.0; band(ring, nrm, wallTop, wallTop + bh, L.style === 'grocer' ? Object.assign({}, L, { trim: '#9a4a37', trim2: '#9a4a37' }) : L); topY = wallTop + bh;
+      ring.forEach((a, i) => { const b = ring[(i + 1) % ring.length]; const [nx, nz, len] = nrm[i]; if (len < 0.3) return; ledge(a, b, [nx, nz], topY, topY + 0.16, 0.22, C(L.cap || L.panel || '#e8e6e1')); }); // metal coping
       rooftopUnits(ring, wallTop, area, id || (cx * 13 + cz * 7));
       // big boxes: pilasters break up the long walls
-      if (big) ring.forEach((a, i) => { const b = ring[(i + 1) % ring.length]; const [nx, nz, len] = nrm[i]; if (len < 18) return; const k = Math.floor(len / 9); const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; for (let j = 1; j < k; j++) { const s0 = j * len / k; const x = a[0] + tx * s0 + nx * 0.25, z = a[1] + tz * s0 + nz * 0.25; box(x, z, tx, tz, 0.35, 0.28, gavg - 0.3, wallTop, C(L.wall).multiplyScalar(0.86)); } });
+      if (big && L.style !== 'grocer') ring.forEach((a, i) => { const b = ring[(i + 1) % ring.length]; const [nx, nz, len] = nrm[i]; if (len < 18) return; const k = Math.floor(len / 9); const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; for (let j = 1; j < k; j++) { const s0 = j * len / k; const x = a[0] + tx * s0 + nx * 0.25, z = a[1] + tz * s0 + nz * 0.25; box(x, z, tx, tz, 0.35, 0.28, gavg - 0.3, wallTop, C(L.wall).multiplyScalar(0.86)); } });
       // a raised brand "tower" over the entrance for the bigger sit-down chains
-      if (big && flen > 14) { // big-box entrance tower: projects from the facade and rises above the roof line
+      if (big && flen > 14 && L.style !== 'grocer') { // big-box entrance tower: projects from the facade and rises above the roof line
         const mx = (fa[0] + fb[0]) / 2, mz = (fa[1] + fb[1]) / 2; const ux = (fb[0] - fa[0]) / flen, uz = (fb[1] - fa[1]) / flen;
         const thl = Math.min(flen * 0.17, 11); box(mx + fnx * 0.8, mz + fnz * 0.8, ux, uz, thl, 1.8, gavg - 0.3, wallTop + 3.2, C(L.wall).multiplyScalar(0.92));
         box(mx + fnx * 0.82, mz + fnz * 0.82, ux, uz, thl + 0.05, 1.85, wallTop + 2.2, wallTop + 3.35, C(L.trim));
@@ -235,9 +265,10 @@ function foodBuilder(T, P, ctx) {
     const mid = [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2];
     const dw = towerW ? Math.min(towerW * 0.35, 3.2) : 0.95; const doff = towerW ? towerFront + 0.03 : 0.04;
     const frame = C(L.frame || (L.mat === 'brick' ? '#2a2e33' : '#8f959b'));
+    const gPanel = L.style === 'grocer' && flen > 8; if (gPanel) topY = Math.max(topY, grocerFront(f, L, fa, fb, fn, g0, gavg, wallTop, frame, dw + 1.6));
     if (flen > 3 && L.style !== 'garage') {
       // storefront glass across most of the street face (not for the windowless big boxes, which get glass at the entrance)
-      if (!big) { const m = Math.min(1.2, flen * 0.12); const gl0 = [fa[0] + ux * m, fa[1] + uz * m], gl1 = [fb[0] - ux * m, fb[1] - uz * m]; glassPane(gl0, [mid[0] - ux * (dw + 0.25), mid[1] - uz * (dw + 0.25)], fn, g0 + 0.82, g0 + 2.85, 0.06, frame); glassPane([mid[0] + ux * (dw + 0.25), mid[1] + uz * (dw + 0.25)], gl1, fn, g0 + 0.82, g0 + 2.85, 0.06, frame); }
+      if (!big && !gPanel) { const m = Math.min(1.2, flen * 0.12); const gl0 = [fa[0] + ux * m, fa[1] + uz * m], gl1 = [fb[0] - ux * m, fb[1] - uz * m]; glassPane(gl0, [mid[0] - ux * (dw + 0.25), mid[1] - uz * (dw + 0.25)], fn, g0 + 0.82, g0 + 2.85, 0.06, frame); glassPane([mid[0] + ux * (dw + 0.25), mid[1] + uz * (dw + 0.25)], gl1, fn, g0 + 0.82, g0 + 2.85, 0.06, frame); }
       // side walls of restaurants get windows too
       if (!big && !shop) nrm.forEach(([nx, nz, len], i) => { if (i === fi || len < 6 || Math.abs(nx * fnx + nz * fnz) > 0.4) return; const a = ring[i], b = ring[(i + 1) % ring.length]; const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; const k = Math.floor((len - 1.5) / 3.2); for (let j = 0; j < k; j++) { const s0 = 1 + j * 3.2; glassPane([a[0] + tx * s0, a[1] + tz * s0], [a[0] + tx * (s0 + 2.2), a[1] + tz * (s0 + 2.2)], [nx, nz], g0 + 0.9, g0 + 2.6, 0.06, frame, 2); } });
       // doors: glass double doors, a projecting metal entrance canopy
@@ -264,7 +295,8 @@ function foodBuilder(T, P, ctx) {
     const lettersMode = L.neon ? 'neon' : (L.brand || big || f.kind === 'shop') && !L.band ? 'let' : 'cab'; // stripes/checks behind letters would hide them
     if (L.neon && flen > 4) neonWindows(f, L, [mid[0] - ux * (dw + 0.35), mid[1] - uz * (dw + 0.35)], [fa[0] + ux * 0.9, fa[1] + uz * 0.9], [mid[0] + ux * (dw + 0.35), mid[1] + uz * (dw + 0.35)], [fb[0] - ux * 0.9, fb[1] - uz * 0.9], fn, g0);
     const LL = lettersMode === 'let' ? letterLook(L, L.band ? L.trim2 : L.trim) : L; // letters must stand out from the band they sit on
-    if (flen > 2.5) { const i0 = towerW || hip ? slot(f.name, L) : slot(f.name, LL, lettersMode); signQuad(i0, [mid[0] - ux * sw / 2, mid[1] - uz * sw / 2], [mid[0] + ux * sw / 2, mid[1] + uz * sw / 2], sy - sh - (frontTower ? 0.35 : 0), sy - (frontTower ? 0.35 : 0), fn, towerW ? towerFront + 0.08 : frontTower ? frontTower + 0.06 : 0.11); }
+    if (gPanel) { } // the supermarket front carries its own lettering
+    else if (flen > 2.5) { const i0 = towerW || hip ? slot(f.name, L) : slot(f.name, LL, lettersMode); signQuad(i0, [mid[0] - ux * sw / 2, mid[1] - uz * sw / 2], [mid[0] + ux * sw / 2, mid[1] + uz * sw / 2], sy - sh - (frontTower ? 0.35 : 0), sy - (frontTower ? 0.35 : 0), fn, towerW ? towerFront + 0.08 : frontTower ? frontTower + 0.06 : 0.11); }
     if (L.brand && rd) {
       let si = -1, ss = 0.15; nrm.forEach(([nx, nz, len], i) => { if (i === fi || len < 6) return; const s = nx * rd.dx + nz * rd.dz; if (s > ss) { ss = s; si = i; } });
       if (si < 0) nrm.forEach(([nx, nz, len], i) => { if (i !== fi && len > 7 && si < 0 && Math.abs(nx * fnx + nz * fnz) < 0.3) si = i; });
@@ -306,6 +338,11 @@ function foodBuilder(T, P, ctx) {
       ring.forEach((a, i) => { const b = ring[(i + 1) % ring.length]; if (nrm[i][2] < 3) return; const s = segDist(f.x, f.z, a[0], a[1], b[0], b[1]); if (s.d < bd) { bd = s.d; bi = i; bt = s.t; } });
       if (bi < 0) continue;
       const a = ring[bi], b = ring[(bi + 1) % ring.length]; const [nx, nz, len] = nrm[bi]; const n = [nx, nz];
+      if (L.style === 'grocer' && len > 22) { // the strip centre's grocery anchor: a full supermarket front
+        const w = Math.min(len - 0.4, Math.max(22, Math.min(len * 0.45, 46))); const c = clamp(bt * len, w / 2 + 0.2, len - w / 2 - 0.2);
+        const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; const p0 = [a[0] + tx * (c - w / 2), a[1] + tz * (c - w / 2)], p1 = [a[0] + tx * (c + w / 2), a[1] + tz * (c + w / 2)];
+        const g0 = H((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2); grocerFront(f, L, p0, p1, n, g0, base + 0.4, wallTop, C(L.frame || '#2a2e33'), 3.4, true); out.count++; continue;
+      }
       const w = Math.min(len - 0.4, f.amenity === 'restaurant' ? 11 : 8); const c = clamp(bt * len, w / 2 + 0.2, len - w / 2 - 0.2);
       const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len; const p0 = [a[0] + tx * (c - w / 2), a[1] + tz * (c - w / 2)], p1 = [a[0] + tx * (c + w / 2), a[1] + tz * (c + w / 2)];
       const g0 = H((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);

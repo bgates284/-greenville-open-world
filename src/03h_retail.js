@@ -18,7 +18,7 @@ const RETAIL_BRANDS = [
   [/lowe'?s/i, { wall: '#d8d3c6', mat: 'store', trim: '#004990', trim2: '#ffffff', awn: '#004990', sign: ['#004990', '#ffffff'], pylon: 1 , font: 'block' }],
   [/sam'?s club/i, { wall: '#d6d7d2', mat: 'store', trim: '#0067a0', trim2: '#7ab800', awn: '#0067a0', sign: ['#0067a0', '#ffffff'], pylon: 1, fuel: ['#0067a0', '#7ab800'] }],
   [/harris teeter/i, { wall: '#c4ae92', mat: 'brick', trim: '#b5121b', trim2: '#2e6b34', awn: '#2e6b34', sign: ['#ffffff', '#b5121b'], pylon: 1 , font: 'serif' }],
-  [/food lion/i, { wall: '#cfc6b6', mat: 'brick', trim: '#1b3c8f', trim2: '#d71920', awn: '#1b3c8f', sign: ['#ffffff', '#1b3c8f'], pylon: 1 }],
+  [/food lion/i, { wall: '#f6eee8', mat: 'brickPlain', base: '#8b4635', style: 'grocer', h: 7.2, panel: '#ece5d6', upper: 1, trim: '#1b3c8f', trim2: '#d71920', awn: '#1b3c8f', sign: ['#1f3f78', '#5b8ed3'], pylon: 1 }], // red brick, cream EIFS sign panel with a cornice, blue letters
   [/publix/i, { wall: '#e4dccb', mat: 'store', trim: '#3f8f29', trim2: '#ffffff', awn: '#3f8f29', sign: ['#3f8f29', '#ffffff'], pylon: 1 }],
   [/aldi/i, { wall: '#d9d6cf', mat: 'store', trim: '#00005f', trim2: '#ff7800', awn: '#00005f', sign: ['#00005f', '#ffffff'], pylon: 1 }],
   [/lidl/i, { wall: '#e8e8e4', mat: 'store', trim: '#0050aa', trim2: '#fff000', awn: '#0050aa', sign: ['#0050aa', '#fff000'], pylon: 1 }],

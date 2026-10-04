@@ -605,6 +605,7 @@ async function buildBuildings(T, P) {
     else if (lu === 225) fac = 'metal';
     else if (area > 2500) fac = 'store';
     else fac = r1 < 0.4 ? 'brick' : 'siding';
+    const grocerStrip = B.units && B.units.some(f => f.look && f.look.style === 'grocer'); if (grocerStrip) fac = 'brickPlain'; // strip centre with a Food Lion: red brick
     // --- height ---
     const lv = parseFloat(t['building:levels']);
     let h = parseLen(t.height);
@@ -653,7 +654,7 @@ async function buildBuildings(T, P) {
     let rise = 0;
     if (shape !== 'flat') { rise = Math.min(5, obb.W / 2 * Math.tan(pitch)); if (parseLen(t.height) > 0) wallTop = Math.max(base + 2.4, top - rise); }
     // --- colours ---
-    let wallCol = colHex(pick(PAL[fac] || PAL.office, r3)); if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); if (fac !== 'siding') wallCol.lerp(new THREE.Color(1, 1, 1), 0.4); } catch (e) { }
+    let wallCol = colHex(pick(PAL[fac] || PAL.office, r3)); if (grocerStrip) wallCol = new THREE.Color('#f4ece6'); if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); if (fac !== 'siding') wallCol.lerp(new THREE.Color(1, 1, 1), 0.4); } catch (e) { }
     let roofCol = colHex(pick(shape === 'flat' ? PAL.flat : PAL.shingle, r4)); if (t['roof:colour']) try { roofCol = new THREE.Color(t['roof:colour']); } catch (e) { }
     if (LM) { wallCol = new THREE.Color(LM.wall); if (!t['roof:colour']) roofCol = new THREE.Color(shape === 'flat' ? (LM.look && LM.look.roof) || '#b9b7b1' : LM.roof); }
     const tf = TEX.facade[fac]; const texW = tf.bayW * 4, texH = tf.floorH * 4; const uOff = Math.floor(r2 * 4) / 4;

@@ -231,8 +231,8 @@ function hmLocalOak(T, B, P, mb) {
     HM.obstacle(T, x, z, 0.4); }
   // --- beer garden on the open side ---
   const Wg = 20, fF = hd - 1.0, fB = -hd - 5;
-  const score = gs => { let n = 0; for (const Bo of P.buildings) { if (Bo === B) continue; const [bx, bz] = centroid(Bo.ring); const s = (bx - cx) * sx + (bz - cz) * sz, f = (bx - cx) * fx + (bz - cz) * fz; if (s * gs > hw && s * gs < hw + Wg && f > fB && f < fF) n++; } for (const t of [0.3, 0.7]) for (const ff of [fF - 2, (fF + fB) / 2, fB + 2]) { const [x, z] = P2(gs * (hw + Wg * t), ff); if (onRoadSurface(x, z)) n += 10; } return n; };
-  const gs = score(1) <= score(-1) ? 1 : -1; const S = t => gs * (hw + t); // t = distance out from the building's side wall
+  const gs = sz > 0 ? 1 : -1; // the beer garden is on the Depot Street (south) side of the building
+  const S = t => gs * (hw + t); // t = distance out from the building's side wall
   // gravel yard
   { const A = (t, f) => { const [x, z] = P2(S(t), f); return [x, H(x, z) + 0.04, z]; }; const q = [A(0, fF), A(Wg, fF), A(Wg, fB), A(0, fB)]; if (gs < 0) q.reverse(); mb.quad(q[0], q[1], q[2], q[3], [0, 0], [0, 0], [0, 0], [0, 0], [0, 1, 0], C('#cdc6b6')); }
   // privacy fence: front (with a gate by the building), outer side, back
@@ -254,7 +254,7 @@ function hmLocalOak(T, B, P, mb) {
   for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + rr() * 0.5, len = 4.2 + rr() * 1.8, rise = 1.8 + rr() * 1.2; const ex = tx + Math.cos(a) * len, ez = tz + Math.sin(a) * len, ey = ty + 2.6 + rise;
     const g = new THREE.CylinderGeometry(0.16, 0.38, Math.hypot(len, rise), 7); g.translate(0, Math.hypot(len, rise) / 2, 0); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ex - tx, ey - ty - 2.6, ez - tz).normalize()); g.applyQuaternion(q); g.translate(tx, ty + 2.6, tz); addGeoTo(mb, g, BARK); tips.push([ex, ey, ez, a]); }
   const LEAF = [C('#3d5a2a'), C('#47672f'), C('#355024')];
-  for (const [ex, ey, ez] of tips) for (let j = 0; j < 2; j++) { const g = new THREE.IcosahedronGeometry(2.4 + rr() * 1.2, 1); g.scale(1.25, 0.62, 1.25); g.translate(ex + (rr() - 0.5) * 1.5, ey + 0.8 + j * 0.7, ez + (rr() - 0.5) * 1.5); addGeoTo(mb, g, LEAF[(j + Math.floor(ex)) % 3]); }
+  for (const [ex, ey, ez] of tips) for (let j = 0; j < 2; j++) { const g = new THREE.IcosahedronGeometry(2.4 + rr() * 1.2, 1); g.scale(1.25, 0.62, 1.25); g.translate(ex + (rr() - 0.5) * 1.5, ey + 0.8 + j * 0.7, ez + (rr() - 0.5) * 1.5); addGeoTo(mb, g, LEAF[((j + Math.floor(ex)) % 3 + 3) % 3]); }
   { const g = new THREE.IcosahedronGeometry(4.2, 1); g.scale(1.2, 0.55, 1.2); g.translate(tx, ty + 7.6, tz); addGeoTo(mb, g, LEAF[0]); }
   HM.obstacle(T, tx, tz, 0.95);
   // string lights: swagged from the limbs out to the fence posts

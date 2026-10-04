@@ -3,8 +3,8 @@
 //   • Aerial — USGS National Map NAIP imagery (USDA summer aerial photos, ~0.6 m, public domain),
 //     draped on the ground in place of the painted land-use colours.
 //   • NCBuildings — NC Emergency Management's statewide building footprints (NC Risk Building
-//     Footprints: every structure, with number of storeys and occupancy type). Adds the buildings
-//     OpenStreetMap is missing (most of rural Pitt County) and gives mapped ones their storeys.
+//     Footprints: every structure, with occupancy type). Adds the buildings OpenStreetMap is missing
+//     (most of rural Pitt County). Its storey counts are not used: they made tall blocks out of houses.
 //   • Canopy — tree canopy heights from Meta / WRI's 1 m canopy height map, pre-processed per square
 //     by tools/fetch-canopy.mjs into public-data/canopy/ (see fetch-canopy.cmd). Trees are placed on
 //     the real tree tops at their real heights.
@@ -74,29 +74,24 @@ const NCBuildings = {
     } catch (e) { this.errors++; console.warn('NC building footprints unavailable for', tx, ty, e.message || e); return null; }
   },
 };
-// OSM building type for a HAZUS occupancy class
+// OSM building type for a HAZUS occupancy class. Only the broad kind is trusted (home, farm building,
+// warehouse, store, church): the statewide survey's office / hotel / hospital / campus classes and its
+// storey counts are too often wrong for small buildings, which put tall office blocks on residential
+// streets. Everything else comes out as a plain low building sized by its footprint.
 function ncBuildingType(occ, area) {
   switch (occ) {
     case 'RES1': return area < 38 ? 'shed' : 'house';
     case 'RES2': return 'static_caravan';
     case 'RES3': return area < 260 ? 'semidetached_house' : 'apartments';
-    case 'RES4': return 'hotel';
-    case 'RES5': case 'RES6': return 'dormitory';
     case 'COM1': return 'retail';
     case 'COM2': return 'warehouse';
-    case 'COM3': case 'COM8': case 'COM9': return 'commercial';
-    case 'COM4': case 'COM5': case 'COM7': case 'GOV1': case 'GOV2': return 'office';
-    case 'COM6': return 'hospital';
-    case 'COM10': return 'parking';
-    case 'EDU1': return 'school';
-    case 'EDU2': return 'university';
     case 'REL1': return 'church';
     case 'AGR1': return area < 60 ? 'shed' : 'barn';
     case 'IND1': case 'IND2': case 'IND3': case 'IND4': case 'IND5': case 'IND6': return 'industrial';
-    default: return area < 45 ? 'shed' : area < 300 ? 'yes' : 'commercial';
+    default: return area < 45 ? 'shed' : area < 280 ? 'house' : 'yes';
   }
 }
-// add the footprints OSM is missing; give matched OSM buildings their storeys
+// add the footprints OSM is missing (heights are left to the game's own rules, not the survey's storeys)
 function mergeNCBuildings(T, P, data) {
   if (!data || !data.rows || !data.rows.length) return 0;
   const W = T.W; const bl = new SpatialHash(30); const ringBox = r => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const q of r) { x0 = Math.min(x0, q[0]); z0 = Math.min(z0, q[1]); x1 = Math.max(x1, q[0]); z1 = Math.max(z1, q[1]); } return [x0, z0, x1, z1]; };
@@ -114,16 +109,15 @@ function mergeNCBuildings(T, P, data) {
       const ob = B._bb || (B._bb = ringBox(B.ring)); const ox = Math.min(bb[2], ob[2]) - Math.max(bb[0], ob[0]), oz = Math.min(bb[3], ob[3]) - Math.max(bb[1], ob[1]);
       if (ox > 0 && oz > 0 && ox * oz > 0.3 * Math.min(bbA, (ob[2] - ob[0]) * (ob[3] - ob[1]))) { hit = B; break; } // overlapping outlines: same building
     }
-    if (hit) { // OSM already has it: just the storeys (and a type if OSM only says "yes")
+    if (hit) { // OSM already has it: only say it's a home when OSM just says "yes"
       matched++; const t = hit.tags;
-      if (st > 0 && !t['building:levels'] && !t.height && !hit.part) t['building:levels'] = String(st);
-      if ((t.building === 'yes' || !t.building) && occ && occ !== 'OTHER' && !hit.part) t.building = ncBuildingType(occ, area);
+      if ((t.building === 'yes' || !t.building) && /^RES[12]$/.test(occ) && !hit.part) t.building = ncBuildingType(occ, area);
       return;
     }
     // footprints are from 2009–12: skip ones now under a road or a mapped parking lot (demolished since)
     if (onRoadSurface(cx, cz)) return;
     if (park.some(a => pointInPoly(cx, cz, a.rings[0]))) return;
-    const tags = { building: ncBuildingType(occ, area), source: 'NCEM' }; if (st > 0) tags['building:levels'] = String(st); if (year > 1700) tags.start_date = String(year);
+    const tags = { building: ncBuildingType(occ, area), source: 'NCEM' }; if (year > 1700) tags.start_date = String(year);
     const B = { id: -(T.tx * 1e7 + T.ty * 1e4 + i + 1) * 10, tags, ring, holes: [], part: false, nc: true }; B._c = [cx, cz];
     P.buildings.push(B); bl.insert(B, ...bb); added++;
   });
