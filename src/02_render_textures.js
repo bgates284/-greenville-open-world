@@ -180,6 +180,16 @@ function buildTextures() {
     }
     g.fillStyle = 'rgba(233,228,216,.9)'; g.fillRect(0, 500, 512, 12);                                                             // stone water table
   });
+  // Winterville Public Safety: light tan brick, a darker tan band, tall maroon-framed windows, recessed panels
+  mk('tanbrick', 4.0, 5.6, (g, ge, r) => {
+    g.fillStyle = '#c9b796'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0, row = 0; y < 512; y += 6, row++) for (let x = (row % 2) * -8; x < 512; x += 16) { const t = r(); g.fillStyle = `rgb(${214 + t * 22 | 0},${196 + t * 20 | 0},${160 + t * 18 | 0})`; g.fillRect(x + 1, y + 1, 14, 4); }
+    for (let f = 0; f < 4; f++) { const y0 = 512 - (f + 1) * 128;
+      g.fillStyle = 'rgba(150,118,80,.55)'; g.fillRect(0, y0 + 14, 512, 7);                       // darker band
+      for (let b = 0; b < 4; b++) { const x0 = b * 128;
+        if (b % 2 === 0) { win(g, ge, r, x0 + 46, y0 + 40, 36, 80, '#6e2323', '#2a3540', '#4f5f6e', .3); g.fillStyle = '#6e2323'; g.fillRect(x0 + 46, y0 + 78, 36, 3); }
+        else { g.strokeStyle = 'rgba(140,108,72,.7)'; g.lineWidth = 4; g.strokeRect(x0 + 30, y0 + 36, 68, 52); } } } // recessed brick panel
+  });
   // Pitt Community College: buff/tan brick, dark bronze ribbon windows, a precast band at each floor
   mk('pcc', 3.6, 4.2, (g, ge, r) => {
     g.fillStyle = '#bdb3a0'; g.fillRect(0, 0, 512, 512);

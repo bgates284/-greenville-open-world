@@ -549,7 +549,7 @@ const PAL = {
   metal: ['#ffffff', '#dfe6ea', '#e8e2d6', '#cfd8d0', '#d6d0e0'],
   shingle: ['#5a5a5c', '#3f4042', '#6b5a4a', '#4a4038', '#5d6468', '#7a6a58', '#3b4a3f', '#7a3b2c', '#48494b'],
   flat: ['#d8d8d6', '#bfc0bf', '#9a9b9c', '#e8e8e6', '#7d7f82', '#cfcac0'],
-  campus: ['#ffffff', '#fbeee8', '#f4e6de'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
+  campus: ['#ffffff', '#fbeee8', '#f4e6de'], tanbrick: ['#ffffff'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
@@ -655,7 +655,7 @@ async function buildBuildings(T, P) {
     // --- colours ---
     let wallCol = colHex(pick(PAL[fac] || PAL.office, r3)); if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); if (fac !== 'siding') wallCol.lerp(new THREE.Color(1, 1, 1), 0.4); } catch (e) { }
     let roofCol = colHex(pick(shape === 'flat' ? PAL.flat : PAL.shingle, r4)); if (t['roof:colour']) try { roofCol = new THREE.Color(t['roof:colour']); } catch (e) { }
-    if (LM) { wallCol = new THREE.Color(LM.wall); if (!t['roof:colour']) roofCol = new THREE.Color(shape === 'flat' ? '#b9b7b1' : LM.roof); }
+    if (LM) { wallCol = new THREE.Color(LM.wall); if (!t['roof:colour']) roofCol = new THREE.Color(shape === 'flat' ? (LM.look && LM.look.roof) || '#b9b7b1' : LM.roof); }
     const tf = TEX.facade[fac]; const texW = tf.bayW * 4, texH = tf.floorH * 4; const uOff = Math.floor(r2 * 4) / 4;
     const mbw = buckets[fac];
     // --- detached houses: built as real houses (04i_houses.js) ---

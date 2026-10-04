@@ -162,6 +162,7 @@ function hmMall(T, B, mb) {
 function buildHandmade(T, P) {
   const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const mb = new MB(true);
   for (const B of P.buildings) {
+    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); } catch (e) { console.warn('Local Oak skipped', e); } continue; }
     const n = (B.tags && B.tags.name) || ''; if (!n) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
     try {
       if (n === 'The Cupola') hmCupola(T, B, mb);
@@ -173,4 +174,112 @@ function buildHandmade(T, P) {
   for (const r of P.roads) if (r.tags && r.tags.name === 'Wright Circle' && r.pts.length > 5) { const c = centroid(r.pts); if (own(c[0], c[1])) try { hmFountain(T, c[0], c[1], mb); } catch (e) { console.warn('fountain skipped', e); } break; }
   for (const a of P.areas) if (a.tags && a.tags.name === 'Town Common') try { hmTownCommon(T, P, a, mb); } catch (e) { console.warn('Town Common skipped', e); }
   addMB(T, mb, lmPlainMat());
+}
+
+// ---------- Local Oak Brewing Co., 2564 Railroad St, Winterville ----------
+// One-storey white-painted brick with a flat roof, black canvas awning over black-framed glass doors
+// and a big storefront window, a lantern, "2564", a whiskey-barrel planter, the name painted on the
+// side wall (plain lettering), and the fenced beer garden beside it: a big live oak strung with
+// lights over a gravel yard, Adirondack chairs around the tree and picnic tables along the fence.
+const HANDBUILT = { 1144052978: 'localOak' }; // OSM building id → builder (the generic building is skipped)
+function hmWhiteBrickMat() {
+  if (MAT.hmWhiteBrick) return MAT.hmWhiteBrick;
+  const c = cnv(256, 256), g = c.getContext('2d'); g.fillStyle = '#dcdcd6'; g.fillRect(0, 0, 256, 256);
+  const r = mulberry32(77); for (let y = 0, row = 0; y < 256; y += 8, row++) for (let x = (row % 2) * -12; x < 256; x += 24) { const t = r(); g.fillStyle = `rgb(${240 + t * 12 | 0},${240 + t * 12 | 0},${236 + t * 12 | 0})`; g.fillRect(x + 1, y + 1, 22, 6); }
+  const t = ctex(c); return MAT.hmWhiteBrick = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 });
+}
+function hmBulbMat() { return MAT.hmBulbs || (MAT.hmBulbs = new THREE.MeshStandardMaterial({ color: 0xfff1c8, emissive: 0xffc96a, emissiveIntensity: 0.5, roughness: 0.4 })); }
+function hmLocalOak(T, B, P, mb) {
+  const ring = B.ring; const o = minAreaRect(ring); if (!o) return;
+  // front = the side facing the street
+  const E = streetEdges(ring); const fe = E.find(e => e.L >= 5) || E[0]; if (!fe) return;
+  const fx = fe.nx, fz = fe.nz, sx = fz, sz = -fx; const yaw = Math.atan2(fx, fz);
+  let mins = 1e9, maxs = -1e9, minf = 1e9, maxf = -1e9; for (const [x, z] of ring) { const s = (x - o.cx) * sx + (z - o.cz) * sz, f = (x - o.cx) * fx + (z - o.cz) * fz; mins = Math.min(mins, s); maxs = Math.max(maxs, s); minf = Math.min(minf, f); maxf = Math.max(maxf, f); }
+  const cx = o.cx + sx * (mins + maxs) / 2 + fx * (minf + maxf) / 2, cz = o.cz + sz * (mins + maxs) / 2 + fz * (minf + maxf) / 2;
+  const hw = (maxs - mins) / 2, hd = (maxf - minf) / 2;
+  const P2 = (s, f) => [cx + sx * s + fx * f, cz + sz * s + fz * f];
+  let g0 = 1e9; for (const [x, z] of ring) g0 = Math.min(g0, H(x, z)); const Hb = 5.0;
+  const C = h => new THREE.Color(h); const BLACK = C('#1b1c1e'), GLASS = C('#2a3a46'), WHITE = C('#f3f2ee'), WOOD = C('#c99f6e'), WOOD2 = C('#b88d5c'), POST = C('#9c7448');
+  const box = (s, f, y0, y1, hs, hf, col, yw = yaw) => { const [x, z] = P2(s, f); HM.box(mb, x, z, g0 + y0, g0 + y1, hs, hf, yw, col); };
+  // --- building: white brick walls, roof, parapet cap ---
+  const wb = new MB(); const cr = [P2(-hw, hd), P2(hw, hd), P2(hw, -hd), P2(-hw, -hd)];
+  for (let i = 0; i < 4; i++) { const a = cr[i], b = cr[(i + 1) % 4]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const nx = (b[1] - a[1]) / L, nz = -(b[0] - a[0]) / L; wb.quad([a[0], g0 - 0.3, a[1]], [b[0], g0 - 0.3, b[1]], [b[0], g0 + Hb, b[1]], [a[0], g0 + Hb, a[1]], [0, 0], [L / 2.6, 0], [L / 2.6, (Hb + 0.3) / 2.6], [0, (Hb + 0.3) / 2.6], [-nx, 0, -nz], null); }
+  { const m = new THREE.Mesh(wb.geo(), hmWhiteBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m); }
+  box(0, 0, Hb - 0.25, Hb - 0.2, hw - 0.05, hd - 0.05, C('#8d8f91'));                                    // roof
+  for (const [s, f, a, b] of [[0, hd, hw + 0.08, 0.12], [0, -hd, hw + 0.08, 0.12], [hw, 0, 0.12, hd], [-hw, 0, 0.12, hd]]) box(s, f, Hb, Hb + 0.12, a, b, C('#e9e8e2')); // cap
+  HM.solid(T, cr, g0 + Hb + 0.2, 'Local Oak Brewing Co.');
+  // --- storefront: double glass doors with transom, big window, black frames ---
+  const ds = -hw * 0.18, ws = Math.min(hw - 2.2, hw * 0.45), ww = Math.min(3.4, hw * 0.75);
+  box(ds, hd + 0.03, 0, 3.25, 1.15, 0.07, BLACK); box(ds, hd + 0.08, 0.05, 2.65, 1.0, 0.03, GLASS); box(ds, hd + 0.08, 2.78, 3.15, 1.0, 0.03, GLASS);
+  box(ds, hd + 0.1, 0, 2.7, 0.04, 0.04, BLACK); box(ds, hd + 0.1, 2.68, 2.76, 1.05, 0.04, BLACK);         // mullions
+  for (const k of [-0.12, 0.12]) box(ds + k, hd + 0.13, 0.9, 1.6, 0.015, 0.03, C('#c6c9cc'));            // pulls
+  box(ws, hd + 0.03, 0.3, 3.2, ww / 2 + 0.12, 0.07, BLACK); box(ws, hd + 0.08, 0.38, 3.12, ww / 2, 0.03, GLASS);
+  box(ws, hd + 0.1, 2.6, 2.66, ww / 2, 0.035, BLACK); box(ws - ww * 0.22, hd + 0.1, 2.66, 3.12, 0.03, 0.035, BLACK); box(ws + ww * 0.22, hd + 0.1, 2.66, 3.12, 0.03, 0.035, BLACK);
+  // --- black canvas awning ---
+  { const a0 = -hw + 0.4, a1 = hw - 0.2, out = 1.6, yT = 3.85, yB = 3.3; const A = (s, f, y) => { const [x, z] = P2(s, f); return [x, g0 + y, z]; };
+    const n = [fx * 0.5, 0.86, fz * 0.5];
+    mb.quad(A(a0, hd, yT), A(a1, hd, yT), A(a1, hd + out, yB), A(a0, hd + out, yB), [0, 0], [0, 0], [0, 0], [0, 0], n, BLACK);
+    mb.quad(A(a0, hd + out, yB), A(a1, hd + out, yB), A(a1, hd, yT), A(a0, hd, yT), [0, 0], [0, 0], [0, 0], [0, 0], [-n[0], -n[1], -n[2]], BLACK);
+    box((a0 + a1) / 2, hd + out, yB - 0.28, yB, (a1 - a0) / 2, 0.02, BLACK);                            // valance
+    for (const s of [a0, a1]) { mb.tri(A(s, hd, yT), A(s, hd + out, yB), A(s, hd + out, yB - 0.28), [0, 0], [0, 0], [0, 0], [sx, 0, sz], BLACK); } }
+  // --- lantern, "2564", barrel planter ---
+  const ls = ds + 1.75; box(ls, hd + 0.18, 2.25, 2.7, 0.11, 0.11, BLACK); box(ls, hd + 0.18, 2.32, 2.6, 0.08, 0.12, C('#e8e1c8'));
+  { const [x, z] = P2(ls, hd + 0.04); const s = signMesh(T, textTexture([['2564', 200, '#2a2f3a', 128, 700]], { w: 512, h: 256 }), 0.62, 0.31, false); s.position.set(x, g0 + 1.95, z); s.rotation.y = yaw; T.group.add(s); }
+  { const bs = ws - ww / 2 - 0.65; const [x, z] = P2(bs, hd + 0.55); const y = H(x, z);
+    HM.geo(mb, new THREE.CylinderGeometry(0.34, 0.3, 0.85, 14), C('#7a5532'), x, y + 0.42, z); for (const h of [0.15, 0.7]) HM.geo(mb, new THREE.CylinderGeometry(0.35, 0.35, 0.05, 14), C('#3a3a3a'), x, y + h, z);
+    const fl = [C('#7b3fa0'), C('#c2283a'), C('#e8c33a'), C('#7b3fa0'), C('#d74f8a')]; for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 0.12 + (i % 3) * 0.07; HM.geo(mb, new THREE.IcosahedronGeometry(i % 2 ? 0.1 : 0.13, 0), i % 3 === 0 ? C('#3f6f2d') : fl[i % 5], x + Math.cos(a) * r, y + 0.92 + (i % 2) * 0.06, z + Math.sin(a) * r); }
+    HM.obstacle(T, x, z, 0.4); }
+  // --- beer garden on the open side ---
+  const Wg = 20, fF = hd - 1.0, fB = -hd - 5;
+  const score = gs => { let n = 0; for (const Bo of P.buildings) { if (Bo === B) continue; const [bx, bz] = centroid(Bo.ring); const s = (bx - cx) * sx + (bz - cz) * sz, f = (bx - cx) * fx + (bz - cz) * fz; if (s * gs > hw && s * gs < hw + Wg && f > fB && f < fF) n++; } for (const t of [0.3, 0.7]) for (const ff of [fF - 2, (fF + fB) / 2, fB + 2]) { const [x, z] = P2(gs * (hw + Wg * t), ff); if (onRoadSurface(x, z)) n += 10; } return n; };
+  const gs = score(1) <= score(-1) ? 1 : -1; const S = t => gs * (hw + t); // t = distance out from the building's side wall
+  // gravel yard
+  { const A = (t, f) => { const [x, z] = P2(S(t), f); return [x, H(x, z) + 0.04, z]; }; const q = [A(0, fF), A(Wg, fF), A(Wg, fB), A(0, fB)]; if (gs < 0) q.reverse(); mb.quad(q[0], q[1], q[2], q[3], [0, 0], [0, 0], [0, 0], [0, 0], [0, 1, 0], C('#cdc6b6')); }
+  // privacy fence: front (with a gate by the building), outer side, back
+  const fence = (t0, f0, t1, f1, gate) => { const L = Math.hypot(t1 - t0, f1 - f0); const nb = Math.floor(L / 0.15);
+    for (let i = 0; i < nb; i++) { const u0 = i / nb, u1 = (i + 1) / nb; if (gate && u0 * L > gate[0] && u1 * L < gate[1]) continue;
+      const [xa, za] = P2(S(t0 + (t1 - t0) * u0), f0 + (f1 - f0) * u0), [xb, zb] = P2(S(t0 + (t1 - t0) * u1), f0 + (f1 - f0) * u1); const y = H(xa, za);
+      const col = i % 3 === 0 ? WOOD2 : i % 3 === 1 ? WOOD : C('#d2ab7c'); const nx = (zb - za), nz = -(xb - xa), nl = Math.hypot(nx, nz) || 1;
+      mb.quad([xa, y - 0.1, za], [xb, y - 0.1, zb], [xb, y + 1.85, zb], [xa, y + 1.85, za], [0, 0], [0, 0], [0, 0], [0, 0], [nx / nl, 0, nz / nl], col);
+      mb.quad([xb, y - 0.1, zb], [xa, y - 0.1, za], [xa, y + 1.85, za], [xb, y + 1.85, zb], [0, 0], [0, 0], [0, 0], [0, 0], [-nx / nl, 0, -nz / nl], col);
+      if (i % 6 === 0) HM.obstacle(T, (xa + xb) / 2, (za + zb) / 2, 0.35); }
+    for (let d = 0; d <= L + 0.01; d += 2.4) { const u = Math.min(1, d / L); const [x, z] = P2(S(t0 + (t1 - t0) * u), f0 + (f1 - f0) * u); HM.geo(mb, new THREE.BoxGeometry(0.1, 2.0, 0.1), POST, x, H(x, z) + 0.9, z); } };
+  fence(0, fF, Wg, fF, [1.2, 2.6]); fence(Wg, fF, Wg, fB); fence(Wg, fB, 0, fB);
+  // the live oak: thick trunk, spreading limbs, a broad low crown, mulch ring with timber edging
+  const tt = Wg * 0.5, tf = (fF + fB) / 2 - 0.5; const [tx, tz] = P2(S(tt), tf); const ty = H(tx, tz);
+  HM.geo(mb, new THREE.CylinderGeometry(4.6, 4.6, 0.12, 28), C('#7a5b3e'), tx, ty + 0.06, tz);
+  HM.geo(mb, new THREE.CylinderGeometry(4.75, 4.75, 0.22, 28, 1, true), C('#6b4a2f'), tx, ty + 0.11, tz);
+  const BARK = C('#4f4135'); HM.geo(mb, new THREE.CylinderGeometry(0.55, 0.85, 2.8, 10), BARK, tx, ty + 1.4, tz);
+  const rr = mulberry32(2564); const tips = [];
+  for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + rr() * 0.5, len = 4.2 + rr() * 1.8, rise = 1.8 + rr() * 1.2; const ex = tx + Math.cos(a) * len, ez = tz + Math.sin(a) * len, ey = ty + 2.6 + rise;
+    const g = new THREE.CylinderGeometry(0.16, 0.38, Math.hypot(len, rise), 7); g.translate(0, Math.hypot(len, rise) / 2, 0); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ex - tx, ey - ty - 2.6, ez - tz).normalize()); g.applyQuaternion(q); g.translate(tx, ty + 2.6, tz); addGeoTo(mb, g, BARK); tips.push([ex, ey, ez, a]); }
+  const LEAF = [C('#3d5a2a'), C('#47672f'), C('#355024')];
+  for (const [ex, ey, ez] of tips) for (let j = 0; j < 2; j++) { const g = new THREE.IcosahedronGeometry(2.4 + rr() * 1.2, 1); g.scale(1.25, 0.62, 1.25); g.translate(ex + (rr() - 0.5) * 1.5, ey + 0.8 + j * 0.7, ez + (rr() - 0.5) * 1.5); addGeoTo(mb, g, LEAF[(j + Math.floor(ex)) % 3]); }
+  { const g = new THREE.IcosahedronGeometry(4.2, 1); g.scale(1.2, 0.55, 1.2); g.translate(tx, ty + 7.6, tz); addGeoTo(mb, g, LEAF[0]); }
+  HM.obstacle(T, tx, tz, 0.95);
+  // string lights: swagged from the limbs out to the fence posts
+  const bulbs = new MB(), wire = BLACK; const anchors = []; for (let d = 0; d <= Wg; d += 4) anchors.push([S(d), fF], [S(d), fB]); for (let f = fB + 4; f < fF; f += 4) anchors.push([S(Wg), f]);
+  for (const [as, af] of anchors) { const [axp, azp] = P2(as, af); const ay = H(axp, azp) + 2.2; let best = tips[0], bd = 1e9; for (const t of tips) { const d = Math.hypot(t[0] - axp, t[2] - azp); if (d < bd) { bd = d; best = t; } }
+    const sx0 = best[0], sy0 = best[1] - 0.6, sz0 = best[2]; const L = Math.hypot(axp - sx0, azp - sz0); const n = Math.max(4, Math.floor(L / 0.7)); let prev = null;
+    for (let i = 0; i <= n; i++) { const u = i / n; const x = sx0 + (axp - sx0) * u, z = sz0 + (azp - sz0) * u, y = sy0 + (ay - sy0) * u - Math.sin(u * Math.PI) * Math.min(1.1, L * 0.08);
+      const g = new THREE.SphereGeometry(0.065, 6, 4); g.translate(x, y - 0.08, z); addGeoTo(bulbs, g, null);
+      if (prev) { const len = Math.hypot(x - prev[0], y - prev[1], z - prev[2]); const w = new THREE.CylinderGeometry(0.012, 0.012, len, 3); w.translate(0, len / 2, 0); w.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(x - prev[0], y - prev[1], z - prev[2]).normalize())); w.translate(prev[0], prev[1], prev[2]); addGeoTo(mb, w, wire); }
+      prev = [x, y, z]; } }
+  { const m = new THREE.Mesh(bulbs.geo(), hmBulbMat()); T.group.add(m); }
+  // Adirondack chairs around the tree, facing it
+  const chair = (x, z, face, col) => { const y = H(x, z); const c = Math.cos(face), s = Math.sin(face); const L = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+    const part = (u, v, y0, y1, a, b, tilt = 0) => { const g = new THREE.BoxGeometry(a * 2, y1 - y0, b * 2); if (tilt) g.rotateX(tilt); const [px, pz] = L(u, v); g.rotateY(face); g.translate(px, y + (y0 + y1) / 2, pz); addGeoTo(mb, g, col); };
+    part(0, 0.05, 0.36, 0.42, 0.33, 0.33, -0.12); part(0, -0.36, 0.45, 1.05, 0.3, 0.04, 0.45); for (const u of [-0.38, 0.38]) { part(u, 0.02, 0.58, 0.62, 0.06, 0.38); part(u, 0.28, 0, 0.6, 0.04, 0.04); part(u, -0.25, 0, 0.42, 0.04, 0.04); } HM.obstacle(T, x, z, 0.45); };
+  for (let k = 0; k < 4; k++) { const a = (k + 0.3) / 4 * Math.PI * 2 + 0.4; const x = tx + Math.cos(a) * 5.6, z = tz + Math.sin(a) * 5.6; chair(x, z, Math.atan2(tx - x, tz - z), C('#a7abad')); }
+  // picnic tables along the outer fence and the back
+  const table = (x, z, face) => { const y = H(x, z); const W2 = C('#a8794e'); const c = Math.cos(face), s = Math.sin(face); const L = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+    const part = (u, v, y0, y1, a, b) => { const [px, pz] = L(u, v); HM.box(mb, px, pz, y + y0, y + y1, a, b, face, W2); };
+    part(0, 0, 0.72, 0.78, 0.9, 0.38); for (const v of [-0.68, 0.68]) part(0, v, 0.42, 0.47, 0.9, 0.14); for (const u of [-0.7, 0.7]) { part(u, -0.3, 0, 0.72, 0.05, 0.05); part(u, 0.3, 0, 0.72, 0.05, 0.05); part(u, 0, 0.38, 0.42, 0.05, 0.75); }
+    HM.obstacle(T, x, z, 0.95); };
+  const tyaw = Math.atan2(sx * gs, sz * gs);
+  for (const f of [fF - 3, (fF + fB) / 2, fB + 3]) { const [x, z] = P2(S(Wg - 1.6), f); table(x, z, tyaw); }
+  for (const t of [4, 15]) { const [x, z] = P2(S(t), fB + 1.6); table(x, z, Math.atan2(fx, fz) + Math.PI / 2); }
+  // the name painted on the garden-side wall, near the front
+  { const s = signMesh(T, textTexture([['LOCAL OAK', 190, '#1f2d55', 96, 800], ['BREWING CO.', 96, '#1f2d55', 200, 700]], { w: 1024, h: 256 }), Math.min(hd * 1.1, 6.4), Math.min(hd * 1.1, 6.4) / 4, false);
+    const [x, z] = P2(gs * (hw + 0.04), hd * 0.35); s.position.set(x, g0 + 3.2, z); s.rotation.y = Math.atan2(sx * gs, sz * gs); T.group.add(s); }
 }

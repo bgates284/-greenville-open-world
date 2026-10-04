@@ -138,7 +138,7 @@ const Env = {
     // emissive city lights
     const n = this.night;
     for (const k in MAT.facade) MAT.facade[k].emissiveIntensity = n * 1.25;
-    MAT.lampHead.emissiveIntensity = n * 6; for (const m of MAT.signMats) m.emissiveIntensity = 0.06 + n * 0.3; if (MAT.foodSigns) for (const m of MAT.foodSigns) m.emissiveIntensity = 0.22 + n * 1.1; MAT.headlight.emissiveIntensity = 0.1 + n * 4; MAT.taillight.emissiveIntensity = 0.3 + n * 2.2;
+    MAT.lampHead.emissiveIntensity = n * 6; if (MAT.hmBulbs) MAT.hmBulbs.emissiveIntensity = 0.35 + n * 3.5; if (MAT.hmGlow) MAT.hmGlow.emissiveIntensity = 0.25 + n * 1.8; for (const m of MAT.signMats) m.emissiveIntensity = 0.06 + n * 0.3; if (MAT.foodSigns) for (const m of MAT.foodSigns) m.emissiveIntensity = 0.22 + n * 1.1; MAT.headlight.emissiveIntensity = 0.1 + n * 4; MAT.taillight.emissiveIntensity = 0.3 + n * 2.2;
 
     // environment map refresh when the sun has moved
     if (this.envDirty || this.sunDir.distanceTo(this.lastEnvSun) > 0.03) {

@@ -33,6 +33,8 @@ function foodBuilder(T, P, ctx) {
   for (const B of cand) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const p of B.ring) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); } B._bb = [x0, z0, x1, z1]; }
   for (const f of foods) {
     if (f.kind === 'centre') { f._alone = true; continue; } // shopping centres: a road-side sign only
+    if (/^Local Oak Brewing/.test(f.name)) { f._alone = false; continue; } // hand-built with its beer garden (04g_handmade.js)
+    if (/^Main & Mill Oyster/.test(f.name)) { f._alone = false; continue; } // hand-built corner building (04h_civic.js)
     let host = null;
     if (f.ref[0] === 'w') host = cand.find(B => 'w' + B.id === f.ref) || null;
     if (!host) { let best = 1e12; for (const B of cand) { const b = B._bb; if (f.x < b[0] || f.x > b[2] || f.z < b[1] || f.z > b[3]) continue; if (pointInPoly(f.x, f.z, B.ring)) { const a = Math.abs(signedArea(B.ring)); if (a < best) { best = a; host = B; } } } }

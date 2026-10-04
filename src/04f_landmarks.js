@@ -33,8 +33,9 @@ const zoneAt = (Z, kind, x, z) => Z.find(q => q.kind === kind && inArea(q.a, x, 
 function landmarkStyle(B, cx, cz, area, obb, Z) {
   const t = B.tags, bt = t.building || t['building:part'] || 'yes', n = t.name || '';
   const lv = parseFloat(t['building:levels']); const rect = obb ? area / (obb.L * obb.W) : 0;
-  if (n === 'The Cupola' || n === 'Greenville Amphitheater') return { kind: 'skip' }; // hand-built (04g_handmade.js)
+  if (n === 'The Cupola' || n === 'Greenville Amphitheater' || HANDBUILT[B.id]) return { kind: 'skip' }; // hand-built (04g_handmade.js)
   if (/^(parking|garage|garages|shed|roof|carport|service)$/.test(bt)) return null;
+  if (typeof CIVIC_LOOK !== 'undefined' && CIVIC_LOOK[B.id]) return { kind: 'civicLook', look: CIVIC_LOOK[B.id], fac: CIVIC_LOOK[B.id].fac, h: CIVIC_LOOK[B.id].h, shape: 'flat', wall: CIVIC_LOOK[B.id].wall || '#ffffff', roof: CIVIC_LOOK[B.id].roof || '#b9b7b1' }; // e.g. Winterville Public Safety (04h_civic.js)
   // stands inside a football stadium are replaced by the seating bowl; other grandstands become stepped seating
   if (bt === 'grandstand' || bt === 'stadium' || bt === 'bleachers') {
     const st = Z.find(q => q.kind === 'stadium' && q.football && inArea(q.a, cx, cz));
@@ -100,6 +101,19 @@ function landmarkExtras(LM, B, T, ctx) {
         for (const s of [-1, 1]) decor.quad(P(s * (w / 2 + 0.4), depth + 0.2, yT + 1.1), P(0, depth + 0.2, pk), P(0, 0, pk), P(s * (w / 2 + 0.4), 0, yT + 1.1), [0, 0], [0, 0], [0, 0], [0, 0], [s * ux * 0.5, 1, s * uz * 0.5], new THREE.Color('#4f5856'));
       }
     }
+  }
+  if (LM.kind === 'civicLook' && LM.look.kind === 'mainmill') {
+    band(wallTop - 0.75, wallTop - 0.55, 0.14, new THREE.Color('#8a3f2c'));        // corbelled brick cornice
+    band(wallTop - 0.55, wallTop + 0.15, 0.06, new THREE.Color('#9b4a35'));
+    band(wallTop + 0.15, wallTop + 0.28, 0.12, new THREE.Color('#7a3526'));        // cap
+  } else if (LM.kind === 'civicLook' && LM.look.kind === 'library') {
+    band(wallTop - 0.42, wallTop + 0.05, 0.18, new THREE.Color('#f4f2ec'));        // white fascia
+    band(base + 2.75, base + 2.95, 0.04, new THREE.Color('#e3d6b8'));              // cream stone band
+    band(base + 0.2, base + 0.65, 0.04, new THREE.Color('#8e4a38'));               // darker brick base
+  } else if (LM.kind === 'civicLook') {
+    band(wallTop - 0.45, wallTop + 0.1, 0.1, new THREE.Color('#e8dcc2'));          // light coping
+    band(wallTop - 1.2, wallTop - 0.95, 0.04, new THREE.Color('#bfa37c'));         // darker tan band
+    band(base + 0.2, base + 0.75, 0.04, new THREE.Color('#bfa37c'));               // base course
   }
   if (LM.kind === 'pcc') {
     band(wallTop - 0.5, wallTop + 0.35, 0.12, new THREE.Color('#d9d2c2'));         // precast coping

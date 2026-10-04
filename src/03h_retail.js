@@ -129,7 +129,7 @@ function smokeLook(f) { let h = 0; for (const c of f.name) h = (h * 31 + c.charC
 // building of its county tax parcel (found by street address), spread along the building when several
 // share one. Rows use the restaurant layout: [name, brand?, type, cuisine, lat, lon, ref, drive-thru]
 const WINTERVILLE_PLACES = [
-  ["Main & Mill Oyster Bar & Tavern",0,"restaurant","seafood",35.527803,-77.402991,"y9101",0],["Nauti Dog Brewing Co.",0,"bar","",35.527903,-77.402988,"y9102",0],
+  ["Main & Mill Oyster Bar & Tavern",0,"restaurant","seafood",35.527803,-77.402991,"y9101",0],["Nauti Dog Brewing Co.",0,"bar","",35.52779,-77.40264,"y9102",0],
   ["Local Oak Brewing Co.",0,"bar","",35.529231,-77.402126,"y9103",0],["Tie Breakers Sports Bar & Grill",0,"bar","american",35.528738,-77.402344,"y9104",0],
   ["Coopers Cup",0,"cafe","coffee_shop",35.528516,-77.402432,"y9105",0],["Marlins Bar",0,"bar","",35.528405,-77.402475,"y9106",0],
   ["Taqueria Tere",0,"restaurant","mexican",35.528293,-77.402519,"y9107",0],["Dixie Queen Seafood Restaurant",0,"restaurant","seafood",35.526807,-77.403095,"y9108",0],
