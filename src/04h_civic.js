@@ -222,51 +222,9 @@ function cvVehicle(key, build) {
   const m = new THREE.Mesh(_cvGeo[key], MAT.cvVeh || (MAT.cvVeh = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.15 }))); m.castShadow = true; m.receiveShadow = true;
   const grp = new THREE.Group(); grp.add(m); if (typeof Rides !== 'undefined') Rides.add(grp, key); return grp; // anyone can drive it (07f_rides.js)
 }
-function makeFireEngine() {
-  return cvVehicle('engine', (bx, wheel) => {
-    const R = new THREE.Color('#b3161c'), Wt = new THREE.Color('#f2f2ee'), S = new THREE.Color('#c3c7cc'), K = new THREE.Color('#202326'), G = new THREE.Color('#2b3a47'), Y = new THREE.Color('#f0c419');
-    bx(-1.25, 1.25, 0.75, 3.05, 1.9, 5.0, R);            // cab
-    bx(-1.26, 1.26, 2.95, 3.12, 1.9, 5.0, Wt);           // white cab roof
-    bx(-1.15, 1.15, 2.0, 2.85, 4.98, 5.04, G);           // windshield
-    for (const s of [-1, 1]) bx(s * 1.26 - 0.01, s * 1.26 + 0.01, 1.95, 2.8, 2.2, 4.6, G);     // side windows
-    bx(-1.25, 1.25, 0.75, 2.75, -5.0, 1.85, R);          // body
-    for (const s of [-1, 1]) { for (let k = 0; k < 4; k++) bx(s * 1.27 - 0.02, s * 1.27 + 0.02, 1.05, 2.55, -4.6 + k * 1.55, -3.2 + k * 1.55, S); bx(s * 1.28 - 0.02, s * 1.28 + 0.02, 0.9, 1.0, -5.0, 5.0, Wt); } // compartments, white stripe
-    bx(-1.1, 1.1, 2.75, 2.95, -4.8, 1.6, K);             // hose bed
-    for (const s of [-1, 1]) bx(s * 0.95 - 0.06, s * 0.95 + 0.06, 3.05, 3.2, -5.2, 3.8, S);    // ladder rails
-    for (let k = 0; k < 18; k++) bx(-0.95, 0.95, 3.08, 3.14, -5.1 + k * 0.5, -5.04 + k * 0.5, S); // rungs
-    bx(-1.0, 1.0, 3.12, 3.3, 3.9, 4.6, R); bx(-0.3, 0.3, 3.12, 3.32, 3.9, 4.6, Wt);              // light bar
-    bx(-1.2, 1.2, 0.55, 1.05, 5.0, 5.35, S);             // bumper
-    bx(-0.7, 0.7, 1.2, 1.9, 5.0, 5.06, S);               // grille
-    for (const s of [-1, 1]) bx(s * 1.0 - 0.18, s * 1.0 + 0.18, 1.25, 1.45, 5.02, 5.08, Y);
-    wheel(-1.05, 3.6, 0.55, 0.4); wheel(1.05, 3.6, 0.55, 0.4); for (const z of [-2.4, -3.6]) { wheel(-1.05, z, 0.55, 0.5); wheel(1.05, z, 0.55, 0.5); }
-  });
-}
-function makeRescueTruck() {
-  return cvVehicle('rescue', (bx, wheel) => {
-    const R = new THREE.Color('#b3161c'), Wt = new THREE.Color('#f2f2ee'), S = new THREE.Color('#c3c7cc'), G = new THREE.Color('#2b3a47');
-    bx(-1.2, 1.2, 0.75, 2.9, 2.0, 4.6, R); bx(-1.21, 1.21, 2.8, 2.95, 2.0, 4.6, Wt); bx(-1.1, 1.1, 1.95, 2.7, 4.58, 4.64, G);
-    for (const s of [-1, 1]) bx(s * 1.21 - 0.01, s * 1.21 + 0.01, 1.9, 2.65, 2.3, 4.3, G);
-    bx(-1.28, 1.28, 0.7, 3.25, -4.7, 1.95, R);           // walk-around rescue body
-    bx(-1.29, 1.29, 2.55, 2.75, -4.7, 1.95, Wt);         // white band
-    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) bx(s * 1.3 - 0.02, s * 1.3 + 0.02, 1.0, 2.45, -4.4 + k * 2.1, -2.6 + k * 2.1, S); // roll-up compartment doors
-    bx(-1.0, 1.0, 2.95, 3.12, 3.6, 4.4, R); bx(-1.15, 1.15, 0.55, 1.0, 4.6, 4.95, S);
-    wheel(-1.05, 3.3, 0.55, 0.4); wheel(1.05, 3.3, 0.55, 0.4); wheel(-1.05, -3.0, 0.55, 0.5); wheel(1.05, -3.0, 0.55, 0.5);
-  });
-}
-function makePoliceCar() {
-  return cvVehicle('police', (bx, wheel) => {
-    const Wt = new THREE.Color('#f4f4f2'), K = new THREE.Color('#15171a'), B = new THREE.Color('#1d3f7a'), G = new THREE.Color('#26313b'), Rd = new THREE.Color('#d11f24'), Bl = new THREE.Color('#1f56d6');
-    bx(-0.92, 0.92, 0.35, 1.0, -2.45, 2.45, Wt);         // lower body
-    bx(-0.9, 0.9, 0.35, 0.95, 0.9, 2.45, K);             // black hood & front doors (two-tone)
-    bx(-0.93, 0.93, 0.35, 0.95, -0.2, 0.9, K);
-    bx(-0.94, 0.94, 0.62, 0.74, -2.2, 2.2, B);           // stripe
-    bx(-0.82, 0.82, 1.0, 1.48, -1.2, 0.85, G);           // glasshouse
-    bx(-0.8, 0.8, 1.46, 1.52, -1.1, 0.8, Wt);            // roof
-    bx(-0.62, -0.02, 1.52, 1.66, -0.2, 0.1, Rd); bx(0.02, 0.62, 1.52, 1.66, -0.2, 0.1, Bl); // light bar
-    bx(-0.7, 0.7, 0.3, 0.8, 2.45, 2.62, K);              // push bumper
-    for (const [x, z] of [[-0.82, 1.5], [0.82, 1.5], [-0.82, -1.45], [0.82, -1.45]]) wheel(x, z, 0.36, 0.26);
-  });
-}
+function makeFireEngine() { const g = makeServiceVehicle('engine'); if (typeof Rides !== 'undefined') Rides.add(g, 'engine'); return g; } // detailed model (04j_service_vehicles.js)
+function makeRescueTruck() { const g = makeServiceVehicle('rescue'); if (typeof Rides !== 'undefined') Rides.add(g, 'rescue'); return g; } // detailed model (04j_service_vehicles.js)
+function makePoliceCar() { const g = makeServiceVehicle('police'); if (typeof Rides !== 'undefined') Rides.add(g, 'police'); return g; } // detailed model (04j_service_vehicles.js)
 
 // ---------- Winterville Public Safety (Fire-Rescue-EMS + Police), Railroad St at Main St ----------
 // Light tan brick with darker banding and maroon-framed windows (its own facade, 'tanbrick'); a taller

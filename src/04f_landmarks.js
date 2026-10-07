@@ -194,22 +194,7 @@ function hospitalDetails(LM, T, ctx, edges, box, frontEdge) {
   spots.push({ type: 'er', x: cx + e.nx * (D / 2 + 3), z: cz + e.nz * (D / 2 + 3), yaw, tx, tz }, { type: 'door', x: mx + e.nx * 2.5, z: mz + e.nz * 2.5, yaw, tx, tz });
   T.hashItems.push([World.obsHash, World.obsHash.insert({ x: cx, z: cz, r: 0.4 }, cx - 1, cz - 1, cx + 1, cz + 1)]);
 }
-let _ambGeo = null;
-function makeAmbulance() {
-  if (!_ambGeo) {
-    const mb = new MB(true); const W = new THREE.Color('#f7f7f5'), R = new THREE.Color('#d42a24'), K = new THREE.Color('#1c1f22'), G = new THREE.Color('#2b3a47');
-    const bx = (x0, x1, y0, y1, z0, z1, c) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); addGeoTo(mb, g, c); };
-    bx(-1.05, 1.05, 0.55, 3.0, -3.3, 1.2, W);          // box body
-    bx(-1.0, 1.0, 0.55, 2.2, 1.2, 3.2, W);             // cab
-    bx(-0.98, 0.98, 1.45, 2.1, 2.4, 3.05, G);          // windshield area
-    bx(-1.07, 1.07, 1.3, 1.6, -3.3, 1.2, R);           // red stripe
-    bx(-0.9, 0.9, 3.0, 3.18, -1.0, 0.9, R);            // light bar
-    for (const [x, z] of [[-0.95, 2.2], [0.95, 2.2], [-0.95, -2.3], [0.95, -2.3]]) { const g = new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14); g.rotateZ(Math.PI / 2); g.translate(x, 0.42, z); addGeoTo(mb, g, K); }
-    _ambGeo = mb.geo(); _ambGeo.userData.shared = true;
-  }
-  const m = new THREE.Mesh(_ambGeo, MAT.amb || (MAT.amb = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1 }))); m.castShadow = true;
-  const cross = new THREE.Group(); cross.add(m); if (typeof Rides !== 'undefined') Rides.add(cross, 'ambulance'); return cross;
-}
+function makeAmbulance() { const g = makeServiceVehicle('ambulance'); if (typeof Rides !== 'undefined') Rides.add(g, 'ambulance'); return g; } // detailed model (04j_service_vehicles.js)
 
 // ---------- grandstands: stepped seating facing the nearest field ----------
 function buildGrandstand(B, T, P, seats, Z) {

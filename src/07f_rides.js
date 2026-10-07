@@ -45,7 +45,7 @@ const Rides = {
       const o = it.o; kind = o.userData.ride.kind; name = this.KINDS[kind]; const w = o.getWorldPosition(new THREE.Vector3()); const q = o.getWorldQuaternion(new THREE.Quaternion()); const f = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
       const S = this.sizeOf(o); x = w.x + f.x * S.cz; z = w.z + f.z * S.cz; yaw = Math.atan2(f.x, f.z); o.removeFromParent(); this.parked.splice(this.parked.indexOf(o), 1);
       const g = new THREE.Group(); o.position.set(0, -0.17, -S.cz); o.rotation.set(0, 0, 0); g.add(o);
-      SC = { g, wheels: [], tailMat: MAT.taillight.clone(), wheelR: 0.5, info: { len: S.len, width: S.width, height: S.height }, kind };
+      SC = { g, wheels: o.userData.wheels || [], tailMat: MAT.taillight.clone(), wheelR: (o.userData.wheels && o.userData.wheels.length) ? 0.5 : 0.5, info: { len: S.len, width: S.width, height: S.height }, kind, svc: o.userData.svc ? o : null };
       UI.toast(`You're driving the ${name}` + (kind === 'police' || kind === 'engine' || kind === 'rescue' || kind === 'ambulance' ? ' — N for lights & siren' : ''), 4000);
     } else {
       const L = it.L; SC = L.SC; kind = L.kind; name = L.name; x = L.holder.position.x; z = L.holder.position.z; yaw = L.holder.rotation.y;
@@ -57,6 +57,7 @@ const Rides = {
     if (old.g) { old.g.removeFromParent(); const h = new THREE.Group(); h.position.copy(C.pos); h.rotation.y = C.yaw; h.add(old.g); dynRoot.add(h); old.tailMat.emissiveIntensity = 0.3;
       this.left.push({ holder: h, SC: old, kind: P.carKind || 'car', name: P.carName || 'car' });
       while (this.left.length > 4) { const D = this.left.shift(); D.holder.removeFromParent(); } }
+    if (this.siren) this.stopSiren(); P.svcObj = SC.svc || null;
     P.useCarVisual(SC); P.carKind = kind; P.carName = name === 'car' && it.type !== 'left' ? 'car' : name;
     C.pos.set(x, surfaceY(x, z) + 0.22, z); C.yaw = yaw; C.speed = 0; C.steer = 0; C.vy = 0; C.pitch = C.roll = 0; C.gear = 'D';
     C.vmax = { engine: 34, rescue: 36, ambulance: 42, police: 60 }[kind] || null;
@@ -68,6 +69,7 @@ const Rides = {
     const P = Player; this.pruneT = (this.pruneT || 0) + dt; if (this.pruneT > 5) { this.pruneT = 0; this.parked = this.parked.filter(o => o.parent && this.inScene(o)); } const svc = P.mode === 'drive' && /^(police|engine|rescue|ambulance)$/.test(P.carKind || '');
     if (!svc) { if (this.siren) this.stopSiren(); return; }
     if (this.siren) { this.sirenT += dt; if (!this.light) { this.light = new THREE.PointLight(0xff2020, 0, 26, 2); dynRoot.add(this.light); }
+      if (P.svcObj) svFlash(P.svcObj, this.sirenT, true);
       const ph = Math.floor(this.sirenT * 4) % 2; this.light.color.set(ph ? 0x2050ff : 0xff2020); this.light.intensity = 40;
       const f = new THREE.Vector3(Math.sin(P.car.yaw), 0, Math.cos(P.car.yaw)); this.light.position.copy(P.car.pos).addScaledVector(f, 0.5); this.light.position.y += ((P.carInfo && P.carInfo.height) || 1.6) + 0.4;
       if (this.osc && Sound.ctx) { const t = Sound.ctx.currentTime; this.osc.frequency.setTargetAtTime(P.carKind === 'engine' ? 600 + Math.sin(this.sirenT * 1.6) * 250 : (Math.floor(this.sirenT * 1.4) % 2 ? 960 : 720), t, 0.05); } }
@@ -76,5 +78,5 @@ const Rides = {
     this.siren = !this.siren; if (!this.siren) { this.stopSiren(); return; }
     this.sirenT = 0; const A = Sound.ctx; if (A) { try { const o = A.createOscillator(); o.type = 'square'; const g = A.createGain(); g.gain.value = 0.02; const lp = A.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400; o.connect(lp); lp.connect(g); g.connect(A.destination); o.start(); this.osc = o; this.sg = g; } catch (e) { } }
   },
-  stopSiren() { this.siren = false; if (this.osc) { try { this.osc.stop(); } catch (e) { } this.osc = null; } if (this.light) this.light.intensity = 0; },
+  stopSiren() { if (Player.svcObj) svFlash(Player.svcObj, 0, false); this.siren = false; if (this.osc) { try { this.osc.stop(); } catch (e) { } this.osc = null; } if (this.light) this.light.intensity = 0; },
 };
