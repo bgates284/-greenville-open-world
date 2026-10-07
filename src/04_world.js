@@ -479,7 +479,7 @@ function buildRoadMeshes(T, P) {
     R_of.set(road.id, { R, Ry: R.map(p => yAt(p)) });
     // junction positions along this road (with each junction's clearance)
     const js = [];
-    for (let i = 0; i < road.nodes.length; i++) { const j = J.get(road.nodes[i]); if (j) js.push([road.cum[i], j.e]); else if (isJunction(road.nodes[i], P)) js.push([road.cum[i], road.w / 2 + 2]); }
+    for (let i = 0; i < road.nodes.length; i++) { const j = J.get(road.nodes[i]); if (j) { if (!j.pass || road.hw === 'service') js.push([road.cum[i], j.pass ? 0 : j.e]); } else if (isJunction(road.nodes[i], P) && !(World.nodeAdj.get(road.nodes[i]) || []).every(a => a.road === road || !a.road.car || /^(service|track)$/.test(a.road.hw || ''))) js.push([road.cum[i], road.w / 2 + 2]); }
     const nearJ = (s, extra) => js.some(([c, e]) => Math.abs(c - s) < e + extra);
     if (road.bridge) {
       for (const side of [-1, 1]) strip(deckSide, R, side * (road.w / 2 + 0.15), 0.3, p => road.deckAt(p[2]) + 0.9, 1 / 4, 0.95);

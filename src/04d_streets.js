@@ -48,7 +48,9 @@ function buildJunctions(T, P) {
         const dx = r.pts[j][0] - cx, dz = r.pts[j][1] - cz, l = Math.hypot(dx, dz); if (l < 0.5) continue;
         // incoming = traffic on this arm drives toward the junction
         const incoming = r.oneway ? (r.oneway * (-k) > 0) : true, outgoing = r.oneway ? !incoming : true;
-        arms.push({ road: r, idx, k, dx: dx / l, dz: dz / l, w: r.w, ang: Math.atan2(dz, dx), incoming, outgoing, segLen: l });
+        let armLen = 0; for (let q = idx; q + k >= 0 && q + k < r.pts.length && armLen < 60; q += k) armLen += Math.hypot(r.pts[q + k][0] - r.pts[q][0], r.pts[q + k][1] - r.pts[q][1]);
+        const minor = !r.car || /^(service|track|driveway|parking_aisle|alley)$/.test(r.hw || '') || (r.tags && /^(driveway|parking_aisle|drive-through)$/.test(r.tags.service || ''));
+        arms.push({ road: r, idx, k, dx: dx / l, dz: dz / l, w: r.w, ang: Math.atan2(dz, dx), incoming, outgoing, segLen: armLen, minor });
       }
       if (arms.length < 2) continue;
       arms.sort((a, b) => a.ang - b.ang);
@@ -56,7 +58,9 @@ function buildJunctions(T, P) {
       const e = Math.max(3.2, wmax / 2 + (rmax >= 5 ? 4.2 : rmax >= 3 ? 3.0 : 1.6)); // where the curb return starts
       const signal = World.signals.has(nid) || arms.some(a => { for (let q = 1; q <= 2; q++) { const n2 = a.road.nodes[a.idx + a.k * q]; if (n2 != null && World.signals.has(n2) && Math.hypot(a.road.pts[a.idx + a.k * q][0] - cx, a.road.pts[a.idx + a.k * q][1] - cz) < 30) return true; } return false; });
       for (const a of arms) { a.stop = false; for (let q = 0; q <= 2; q++) { const n2 = a.road.nodes[a.idx + a.k * q]; if (n2 != null && World.stops.has(n2) && Math.hypot(a.road.pts[a.idx + a.k * q][0] - cx, a.road.pts[a.idx + a.k * q][1] - cz) < 20) a.stop = true; } }
-      J.set(nid, { id: nid, x: cx, z: cz, arms, e, wmax, rmax, signal, y: H(cx, cz) + 0.15 + rmax * 0.012 + 0.03 });
+      // a street that just carries on (a renamed way, or only driveways / service roads joining it): its sidewalks run straight through
+      const majors = arms.filter(a => !a.minor); const pass = majors.length < 2 || (majors.length === 2 && majors[0].dx * majors[1].dx + majors[0].dz * majors[1].dz < -0.86);
+      J.set(nid, { id: nid, x: cx, z: cz, arms, e, wmax, rmax, signal, pass, y: H(cx, cz) + 0.15 + rmax * 0.012 + 0.03 });
     }
   }
   return J;
@@ -120,8 +124,22 @@ function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
       else if (C && deg > 195) pts = [P0, C, P2];
       else pts = [P0, P2];
       for (let k = 1; k < pts.length - 1; k++) ring.push(pts[k]);
-      const short = a.segLen < e + 1 || b.segLen < e + 1;
-      if (!short && (hasWalk(a, true) || hasWalk(b, false))) curbs.push(pts);
+    }
+    if (!j.pass) {
+      const AM = A.filter(x => !x.minor), nm = AM.length, MM = AM.map(mouth);
+      for (let i = 0; i < nm; i++) {
+        const a = AM[i], b = AM[(i + 1) % nm]; const ma = MM[i], mb = MM[(i + 1) % nm];
+        let gap = b.ang - a.ang; if (i === nm - 1) gap += Math.PI * 2;
+        const P0 = ma.next, P2 = mb.prev; let pts;
+        const den = a.dx * b.dz - a.dz * b.dx; let C = null;
+        if (Math.abs(den) > 0.08) { const t = ((P2[0] - P0[0]) * b.dz - (P2[1] - P0[1]) * b.dx) / den; C = [P0[0] + a.dx * t, P0[1] + a.dz * t]; if (Math.hypot(C[0] - j.x, C[1] - j.z) > e * 2.2) C = null; }
+        const deg = gap * 180 / Math.PI;
+        if (C && deg < 165) { pts = []; for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; pts.push([u * u * P0[0] + 2 * u * t * C[0] + t * t * P2[0], u * u * P0[1] + 2 * u * t * C[1] + t * t * P2[1]]); } }
+        else if (C && deg > 195) pts = [P0, C, P2];
+        else pts = [P0, P2];
+        const short = a.segLen < e * 0.6 || b.segLen < e * 0.6;
+        if (!short && (hasWalk(a, true) || hasWalk(b, false))) curbs.push(pts);
+      }
     }
     // surface: fan from the centre across the mouths and curb returns
     // (subdivided so it follows the ground as closely as the road ribbons underneath it do)
