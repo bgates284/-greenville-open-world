@@ -1,7 +1,8 @@
 // =====================================================================
 // HAND-BUILT LANDMARKS — places everyone recognises get their own models instead of generated boxes:
-//   • the ECU Cupola on the Mall (white columns, drum and copper dome)
-//   • Wright Fountain in the middle of Wright Circle
+//   • the ECU Cupola on the Mall (white columns, drum and grey dome)
+//   • (the Main Campus Student Center and its E C U letters are in 04k_ecu.js)
+//   • Wright Fountain in the middle of Wright Circle: a round pool in stepped stone rings, one tall jet
 //   • Joyner Library's glass entrance pavilion and lettering, facing the Mall
 //   • the Town Common: Tar River promenade with railing, lamps and benches, the amphitheater's
 //     arched shell over its stage, and a brick entrance sign
@@ -38,7 +39,7 @@ function hmCupola(T, B, mb) {
   HM.geo(mb, new THREE.CylinderGeometry(R + 0.5, R + 0.4, 0.2, 8), HM_WHITE, cx, ye + 0.64, cz, 0, Math.PI / 8, 0);                      // cornice
   HM.geo(mb, new THREE.CylinderGeometry(R * 0.78, R * 0.82, 1.2, 8), HM_WHITE, cx, ye + 1.34, cz, 0, Math.PI / 8, 0);                    // drum
   for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; HM.geo(mb, new THREE.BoxGeometry(0.4, 0.75, 0.05), HM_DARK, cx + Math.cos(a) * R * 0.76, ye + 1.34, cz + Math.sin(a) * R * 0.76, 0, -a + Math.PI / 2, 0); } // louvred openings
-  const dome = new THREE.SphereGeometry(R * 0.86, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 1.15, 1); HM.geo(mb, dome, new THREE.Color('#7fa293'), cx, ye + 1.94, cz);
+  const dome = new THREE.SphereGeometry(R * 0.86, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 1.15, 1); HM.geo(mb, dome, new THREE.Color('#8b9294'), cx, ye + 1.94, cz); // weathered grey dome
   HM.geo(mb, new THREE.CylinderGeometry(0.06, 0.1, 1.3, 8), new THREE.Color('#c9a227'), cx, ye + 1.94 + R * 0.99 + 0.6, cz);
   HM.geo(mb, new THREE.SphereGeometry(0.16, 10, 8), new THREE.Color('#e0b72d'), cx, ye + 1.94 + R * 0.99 + 1.3, cz);
   addDeck(T, Array.from({ length: 16 }, (_, k) => [cx + Math.cos(k / 16 * 6.283) * (R + 0.7), cz + Math.sin(k / 16 * 6.283) * (R + 0.7)]), g + 0.88);
@@ -48,19 +49,17 @@ function hmCupola(T, B, mb) {
 // Wright Fountain: stone basin, two tiers, a jet of water
 function hmFountain(T, x, z, mb) {
   const g = H(x, z);
-  HM.geo(mb, new THREE.CylinderGeometry(9, 9, 0.1, 48), HM_BRICK2, x, g + 0.06, z);                                        // brick plaza
-  HM.geo(mb, new THREE.CylinderGeometry(4.8, 4.9, 0.6, 40, 1, true), HM_STONE, x, g + 0.3, z);                              // basin wall
-  HM.geo(mb, new THREE.CylinderGeometry(5.1, 5.1, 0.12, 40), HM_STONE, x, g + 0.62, z);                                      // coping
-  HM.geo(mb, new THREE.CylinderGeometry(0.5, 0.7, 1.6, 16), HM_STONE, x, g + 1.0, z);                                        // pedestal
-  const bowl = new THREE.CylinderGeometry(1.8, 0.6, 0.45, 28); HM.geo(mb, bowl, HM_STONE, x, g + 1.9, z);
-  HM.geo(mb, new THREE.CylinderGeometry(0.25, 0.35, 0.9, 12), HM_STONE, x, g + 2.5, z);
-  HM.geo(mb, new THREE.CylinderGeometry(0.9, 0.3, 0.3, 20), HM_STONE, x, g + 3.0, z);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(4.75, 40), MAT.hmWater || (MAT.hmWater = new THREE.MeshStandardMaterial({ color: 0x3b6d82, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.85 })));
-  water.rotation.x = -Math.PI / 2; water.position.set(x, g + 0.5, z); T.group.add(water);
+  HM.geo(mb, new THREE.CylinderGeometry(11, 11, 0.1, 56), HM_BRICK2, x, g + 0.06, z);                                       // brick plaza
+  for (const [r, h] of [[7.4, 0.22], [6.8, 0.44], [6.2, 0.66]]) HM.geo(mb, new THREE.CylinderGeometry(r, r, h, 56), HM_STONE, x, g + h / 2, z); // stepped stone rings to sit on
+  HM.geo(mb, new THREE.CylinderGeometry(5.7, 5.7, 0.9, 56, 1, true), HM_STONE, x, g + 0.45, z);                             // inner basin wall
+  HM.geo(mb, new THREE.CylinderGeometry(1.1, 1.3, 0.5, 20), HM_STONE, x, g + 0.5, z);                                       // nozzle drum
+  const water = new THREE.Mesh(new THREE.CircleGeometry(5.68, 56), MAT.hmWater || (MAT.hmWater = new THREE.MeshStandardMaterial({ color: 0x3b6d82, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.85 })));
+  water.rotation.x = -Math.PI / 2; water.position.set(x, g + 0.55, z); T.group.add(water);
   const sprayM = MAT.hmSpray || (MAT.hmSpray = new THREE.MeshStandardMaterial({ color: 0xe8f4fa, transparent: true, opacity: 0.55, roughness: 0.2, depthWrite: false }));
-  const jet = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.4, 12, 1, true), sprayM); jet.position.set(x, g + 4.3, z); jet.rotation.x = Math.PI; T.group.add(jet);
-  const fall = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.9, 1.3, 28, 1, true), sprayM); fall.position.set(x, g + 1.15, z); T.group.add(fall);
-  HM.obstacle(T, x, z, 5.0);
+  const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.5, 8.5, 14, 1, true), sprayM); jet.position.set(x, g + 0.75 + 4.25, z); T.group.add(jet); // the tall jet
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 8), sprayM); crown.scale.set(1, 1.6, 1); crown.position.set(x, g + 9.0, z); T.group.add(crown);
+  const fall = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 2.4, 2.2, 28, 1, true), sprayM); fall.position.set(x, g + 1.6, z); T.group.add(fall); // spray falling back
+  HM.obstacle(T, x, z, 6.0); (T.noTrees || (T.noTrees = [])).push([x, z, 9]);
 }
 
 // Joyner Library: glass entrance pavilion + canopy + lettering on the side facing the Mall
@@ -162,7 +161,7 @@ function hmMall(T, B, mb) {
 function buildHandmade(T, P) {
   const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const mb = new MB(true);
   for (const B of P.buildings) {
-    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
+    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); else if (HANDBUILT[B.id] === 'studentCenter') hmStudentCenter(T, B, P, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
     const n = (B.tags && B.tags.name) || ''; if (!n) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
     try {
       if (n === 'The Cupola') hmCupola(T, B, mb);
@@ -252,7 +251,7 @@ function hmWvRow(T, B, mb) {
 // and a big storefront window, a lantern, "2564", a whiskey-barrel planter, the name painted on the
 // side wall (plain lettering), and the fenced beer garden beside it: a big live oak strung with
 // lights over a gravel yard, Adirondack chairs around the tree and picnic tables along the fence.
-const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow' }; // OSM building id → builder (the generic building is skipped)
+const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow', 575376082: 'studentCenter' }; // OSM building id → builder (the generic building is skipped)
 function hmWhiteBrickMat() {
   if (MAT.hmWhiteBrick) return MAT.hmWhiteBrick;
   const c = cnv(256, 256), g = c.getContext('2d'); g.fillStyle = '#dcdcd6'; g.fillRect(0, 0, 256, 256);

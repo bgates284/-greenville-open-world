@@ -756,6 +756,7 @@ function buildTrees(T, P) {
     put(W.x0 + (px + r()) / 512 * sx, W.z0 + (pz + r()) / 512 * sz, cls); count++;
   }
   }
+  if (T.noTrees) for (const sp in lists) lists[sp] = lists[sp].filter(t => !T.noTrees.some(([x, z, rr]) => (t[0] - x) ** 2 + (t[1] - z) ** 2 < rr * rr)); // kept clear by hand-built landmarks (fountain, flower beds, porches)
   const o = new THREE.Object3D(); const col = new THREE.Color();
   for (const sp in lists) {
     const L = lists[sp]; if (!L.length) continue;
