@@ -172,6 +172,7 @@ function buildHandmade(T, P) {
   }
   for (const r of P.roads) if (r.tags && r.tags.name === 'Wright Circle' && r.pts.length > 5) { const c = centroid(r.pts); if (own(c[0], c[1])) try { hmFountain(T, c[0], c[1], mb); } catch (e) { console.warn('fountain skipped', e); } break; }
   for (const a of P.areas) if (a.tags && a.tags.name === 'Town Common') try { hmTownCommon(T, P, a, mb); } catch (e) { console.warn('Town Common skipped', e); }
+  for (const a of P.areas) if (a.tags && a.tags.name === 'Pitt Community College' && /college|university/.test(a.tags.amenity || '')) try { pccGrounds(T, P, a, mb); } catch (e) { console.warn('PCC grounds skipped', e); }
   addMB(T, mb, lmPlainMat());
 }
 

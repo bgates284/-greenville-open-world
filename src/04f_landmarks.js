@@ -47,11 +47,13 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
     let h = lv > 0 ? lv * 4.2 + 1 : /ECU Health Medical Center/.test(n) ? 30 : /Heart Institute/.test(n) ? 22 : /Children/.test(n) ? 18 : area > 6000 ? 22 : area > 2500 ? 17 : 12.5;
     return { kind: 'hospital', fac: glass ? 'medglass' : 'hospital', h, shape: 'flat', wall: glass ? '#ffffff' : pick(['#ffffff', '#f6f1e8', '#efe9de'], (B.id % 7) / 7), roof: '#cfcfca', main: /^ECU Health Medical Center$/.test(n) || (!n && bt === 'hospital' && area > 8000), name: n, er: t.emergency === 'yes' };
   }
-  // Pitt Community College: buff brick with dark bronze window bands, flat roofs, names on the front
+  // Pitt Community College: red brick, white-framed windows, grey pitched roofs, white columned porticos or glass entrance towers, names on the front
   if (zoneAt(Z, 'pcc', cx, cz) || /Pitt Community College/.test(t.operator || '')) {
     if (/^(roof|shed|garage|garages)$/.test(bt) || area < 40 || t.amenity === 'police') return null;
     const h = lv > 0 ? lv * 4.2 + 1.2 : area < 150 ? 4.2 : area < 600 ? 5.8 : area < 2500 ? 9.2 : 10.4;
-    return { kind: 'pcc', fac: 'pcc', h, shape: 'flat', wall: pick(['#ffffff', '#f8f2ea', '#fbf6ef'], (B.id % 7) / 7), roof: '#b9b7b1', name: n };
+    const hip = rect > 0.82 && obb && obb.W < 30 && area < 2600;
+    const entry = /Reddrick|Humber|Fulford|Whichard|Everett|Simon|Whitley|Leslie/.test(n) ? 'portico' : (/Goess|Russell|Warren|Vernon White|Williams|Science/.test(n) || area > 2500) ? 'glass' : null;
+    return { kind: 'pcc', fac: 'pcc', h, shape: hip ? 'hipped' : 'flat', wall: pick(['#ffffff', '#fbeee8', '#f6ebe4'], (B.id % 7) / 7), roof: '#5b6166', name: n, entry, portico: entry === 'portico', cupola: /Humber/.test(n), look: { roof: '#80858a' } };
   }
   const campus = zoneAt(Z, 'campus', cx, cz) || zoneAt(Z, 'athletic', cx, cz) || bt === 'university' || bt === 'college' || /\bECU\b|East Carolina/.test(n);
   if (campus) {
@@ -82,7 +84,7 @@ function landmarkExtras(LM, B, T, ctx) {
     return best;
   };
   const WHITE = new THREE.Color('#f4f1ea');
-  if (LM.kind === 'campus') {
+  if (LM.kind === 'campus' || (LM.kind === 'pcc' && LM.portico)) { // (PCC's columned entrances are built the same way)
     band(wallTop - 0.55, wallTop, 0.28, WHITE);                  // cornice
     band(base + 0.35, base + 0.95, 0.08, new THREE.Color('#e3ddd0')); // stone water table
     if (LM.portico) {
@@ -116,17 +118,42 @@ function landmarkExtras(LM, B, T, ctx) {
     band(base + 0.2, base + 0.75, 0.04, new THREE.Color('#bfa37c'));               // base course
   }
   if (LM.kind === 'pcc') {
-    band(wallTop - 0.5, wallTop + 0.35, 0.12, new THREE.Color('#d9d2c2'));         // precast coping
-    band(base + 0.2, base + 0.8, 0.05, new THREE.Color('#8a6a52'));                 // darker brick base
-    if (LM.name && area > 300) {
-      const e = frontEdge(); if (e) {
-        const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz); const w = Math.min(e.L * 0.6, 13), sh = w * 96 / 1024;
-        const g0 = H(mx, mz), cw = Math.min(7, e.L * 0.35); // name above the entrance canopy
-        const s = signMesh(T, textTexture([[LM.name.toUpperCase(), 76, '#3a2c20', 50, 700]], { w: 1024, h: 96 }), w, sh, false);
-        s.position.set(mx + e.nx * 0.16, Math.min(wallTop - sh / 2 - 0.2, g0 + 3.6 + sh / 2), mz + e.nz * 0.16); s.rotation.y = yaw; T.group.add(s);
-        box(mx + e.nx * 1.6, mz + e.nz * 1.6, g0 + 3.1, g0 + 3.45, cw / 2, 1.6, yaw, new THREE.Color('#1f3f73'));
-        for (const sg of [-1, 1]) { const ux = Math.cos(yaw), uz = -Math.sin(yaw); box(mx + e.nx * 3.0 + ux * sg * (cw / 2 - 0.2), mz + e.nz * 3.0 + uz * sg * (cw / 2 - 0.2), g0, g0 + 3.1, 0.1, 0.1, yaw, new THREE.Color('#c9ccd0')); }
-      }
+    if (!LM.portico) { band(wallTop - 0.5, wallTop, 0.25, WHITE); band(base + 0.35, base + 0.9, 0.06, new THREE.Color('#e3ddd0')); } // white cornice, light water table
+    if (LM.shape === 'flat' && ring.length >= 3) { // grey pitched roof round the edge (the real roofs are pitched; from the ground this reads the same)
+      const n = ring.length, RISE = Math.min(2.6, 0.9 + Math.sqrt(area) * 0.05), IN = 3.0, RC = new THREE.Color('#5b6166');
+      const N = []; for (let i = 0; i < n; i++) { const a = ring[i], b = ring[(i + 1) % n]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-6; let nx = (b[1] - a[1]) / L, nz = -(b[0] - a[0]) / L; if (sa < 0) { nx = -nx; nz = -nz; } N.push([nx, nz, L]); }
+      const O = [], I = []; for (let i = 0; i < n; i++) { const n1 = N[(i + n - 1) % n], n2 = N[i]; let mx = n1[0] + n2[0], mz = n1[1] + n2[1]; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const k = Math.min(1.8, 1 / Math.max(0.4, mx * n2[0] + mz * n2[1])); const p = ring[i]; O.push([p[0] + mx * 0.45 * k, p[1] + mz * 0.45 * k]); I.push([p[0] - mx * IN * k, p[1] - mz * IN * k]); }
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; if (N[i][2] < 0.05) continue; decor.quad([O[i][0], wallTop - 0.1, O[i][1]], [O[j][0], wallTop - 0.1, O[j][1]], [I[j][0], wallTop + RISE, I[j][1]], [I[i][0], wallTop + RISE, I[i][1]], [0, 0], [0, 0], [0, 0], [0, 0], [N[i][0], 1.3, N[i][1]], RC); }
+    }
+    const e = frontEdge();
+    if (e && LM.entry === 'glass') { // a glass entrance tower with a curved metal roof, taller than the brick
+      const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz), ux = e.nz, uz = -e.nx, g0 = H(mx, mz);
+      const w = Math.min(e.L * 0.32, 15), d = 4.6, yT = wallTop + 2.8, cx = mx + e.nx * d / 2, cz = mz + e.nz * d / 2;
+      const GL = new THREE.Color('#3e6584'), FR = new THREE.Color('#f2f2ef');
+      box(cx, cz, base, yT, w / 2, d / 2, yaw, GL);
+      const nm = Math.max(2, Math.round(w / 1.6)); for (let k = 0; k <= nm; k++) { const u = -w / 2 + k * w / nm; box(cx + ux * u + e.nx * d / 2, cz + uz * u + e.nz * d / 2, base, yT, 0.09, 0.09, yaw, FR); }
+      for (const sg of [-1, 1]) for (let v = 1.5; v <= d; v += 1.5) box(mx + ux * sg * w / 2 + e.nx * v, mz + uz * sg * w / 2 + e.nz * v, base, yT, 0.09, 0.09, yaw, FR);
+      for (let y = g0 + 4.3; y < yT - 1; y += 4.2) box(cx, cz, y, y + 0.3, w / 2 + 0.06, d / 2 + 0.06, yaw, FR);
+      box(cx + e.nx * (d / 2 + 0.05), cz + e.nz * (d / 2 + 0.05), g0, g0 + 2.8, 1.8, 0.05, yaw, new THREE.Color('#1c2730'));          // doors
+      const rf = new THREE.CylinderGeometry(d / 2 + 0.9, d / 2 + 0.9, w + 1.4, 24, 1, false, 0, Math.PI); rf.rotateZ(Math.PI / 2); rf.scale(1, 0.5, 1); rf.rotateY(yaw); rf.translate(cx, yT, cz);
+      addGeoTo(decor, rf, new THREE.Color('#c9cdd0'));
+      if (LM.name) { const sw = Math.min(w * 0.85, 11), s = signMesh(T, textTexture([[LM.name.toUpperCase(), 76, '#ffffff', 50, 700]], { w: 1024, h: 96 }), sw, sw * 96 / 1024, false); s.position.set(cx + e.nx * (d / 2 + 0.1), g0 + 3.4, cz + e.nz * (d / 2 + 0.1)); s.rotation.y = yaw; T.group.add(s); }
+    } else if (e && LM.portico && LM.name) { // name on the portico's entablature
+      const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz), g0 = H(mx, mz);
+      const w = Math.min(e.L * 0.6, 26), colH = Math.min(wallTop - base - 1.2, 12), yT = g0 + 0.9 + colH, sw = Math.min(w * 0.85, 13);
+      const s = signMesh(T, textTexture([[LM.name.toUpperCase(), 70, '#3b3b3b', 50, 700]], { w: 1024, h: 96 }), sw, sw * 96 / 1024, false); s.position.set(mx + e.nx * 4.45, yT + 0.55, mz + e.nz * 4.45); s.rotation.y = yaw; T.group.add(s);
+    } else if (e && LM.name && area > 300) {
+      const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz), g0 = H(mx, mz), sw = Math.min(e.L * 0.5, 11);
+      const s = signMesh(T, textTexture([[LM.name.toUpperCase(), 76, '#f3ead8', 50, 700]], { w: 1024, h: 96 }), sw, sw * 96 / 1024, false); s.position.set(mx + e.nx * 0.12, Math.min(wallTop - 1, g0 + 3.6), mz + e.nz * 0.12); s.rotation.y = yaw; T.group.add(s);
+      box(mx + e.nx * 1.4, mz + e.nz * 1.4, g0 + 2.9, g0 + 3.15, 2.6, 1.4, yaw, WHITE);                                                // white entry canopy
+    }
+    if (LM.cupola && obb) { // Humber's white cupola on the roof
+      const x = obb.cx, z = obb.cz, y = wallTop + (LM.shape === 'flat' ? 0.2 : 3), Wc = new THREE.Color('#f6f5f1');
+      box(x, z, y, y + 3.0, 1.7, 1.7, Math.atan2(obb.ux, obb.uz), Wc); box(x, z, y + 3.0, y + 3.25, 1.9, 1.9, Math.atan2(obb.ux, obb.uz), Wc);
+      const oc = new THREE.CylinderGeometry(1.05, 1.15, 2.0, 8); oc.translate(x, y + 4.25, z); addGeoTo(decor, oc, Wc);
+      for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; box(x + Math.cos(a) * 1.09, z + Math.sin(a) * 1.09, y + 3.6, y + 4.9, 0.25, 0.04, -a + Math.PI / 2, new THREE.Color('#3a3d40')); }
+      const dm = new THREE.ConeGeometry(1.3, 1.9, 8); dm.translate(x, y + 6.2, z); addGeoTo(decor, dm, new THREE.Color('#5b6166'));
+      const sp = new THREE.CylinderGeometry(0.04, 0.08, 1.3, 6); sp.translate(x, y + 7.8, z); addGeoTo(decor, sp, new THREE.Color('#c9a227'));
     }
   }
   if (LM.kind === 'hospital') {
