@@ -216,6 +216,10 @@ const Peds = {
   update(dt, focus) {
     const want = Math.round(Q.peds * (Env.night > 0.6 ? 0.45 : 1) * (Env.rain > 0.5 ? 0.35 : 1));
     for (let k = 0; k < 2 && this.list.length < want; k++) this.spawn(focus);
+    // anyone who appeared before the character models finished loading (the simple built-in figure) is swapped for a realistic one, a couple a second
+    this.upT = (this.upT || 0) + dt;
+    if (this.upT > 0.4 && typeof RB !== 'undefined' && RB.count() > 0) { this.upT = 0; const p = this.list.find(q => q.person && !q.person.npc && (q.upFail || 0) < 3 && q.state !== 'down');
+      if (p) { let n = null; try { n = makeNpc(this.seed++, p.x, p.z); } catch (e) { } if (n) { disposePerson(p.person); p.person = n; dynRoot.add(n.g); } else p.upFail = (p.upFail || 0) + 1; } }
     const P = Player, C = P.car; const drive = P.mode === 'drive';
     const cfx = Math.sin(C.yaw), cfz = Math.cos(C.yaw);
     for (let pi = this.list.length - 1; pi >= 0; pi--) {

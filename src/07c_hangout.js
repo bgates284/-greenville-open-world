@@ -13,7 +13,7 @@ const Hangouts = {
     for (const [f, set] of this.sets) if (!want.has(f) && Math.hypot(f.x - focus.x, f.z - focus.z) > 270) { this.drop(set); this.sets.delete(f); }
     for (const f of want) if (!this.sets.has(f) && Tiles.readyAround(f.x, f.z, 0)) { const s = this.cast(f); if (s) this.sets.set(f, s); }
     // once the realistic people have loaded, recast groups that were made of simple people
-    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [f, set] of this.sets) if (set.simple && set.actors.length) { this.drop(set); this.sets.set(f, this.cast(f)); break; }
+    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [f, set] of this.sets) if (set.simple && set.actors.length && RB.count() > (set.rbN || 0)) { this.drop(set); this.sets.set(f, this.cast(f)); break; }
     for (const set of this.sets.values()) for (const a of set.actors) this.step(a, dt, set);
     this.stepPuffs(dt);
   },
@@ -61,7 +61,7 @@ const Hangouts = {
       if (A && B) { const ball = new THREE.Mesh(this.ballGeo || (this.ballGeo = new THREE.IcosahedronGeometry(0.035, 1)), MAT.sack || (MAT.sack = new THREE.MeshStandardMaterial({ color: 0xd9722b, roughness: 0.95 }))); ball.castShadow = true; dynRoot.add(ball); props.push(ball); const game = { ball, A, B, t: 0, from: A, dur: 0.9 }; A.game = game; B.game = game; A.kicker = true; }
       else if (A) A.kind = 'chill';
     }
-    return { actors, props, simple: !actors.some(a => a.person.npc) };
+    return { actors, props, simple: actors.some(a => !a.person.npc), rbN: typeof RB !== 'undefined' ? RB.count() : 0 };
   },
 
   // ---------- per frame ----------

@@ -23,7 +23,7 @@ const HospitalLife = {
       else if (d > 290 && this.sets.has(key)) { this.drop(this.sets.get(key)); this.sets.delete(key); }
     }
     for (const [key, set] of this.sets) if (!live.has(key)) { this.drop(set); this.sets.delete(key); }
-    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [key, set] of this.sets) if (set.simple && set.spot) { this.drop(set); this.sets.set(key, this.cast(set.spot, set.spots)); break; }
+    if (typeof RB !== 'undefined' && RB.count() >= 4) for (const [key, set] of this.sets) if (set.simple && set.spot && RB.count() > (set.rbN || 0)) { this.drop(set); this.sets.set(key, this.cast(set.spot, set.spots)); break; }
     for (const set of this.sets.values()) for (const a of set.actors) this.step(a, dt);
   },
   clear() { for (const set of this.sets.values()) this.drop(set); this.sets.clear(); },
@@ -52,7 +52,7 @@ const HospitalLife = {
     const v = at(6.6, 0.1); add(this.stander('visitor', r, v[0], v[1], w));
     // a doctor on the phone by the doors
     const ph = at(-4, -0.4); const doc = this.stander('doctor', r, ph[0], ph[1], null); if (doc) { doc.phone = true; doc.yaw = s.yaw; add(doc); }
-    return { actors, spot: s, spots, simple: !actors.some(a => a.person.npc) };
+    return { actors, spot: s, spots, simple: actors.some(a => !a.person.npc || (a.riderPerson && !a.riderPerson.npc)), rbN: typeof RB !== 'undefined' ? RB.count() : 0 }; // recast while anyone is still a simple figure and more models have loaded
   },
   // open path between two points (trimmed where it would enter a building)
   path(a, b) {
