@@ -1,4 +1,26 @@
 {
+"1144052956": {
+"colour": "#f4f2ec",
+"levels": 2,
+"mat": "wood",
+"note": "Winterville Museum (Cox-Ange House): white farmhouse, metal roof",
+"roof": "#a3a8ab",
+"roofShape": "hipped"
+},
+"1342691911": {
+"levels": 1,
+"mat": "brick",
+"note": "Margaret Little Blount Library, Bethel: dark brick",
+"roofShape": "flat"
+},
+"1488616629": {
+"colour": "#f4f2ec",
+"levels": 1,
+"mat": "wood",
+"note": "St. John's Episcopal: white frame Gothic chapel",
+"roof": "#4a4f55",
+"roofShape": "gabled"
+},
 "201552833": {
 "colour": "#f4f2ec",
 "levels": 2,

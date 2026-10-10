@@ -138,22 +138,37 @@ function hmAmphitheater(T, B, mb, P) { // band shell: a white half-dome over the
 }
 
 // Greenville Mall: gabled glass entrances with canopy and sign on the two longest walls
-function hmMall(T, B, mb) {
+function hmMall(T, B, mb) { // entrance pavilions: tan stucco, a blue standing-seam hip roof with a fan-window gable, the round GREENVILLE MALL medallion, lower blue canopies on square columns either side
   const E = HM.edgesOf(B.ring).filter(e => e.L > 30).sort((a, b) => b.L - a.L).slice(0, 3);
-  const top = (parseFloat(B.tags['building:levels']) || 1) * 5 + 3;
+  const top = (parseFloat(B.tags['building:levels']) || 1) * 5 + 3; const C = h => new THREE.Color(h);
+  const TAN = C('#d9c9a8'), TAN2 = C('#c4b08c'), BLUE = C('#2a5aa6'), GL = C('#2c3a44'), WH = C('#f3efe6');
   for (const e of E) {
     const g = H(e.mx, e.mz), yaw = Math.atan2(e.nx, e.nz), tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L;
-    const W = 16, D = 5, Hh = top + 4; const cx = e.mx + e.nx * D / 2, cz = e.mz + e.nz * D / 2;
-    HM.box(mb, cx, cz, g, g + Hh, W / 2, D / 2, yaw, new THREE.Color('#d8cfbf'));                 // entrance block
-    HM.box(mb, cx + e.nx * (D / 2 + 0.02), cz + e.nz * (D / 2 + 0.02), g + 0.1, g + Hh - 2.2, W / 2 - 1.2, 0.05, yaw, HM_GLASS); // glass front
-    // gable
+    const W = 13, D = 6, Hh = top + 2.5; const cx = e.mx + e.nx * D / 2, cz = e.mz + e.nz * D / 2;
     const P = (u, v, y) => [cx + tx * u + e.nx * v, y, cz + tz * u + e.nz * v];
-    mb.tri(P(-W / 2 - 0.5, D / 2 + 0.1, g + Hh), P(W / 2 + 0.5, D / 2 + 0.1, g + Hh), P(0, D / 2 + 0.1, g + Hh + 4.5), [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], new THREE.Color('#c9bfae'));
-    for (const s of [-1, 1]) mb.quad(P(s * (W / 2 + 0.5), D / 2 + 0.1, g + Hh), P(0, D / 2 + 0.1, g + Hh + 4.5), P(0, -D / 2, g + Hh + 4.5), P(s * (W / 2 + 0.5), -D / 2, g + Hh), [0, 0], [0, 0], [0, 0], [0, 0], [s * tx * 0.5, 1, s * tz * 0.5], new THREE.Color('#6b7176'));
-    // canopy on columns
-    HM.box(mb, cx + e.nx * (D / 2 + 3), cz + e.nz * (D / 2 + 3), g + 4.4, g + 4.8, W / 2 + 1, 3.2, yaw, HM_WHITE);
-    for (const s of [-1, 1]) { const x = cx + tx * s * W / 2 + e.nx * (D / 2 + 5.6), z = cz + tz * s * W / 2 + e.nz * (D / 2 + 5.6); HM.geo(mb, new THREE.CylinderGeometry(0.25, 0.25, 4.4, 12), HM_WHITE, x, g + 2.2, z); HM.obstacle(T, x, z, 0.3); }
-    const sg = HM.sign(T, 'GREENVILLE MALL', 13, 3.2, { col: '#ffffff', size: 140, glow: true, bg: '#1f3a5f' }); sg.position.set(cx + e.nx * (D / 2 + 0.08), g + Hh - 1.3, cz + e.nz * (D / 2 + 0.08)); sg.rotation.y = yaw; T.group.add(sg);
+    const bx = (u, v, y0, y1, hu, hv, col) => { const [x, , z] = P(u, v, 0); HM.box(mb, x, z, y0, y1, hu, hv, yaw, col); };
+    bx(0, 0, g - 0.2, g + Hh, W / 2, D / 2, TAN); bx(0, 0, g - 0.2, g + 0.9, W / 2 + 0.06, D / 2 + 0.06, TAN2);                 // pavilion + stone base
+    for (const s of [-1, 1]) bx(s * (W / 2 - 0.7), D / 2 + 0.25, g, g + Hh, 0.7, 0.3, TAN2);                                    // corner piers
+    bx(0, D / 2 + 0.03, g, g + 3.3, W / 2 - 2.2, 0.05, GL); bx(0, D / 2 + 0.06, g + 3.3, g + 3.55, W / 2 - 2.2, 0.06, WH);          // glass doors + transom bar
+    bx(0, D / 2 + 0.03, g + 3.55, g + Hh - 3.4, W / 2 - 2.2, 0.05, GL); for (let k = -2; k <= 2; k++) bx(k * (W - 4.4) / 5, D / 2 + 0.07, g, g + Hh - 3.4, 0.06, 0.05, WH); // storefront glazing + mullions
+    // blue hip roof with a front gable
+    const y0 = g + Hh, r = 3.4, hu = W / 2 + 0.6, hv = D / 2 + 0.6;
+    const A = P(-hu, -hv, y0), Bq = P(hu, -hv, y0), Cq = P(hu, hv, y0), Dq = P(-hu, hv, y0), R1 = P(-hu * 0.35, 0, y0 + r), R2 = P(hu * 0.35, 0, y0 + r);
+    const n = (u, v) => [tx * u + e.nx * v, 1.2, tz * u + e.nz * v];
+    mb.quad(Dq, Cq, R2, R1, [0, 0], [0, 0], [0, 0], [0, 0], n(0, 1), BLUE); mb.quad(Bq, A, R1, R2, [0, 0], [0, 0], [0, 0], [0, 0], n(0, -1), BLUE);
+    mb.tri(A, Dq, R1, [0, 0], [0, 0], [0, 0], n(-1, 0), BLUE); mb.tri(Cq, Bq, R2, [0, 0], [0, 0], [0, 0], n(1, 0), BLUE);
+    const gw = 3.6; mb.tri(P(-gw, hv + 0.05, y0), P(gw, hv + 0.05, y0), P(0, hv + 0.05, y0 + 2.6), [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], TAN); // gable wall
+    for (const s of [-1, 1]) mb.quad(P(s * (gw + 0.3), hv + 0.4, y0 - 0.1), P(0, hv + 0.4, y0 + 2.75), P(0, 0, y0 + 2.75), P(s * (gw + 0.3), 0, y0 - 0.1), [0, 0], [0, 0], [0, 0], [0, 0], n(s * 0.6, 0.5), BLUE);
+    { const fan = new THREE.CircleGeometry(1.7, 20, 0, Math.PI); fan.rotateY(yaw); const [x, , z] = P(0, hv + 0.1, 0); HM.geo(mb, fan, GL, x, y0 + 0.15, z);              // fan window
+      for (let k = 1; k < 6; k++) { const a = k / 6 * Math.PI; const [mx, , mz] = P(Math.cos(a) * 0.85, hv + 0.14, 0); HM.geo(mb, new THREE.BoxGeometry(0.07, 1.7, 0.04).rotateZ(Math.PI / 2 - a).rotateY(yaw), WH, mx, y0 + 0.15 + Math.sin(a) * 0.85, mz); } }
+    // the medallion sign over the doors
+    { const sgn = HM.sign(T, 'GREENVILLE MALL', 4.8, 1.2, { col: '#5a5340', size: 120, bg: '#efe6d0' }); const [x, , z] = P(0, D / 2 + 0.12, 0); sgn.position.set(x, g + Hh - 1.7, z); sgn.rotation.y = yaw; T.group.add(sgn);
+      const disc = new THREE.CircleGeometry(0.55, 20); disc.rotateY(yaw); HM.geo(mb, disc, C('#3b6fb6'), x, g + Hh - 0.55, z); }
+    // lower blue canopies on square tan columns either side
+    for (const s of [-1, 1]) { const u0 = s * (W / 2 + 3.2);
+      bx(u0, D / 2 - 0.5, g + 3.8, g + 4.1, 3.2, 1.9, TAN2);
+      const cA = P(u0 - 3.4, D / 2 + 1.6, g + 4.1), cB = P(u0 + 3.4, D / 2 + 1.6, g + 4.1), cC = P(u0 + 3.4, D / 2 - 2.6, g + 5.3), cD = P(u0 - 3.4, D / 2 - 2.6, g + 5.3); mb.quad(cA, cB, cC, cD, [0, 0], [0, 0], [0, 0], [0, 0], [e.nx, 1.5, e.nz], BLUE);
+      for (const t of [-1, 1]) { const [x, , z] = P(u0 + t * 2.9, D / 2 + 1.2, 0); HM.box(mb, x, z, g, g + 3.8, 0.35, 0.35, yaw, TAN); HM.obstacle(T, x, z, 0.45); } }
     const ring = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [cx + tx * u * W / 2 + e.nx * v * D / 2, cz + tz * u * W / 2 + e.nz * v * D / 2]); HM.solid(T, ring, g + Hh, 'Greenville Mall');
   }
 }
@@ -161,7 +176,7 @@ function hmMall(T, B, mb) {
 function buildHandmade(T, P) {
   const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const mb = new MB(true);
   for (const B of P.buildings) {
-    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); else if (HANDBUILT[B.id] === 'studentCenter') hmStudentCenter(T, B, P, mb); else if (HANDBUILT[B.id] === 'courthouse') hmCourthouse(T, B, P, mb); else if (HANDBUILT[B.id] === 'oldPostOffice') hmOldPostOffice(T, B, P, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
+    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); else if (HANDBUILT[B.id] === 'studentCenter') hmStudentCenter(T, B, P, mb); else if (HANDBUILT[B.id] === 'courthouse') hmCourthouse(T, B, P, mb); else if (HANDBUILT[B.id] === 'oldPostOffice') hmOldPostOffice(T, B, P, mb); else if (HANDBUILT[B.id] === 'bethelBaptist') hmBethelBaptist(T, B, P, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
     const n = (B.tags && B.tags.name) || ''; if (!n) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
     try {
       if (n === 'The Cupola') hmCupola(T, B, mb);
@@ -172,6 +187,7 @@ function buildHandmade(T, P) {
   }
   for (const r of P.roads) if (r.tags && r.tags.name === 'Wright Circle' && r.pts.length > 5) { const c = centroid(r.pts); if (own(c[0], c[1])) try { hmFountain(T, c[0], c[1], mb); } catch (e) { console.warn('fountain skipped', e); } break; }
   for (const a of P.areas) if (a.tags && a.tags.name === 'Town Common') try { hmTownCommon(T, P, a, mb); } catch (e) { console.warn('Town Common skipped', e); }
+  for (const a of P.areas) if (a.tags && a.tags.name === 'Clark-LeClair Stadium') try { hmClarkTower(T, P, a, mb); } catch (e) { console.warn('Clark-LeClair tower skipped', e); }
   for (const a of P.areas) if (a.tags && a.tags.name === 'Pitt Community College' && /college|university/.test(a.tags.amenity || '')) try { pccGrounds(T, P, a, mb); } catch (e) { console.warn('PCC grounds skipped', e); }
   addMB(T, mb, lmPlainMat());
 }
@@ -252,7 +268,7 @@ function hmWvRow(T, B, mb) {
 // and a big storefront window, a lantern, "2564", a whiskey-barrel planter, the name painted on the
 // side wall (plain lettering), and the fenced beer garden beside it: a big live oak strung with
 // lights over a gravel yard, Adirondack chairs around the tree and picnic tables along the fence.
-const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow', 575376082: 'studentCenter', 1140389745: 'courthouse', 201594204: 'oldPostOffice' }; // OSM building id → builder (the generic building is skipped)
+const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow', 575376082: 'studentCenter', 1140389745: 'courthouse', 201594204: 'oldPostOffice', 1489297514: 'bethelBaptist' }; // OSM building id → builder (the generic building is skipped)
 function hmWhiteBrickMat() {
   if (MAT.hmWhiteBrick) return MAT.hmWhiteBrick;
   const c = cnv(256, 256), g = c.getContext('2d'); g.fillStyle = '#dcdcd6'; g.fillRect(0, 0, 256, 256);
