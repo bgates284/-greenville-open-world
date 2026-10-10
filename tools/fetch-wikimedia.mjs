@@ -3,7 +3,7 @@
 // it looks for photos taken within a short distance of it, and also for photos whose title names it, then downloads
 // up to six 1024 px versions to .cache/wikimedia/img/ and lays them out on contact sheets (tools/mapillary-sheets.py --src wikimedia).
 // They're used as reference when the place is modelled by hand. No account or key needed.
-//   node tools/fetch-wikimedia.mjs [--top 300] [--only "name pattern"]            (or double-click fetch-wikimedia.cmd)
+//   node tools/fetch-wikimedia.mjs [--top 300] [--only "name pattern"] [--places other-list.json]            (or double-click fetch-wikimedia.cmd)
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,7 +11,7 @@ const root = process.cwd();
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const TOP = +arg('top', 300);
 const ONLY = arg('only', ''); // a name pattern, e.g. --only "Courthouse|City Hall"
-const places = JSON.parse(fs.readFileSync(path.join(root, 'public-data', 'notable-places.json'), 'utf8')).filter(p => !ONLY || new RegExp(ONLY, 'i').test(p.name)).slice(0, TOP);
+const places = JSON.parse(fs.readFileSync(arg('places', path.join(root, 'public-data', 'notable-places.json')), 'utf8')).filter(p => !ONLY || new RegExp(ONLY, 'i').test(p.name)).slice(0, TOP);
 const cache = path.join(root, '.cache', 'wikimedia'), imgDir = path.join(cache, 'img'); fs.mkdirSync(imgDir, { recursive: true });
 const picksFile = path.join(cache, 'picks.json'), credFile = path.join(cache, 'credits.json');
 const picks = fs.existsSync(picksFile) ? JSON.parse(fs.readFileSync(picksFile, 'utf8')) : {};

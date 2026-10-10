@@ -1,4 +1,35 @@
 {
+"1042024657": {
+"levels": 2,
+"mat": "brick",
+"note": "Greenville Tobacco Warehouse Historic District: long red brick warehouse",
+"roofShape": "flat"
+},
+"1139718356": {
+"levels": 2,
+"mat": "brick",
+"note": "Greenville Tobacco Warehouse Historic District: long red brick warehouse",
+"roofShape": "flat"
+},
+"1140147800": {
+"colour": "#8fa37e",
+"levels": 2,
+"mat": "wood",
+"note": "Jones-Lee House: sage green Gothic Revival, red metal roof",
+"roof": "#b0303a",
+"roofShape": "gabled"
+},
+"1140389747": {
+"colour": "#e9dcc4",
+"levels": 2,
+"mat": "wood",
+"note": "James L. Fleming House: cream Queen Anne, red-shingled turret, slate roof",
+"roof": "#6e7378",
+"turret": {
+"colour": "#94473a",
+"roof": "#6e7378"
+}
+},
 "1144052956": {
 "colour": "#f4f2ec",
 "levels": 2,
@@ -27,6 +58,25 @@
 "mat": "wood",
 "note": "Robert Lee Humber House: white frame, wraparound porch",
 "roof": "#3f4448",
+"roofShape": "gabled"
+},
+"p7520": {
+"colour": "#b9bec2",
+"levels": 2,
+"mat": "wood",
+"note": "E. B. Ficklen House (1901): grey Queen Anne, wraparound porch, turret",
+"roof": "#5a5f66",
+"turret": {
+"colour": "#c9ccd0",
+"roof": "#5a5f66"
+}
+},
+"p80947": {
+"colour": "#f4f2ec",
+"levels": 1,
+"mat": "wood",
+"note": "Red Banks Primitive Baptist Church: white frame meeting house",
+"roof": "#55595e",
 "roofShape": "gabled"
 }
 }

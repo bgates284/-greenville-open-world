@@ -145,3 +145,22 @@ function hmClarkTower(T, P, a, mb) {
   const sg = HM.sign(T, 'CLARK-LeCLAIR STADIUM', 4.6, 1.4, { col: '#f2ead6', size: 110 }); sg.position.set(x + Math.sin(yaw) * 2.66, g + 10.2, z + Math.cos(yaw) * 2.66); sg.rotation.y = yaw; T.group.add(sg);
   HM.solid(T, [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [x + Math.cos(yaw) * u * 2.7 + Math.sin(yaw) * v * 2.7, z - Math.sin(yaw) * u * 2.7 + Math.cos(yaw) * v * 2.7]), g + 17.5, 'Clark-LeClair clock tower');
 }
+
+// Queen Anne turrets: a round corner tower with a conical roof on houses whose photo-read look asks for one
+// (public-data/facades.json "turret": { colour, roof }), on the corner nearest the street
+function hmTurrets(T, P, mb) {
+  const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const C = h => new THREE.Color(h);
+  for (const B of P.buildings) {
+    const f = B.facade; if (!f || !f.turret || !B.ring || B.ring.length < 3) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
+    const nr = nearestRoad(cx, cz, 80, r => r.car); let v = B.ring[0], bd = 1e9;
+    for (const p of B.ring) { const d = nr ? Math.hypot(p[0] - nr.x, p[1] - nr.z) : -Math.hypot(p[0] - cx, p[1] - cz); if (d < bd) { bd = d; v = p; } }
+    const dx = cx - v[0], dz = cz - v[1], dl = Math.hypot(dx, dz) || 1; const x = v[0] + dx / dl * 1.2, z = v[1] + dz / dl * 1.2; // tucked into the corner
+    let g = 1e9; for (const p of B.ring) g = Math.min(g, H(p[0], p[1])); const h = (f.levels || 2) * 3.1 + 1.6, r = f.turret.r || 2.1;
+    HM.geo(mb, new THREE.CylinderGeometry(r, r, h + 0.4, 10), C(f.turret.colour || f.colour || '#e8e2d6'), x, g + h / 2 - 0.2, z);
+    HM.geo(mb, new THREE.CylinderGeometry(r + 0.15, r + 0.15, 0.25, 10), C('#f4f2ec'), x, g + h, z);
+    for (let lv = 0; lv < (f.levels || 2); lv++) for (let k = 0; k < 3; k++) { const a = Math.atan2(-dx, -dz) + (k - 1) * 0.7; HM.geo(mb, new THREE.BoxGeometry(0.75, 1.5, 0.08).rotateY(a), C('#2b3540'), x + Math.sin(a) * (r + 0.02), g + 1.6 + lv * 3.1, z + Math.cos(a) * (r + 0.02)); }
+    HM.geo(mb, new THREE.ConeGeometry(r + 0.35, r * 2.2, 10), C(f.turret.roof || f.roof || '#5a5f66'), x, g + h + 0.12 + r * 1.1, z);
+    HM.geo(mb, new THREE.CylinderGeometry(0.03, 0.06, 0.9, 6), C('#3a3a3a'), x, g + h + r * 2.2 + 0.5, z);
+    HM.obstacle(T, x, z, r);
+  }
+}
