@@ -164,3 +164,34 @@ function hmTurrets(T, P, mb) {
     HM.obstacle(T, x, z, r);
   }
 }
+
+// the street-facing wall of a building (long, and looking straight at a car road)
+function hmStreetEdge(B, minL = 8) {
+  let best = null, bs = -1e9;
+  for (const e of HM.edgesOf(B.ring)) { if (e.L < minL) continue; const nr = nearestRoad(e.mx, e.mz, 120, r => r.car && r.hw !== 'service'); if (!nr) continue;
+    const dx = nr.x - e.mx, dz = nr.z - e.mz, dl = Math.hypot(dx, dz) || 1; const face = (dx * e.nx + dz * e.nz) / dl; const s = e.L * Math.max(0, face) - dl * 0.5; if (s > bs) { bs = s; best = e; } }
+  return best || HM.edgesOf(B.ring).sort((a, b) => b.L - a.L)[0];
+}
+// ECU Student Recreation Center: the round brick drum at the entrance, dark brick bands, a white cap, glass at its foot
+function hmRecDrum(T, B, mb) {
+  const e = hmStreetEdge(B, 20); if (!e) return; const C = h => new THREE.Color(h); const R = 8.5, x = e.mx + e.nx * 2.5, z = e.mz + e.nz * 2.5, g = H(x, z), h = 15;
+  HM.geo(mb, new THREE.CylinderGeometry(R, R, h, 32), C('#9c4b36'), x, g + h / 2 - 0.3, z);
+  for (const y of [3.6, 7.6, 11.6]) HM.geo(mb, new THREE.CylinderGeometry(R + 0.06, R + 0.06, 0.5, 32), C('#6e3226'), x, g + y, z);
+  HM.geo(mb, new THREE.CylinderGeometry(R + 0.4, R + 0.4, 1.1, 32), C('#f1eee6'), x, g + h + 0.2, z);
+  const glass = new THREE.CylinderGeometry(R + 0.04, R + 0.04, 3.1, 32, 1, true, Math.atan2(e.nx, e.nz) - 1.0, 2.0); HM.geo(mb, glass, C('#2f4250'), x, g + 1.6, z);
+  for (let k = 0; k < 10; k++) { const a = Math.atan2(e.nx, e.nz) - 1.0 + k * 0.2 + 0.1; HM.geo(mb, new THREE.BoxGeometry(0.4, 1.2, 0.08).rotateY(a), C('#2b3540'), x + Math.sin(a) * (R + 0.03), g + 9.6, z + Math.cos(a) * (R + 0.03)); } // band of windows
+  HM.solid(T, Array.from({ length: 12 }, (_, k) => [x + Math.cos(k / 12 * 6.283) * R, z + Math.sin(k / 12 * 6.283) * R]), g + h, 'Student Recreation Center');
+}
+// ECU Health Sciences Campus Student Center: the brick clock tower with stone bands and a lit glass lantern, and its own E C U letters
+function hmHSClock(T, B, mb) {
+  const e = hmStreetEdge(B, 15); if (!e) return; const C = h => new THREE.Color(h); const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L;
+  const x = e.b[0] - tx * 4 + e.nx * 4.5, z = e.b[1] - tz * 4 + e.nz * 4.5, g = H(x, z), yaw = Math.atan2(e.nx, e.nz), s = 2.7;
+  HM.box(mb, x, z, g - 0.3, g + 22, s, s, yaw, C('#8f4a36'));
+  for (const y of [1.0, 6, 11, 16, 21.2]) HM.box(mb, x, z, g + y, g + y + 0.5, s + 0.12, s + 0.12, yaw, C('#e2d8c4'));
+  HM.box(mb, x, z, g + 22, g + 27, s - 0.25, s - 0.25, yaw, C('#4f7fa8'));                                                     // glass lantern
+  for (const a of [-1, 1]) for (const b of [-1, 1]) HM.box(mb, x + Math.cos(yaw) * a * (s - 0.3) + Math.sin(yaw) * b * (s - 0.3), z - Math.sin(yaw) * a * (s - 0.3) + Math.cos(yaw) * b * (s - 0.3), g + 22, g + 27, 0.18, 0.18, yaw, C('#f2f0ea'));
+  HM.box(mb, x, z, g + 27, g + 27.7, s + 0.3, s + 0.3, yaw, C('#e2d8c4'));
+  for (let i = 0; i < 4; i++) { const a = yaw + i * Math.PI / 2; const m = new THREE.Mesh(new THREE.CircleGeometry(1.5, 28), pccClockMat()); m.position.set(x + Math.sin(a) * (s + 0.02), g + 18.8, z + Math.cos(a) * (s + 0.02)); m.rotation.y = a; T.group.add(m); }
+  HM.solid(T, [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [x + Math.cos(yaw) * u * s + Math.sin(yaw) * v * s, z - Math.sin(yaw) * u * s + Math.cos(yaw) * v * s]), g + 27.7, 'Health Sciences clock tower');
+  ecuLetters(T, mb, [e.mx + e.nx * 16, 0, e.mz + e.nz * 16], e.nx, e.nz, 0.85);
+}

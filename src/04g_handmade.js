@@ -183,6 +183,8 @@ function buildHandmade(T, P) {
       else if (n === 'Joyner Library') hmJoyner(T, B, P, mb);
       else if (n === 'Greenville Amphitheater') hmAmphitheater(T, B, mb, P);
       else if (n === 'Greenville Mall') hmMall(T, B, mb);
+      else if (n === 'Richard R. and JoAnn M Eakin Student Recreation Center') hmRecDrum(T, B, mb);
+      else if (n === 'Health Sciences Campus Student Center') hmHSClock(T, B, mb);
     } catch (e) { console.warn('landmark', n, 'skipped', e); }
   }
   for (const r of P.roads) if (r.tags && r.tags.name === 'Wright Circle' && r.pts.length > 5) { const c = centroid(r.pts); if (own(c[0], c[1])) try { hmFountain(T, c[0], c[1], mb); } catch (e) { console.warn('fountain skipped', e); } break; }
