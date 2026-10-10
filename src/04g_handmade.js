@@ -161,7 +161,7 @@ function hmMall(T, B, mb) {
 function buildHandmade(T, P) {
   const W = T.W; const own = (x, z) => x >= W.x0 && x < W.x1 && z >= W.z0 && z < W.z1; const mb = new MB(true);
   for (const B of P.buildings) {
-    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); else if (HANDBUILT[B.id] === 'studentCenter') hmStudentCenter(T, B, P, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
+    if (HANDBUILT[B.id]) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { if (HANDBUILT[B.id] === 'localOak') hmLocalOak(T, B, P, mb); else if (HANDBUILT[B.id] === 'wvRow') hmWvRow(T, B, mb); else if (HANDBUILT[B.id] === 'studentCenter') hmStudentCenter(T, B, P, mb); else if (HANDBUILT[B.id] === 'courthouse') hmCourthouse(T, B, P, mb); else if (HANDBUILT[B.id] === 'oldPostOffice') hmOldPostOffice(T, B, P, mb); } catch (e) { console.warn(HANDBUILT[B.id] + ' skipped', e); } continue; }
     const n = (B.tags && B.tags.name) || ''; if (!n) continue; const [cx, cz] = centroid(B.ring); if (!own(cx, cz)) continue;
     try {
       if (n === 'The Cupola') hmCupola(T, B, mb);
@@ -252,7 +252,7 @@ function hmWvRow(T, B, mb) {
 // and a big storefront window, a lantern, "2564", a whiskey-barrel planter, the name painted on the
 // side wall (plain lettering), and the fenced beer garden beside it: a big live oak strung with
 // lights over a gravel yard, Adirondack chairs around the tree and picnic tables along the fence.
-const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow', 575376082: 'studentCenter' }; // OSM building id → builder (the generic building is skipped)
+const HANDBUILT = { 1144052978: 'localOak', 1144052969: 'wvRow', 575376082: 'studentCenter', 1140389745: 'courthouse', 201594204: 'oldPostOffice' }; // OSM building id → builder (the generic building is skipped)
 function hmWhiteBrickMat() {
   if (MAT.hmWhiteBrick) return MAT.hmWhiteBrick;
   const c = cnv(256, 256), g = c.getContext('2d'); g.fillStyle = '#dcdcd6'; g.fillRect(0, 0, 256, 256);
