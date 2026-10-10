@@ -590,7 +590,8 @@ async function buildBuildings(T, P) {
     const mat = (t['building:material'] || t['building:facade:material'] || '').toLowerCase();
     if (/brick/.test(mat)) fac = du < 700 && area > 200 ? 'shop' : 'brick';
     else if (/metal|steel/.test(mat)) fac = 'metal';
-    else if (/glass|concrete|stone/.test(mat)) fac = 'office';
+    else if (/glass|stone/.test(mat)) fac = 'office';
+    else if (/concrete/.test(mat)) fac = HOUSEY.has(bt) || area < 200 ? 'siding' : 'store'; // concrete block: painted block shops and garages
     else if (/wood|vinyl|plaster/.test(mat)) fac = 'siding';
     // small-town downtowns (Winterville, Ayden, Farmville, Grifton, Bethel…): storefront blocks, some mapped as "house"
     else if (wvDown(cx, cz) < 150 && /^(yes|retail|commercial|house)$/.test(bt) && (area > 400 || (area > 120 && (B.units || lu !== 80)))) fac = 'shop';
@@ -974,6 +975,7 @@ function TT(n, f) { const t = performance.now(); const r = f(); TIMES[n] = (TIME
 async function TTa(n, f) { const t = performance.now(); const r = await f(); TIMES[n] = (TIMES[n] || 0) + performance.now() - t; return r; }
 async function buildTile(T) {
   const parcelP = Parcels.get(T.tx, T.ty).catch(() => null); // county parcels load alongside the map data
+  const pittP = PittRecords.get(T.tx, T.ty).catch(() => null); // what each building is made of (county tax records, 03k_realdata.js)
   const aerialP = Aerial.get(T.tx, T.ty).catch(() => null), ncP = NCBuildings.get(T.tx, T.ty).catch(() => null), canopyP = Canopy.get(T.tx, T.ty).catch(() => null); // real-world layers (03k_realdata.js)
   const data = await getTileData(T.tx, T.ty, T.prio);
   if (Food.extraP) await Promise.race([Food.extraP, sleep(4000)]); // the county's restaurants & stores (places.json)
@@ -986,6 +988,8 @@ async function buildTile(T) {
   try { mergeNCBuildings(T, P, await Promise.race([ncP, late(15000)])); } catch (e) { console.warn('NC building footprints skipped', e); } await yieldMaybe();
   T.aerial = await Promise.race([aerialP, late(15000)]); T.canopy = await Promise.race([canopyP, late(8000)]);
   if (T.state === 'gone') { if (T.aerial && T.aerial.close) T.aerial.close(); return; }
+  try { T.facades = applyFacades(P, await Promise.race([Facades.get(), late(8000)])); } catch (e) { console.warn('photo-read facades skipped', e); } // real looks read off street photos win over the tax record
+  try { T.pittMatched = applyPittRecords(T, P, await Promise.race([pittP, late(20000)]), await Promise.race([Facades.get(), late(1)])); } catch (e) { console.warn('county building records skipped', e); }
   try { T.parcelAdded = applyParcels(T, P, await Promise.race([parcelP, sleep(12000).then(() => null)])); } catch (e) { console.warn('parcels skipped', e); } await yieldMaybe();
   try { prepCivic(T, P); } catch (e) { console.warn('stations skipped', e); }
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();

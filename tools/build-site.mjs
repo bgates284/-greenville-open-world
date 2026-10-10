@@ -20,6 +20,11 @@ if (fs.existsSync(path.join(root, 'public-data', 'places.json'))) fs.copyFileSyn
 // tree canopy heights per square (npm run fetch-canopy)
 const canSrc = path.join(root, 'public-data', 'canopy'); let nc = 0;
 if (fs.existsSync(canSrc)) { fs.mkdirSync(path.join(site, 'data', 'canopy'), { recursive: true }); for (const f of fs.readdirSync(canSrc)) { fs.copyFileSync(path.join(canSrc, f), path.join(site, 'data', 'canopy', f)); if (f.endsWith('.gz')) nc++; } }
+// what each building is made of, from the county tax records (npm run fetch-pitt-buildings)
+const pbSrc = path.join(root, 'public-data', 'pittbld');
+if (fs.existsSync(pbSrc)) { fs.mkdirSync(path.join(site, 'data', 'pittbld'), { recursive: true }); for (const f of fs.readdirSync(pbSrc)) if (f !== 'summary.json') fs.copyFileSync(path.join(pbSrc, f), path.join(site, 'data', 'pittbld', f)); }
+// building looks read off street-level photos (tools/fetch-mapillary.mjs)
+if (fs.existsSync(path.join(root, 'public-data', 'facades.json'))) fs.copyFileSync(path.join(root, 'public-data', 'facades.json'), path.join(site, 'data', 'facades.json'));
 // detailed car models (03l_cars.js)
 const vehSrc = path.join(root, 'public-data', 'vehicles');
 if (fs.existsSync(vehSrc)) { fs.mkdirSync(path.join(site, 'data', 'vehicles'), { recursive: true }); for (const f of fs.readdirSync(vehSrc)) fs.copyFileSync(path.join(vehSrc, f), path.join(site, 'data', 'vehicles', f)); }

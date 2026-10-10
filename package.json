@@ -15,7 +15,9 @@
     "fetch-city": "node tools/fetch-city.mjs --pack",
     "fetch-canopy": "node tools/fetch-canopy.mjs",
     "fetch-transit": "node tools/fetch-transit.mjs",
-    "fetch-places": "node tools/fetch-places.mjs"
+    "fetch-places": "node tools/fetch-places.mjs",
+    "fetch-pitt-buildings": "node tools/fetch-pitt-buildings.mjs",
+    "fetch-mapillary": "node tools/fetch-mapillary.mjs"
   },
   "devDependencies": {
     "vite": "^6.3.5",

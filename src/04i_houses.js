@@ -72,7 +72,7 @@ function buildHouse(B, k) {
   let wallCol = new THREE.Color(pick(brick ? HOUSE_COL.brick : sidePal, rng()));
   if (t['building:colour']) try { wallCol = new THREE.Color(t['building:colour']); } catch (e) { }
   const sideKey = 'sidingPlain', sideCol = new THREE.Color(pick(HOUSE_COL.siding, rng())); // gables over brick
-  const wainscot = !brick && era === 'suburb' && rng() < 0.4; // brick-front skirt on 80s/90s houses
+  const wainscot = !brick && (t['pitt:skirt'] ? true : era === 'suburb' && rng() < 0.4); // brick-front skirt (the county record says so, or on 80s/90s houses)
   const trim = new THREE.Color(HOUSE_COL.trim);
   const shutterCol = new THREE.Color(pick(HOUSE_COL.shutter, rng())); const shutters = era !== 'mill' && rng() < (era === 'ranch' ? 0.75 : 0.6);
   const doorCol = new THREE.Color(pick(HOUSE_COL.door, rng()));

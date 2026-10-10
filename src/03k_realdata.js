@@ -141,3 +141,78 @@ const Canopy = {
     } catch (e) { return null; }
   },
 };
+
+// ---- what each building is made of, from the Pitt County tax records ----
+// tools/fetch-pitt-buildings.mjs saves, per map square, every parcel that has a building with the county's
+// building cards (exterior walls, roof, style, storeys, year built). Each OpenStreetMap / NC building is matched
+// to the parcel it stands in and gets those as tags before the builders run, so a brick ranch is brick with a
+// hip roof, a vinyl two-storey is vinyl, a metal shop building is metal, and so on — for the whole county.
+const PittRecords = {
+  index: null,
+  base() { return window.GV_DATA ? window.GV_DATA + 'pittbld/' : 'public-data/pittbld/'; },
+  async get(tx, ty) {
+    if (!this.index) this.index = fetchTimeout(this.base() + 'index.json', 15000).then(r => r.ok ? r.json() : []).then(a => new Set(a)).catch(() => new Set());
+    const idx = await this.index; const name = `${tx}_${ty}`; if (!idx.has(name)) return null;
+    try {
+      const r = await fetchTimeout(this.base() + name + '.json.gz', 20000); if (!r.ok) return null;
+      let buf = new Uint8Array(await r.arrayBuffer());
+      if (buf[0] === 0x1f && buf[1] === 0x8b) buf = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+      const list = JSON.parse(new TextDecoder().decode(buf)); const lon0 = LON0 + tx * TLON, lat0 = LAT0 + ty * TLAT;
+      return list.map(([cards, flat, pn]) => { const ring = []; for (let i = 0; i < flat.length; i += 2) ring.push([lonToX(lon0 + flat[i] / 1e6), latToZ(lat0 + flat[i + 1] / 1e6)]); return { cards, ring, pn }; });
+    } catch (e) { return null; }
+  },
+};
+// county codes → OpenStreetMap-style tags the builders understand
+function pittWall(w) {
+  if (/^(FACE-BRK|COM-BRK|UTY-BRK|BK\/MASO|BK\/WOOD|BK\/STUCO|BK\/PFMET|BK\/BLOCK)$/.test(w) || /BRK|BRICK/.test(w)) return { mat: 'brick' };
+  if (w === 'BK/VINYL') return { mat: 'vinyl', skirt: true };                                   // brick skirt, vinyl above
+  if (/METAL|PRE-FAB|S-MAX/.test(w)) return { mat: 'metal' };
+  if (/CONC|CM-|BLOCK|PRE-PAN/.test(w)) return { mat: 'concrete' };
+  if (/STUC/.test(w)) return { mat: 'plaster' };
+  if (/CED|WD|WOOD|SHING|SHIN/.test(w)) return { mat: 'wood' };
+  if (/VINYL|SID|MASONITE|COMP|ALUM/.test(w)) return { mat: 'vinyl' };
+  return null;
+}
+function pittRoof(r) { return r === 'HIP' || r === 'GAM/MANS' ? 'hipped' : r === 'GABLE' || r === 'SHED' ? 'gabled' : /FLAT|RF-CONC|BAR-JST|STEEL-FR/.test(r) ? 'flat' : ''; }
+function applyPittRecords(T, P, list, F) {
+  if (!list || !list.length) return 0;
+  const H2 = new SpatialHash(30); for (const p of list) { H2.insert(p, ...ringBB(p.ring)); p.blds = []; }
+  for (const B of P.buildings) {
+    if (B.part || B.food || B.ring.length < 3) continue; const a = Math.abs(signedArea(B.ring)); if (a < 30) continue; // sheds keep their own look
+    const [x, z] = centroid(B.ring); let best = null;
+    for (const p of H2.query(x, z, x, z)) if (pointInPoly(x, z, p.ring) && (!best || Math.abs(signedArea(p.ring)) < Math.abs(signedArea(best.ring)))) best = p;
+    if (best) best.blds.push([a, B]);
+  }
+  let n = 0;
+  for (const p of list) {
+    if (!p.blds.length) continue; p.blds.sort((u, v) => v[0] - u[0]);
+    p.blds.forEach(([, B], i) => {
+      const c = p.cards[Math.min(i, p.cards.length - 1)]; if (!c || (i >= p.cards.length && i > 0)) return; // more buildings than cards: the extras are outbuildings
+      const [wall, roof, style, story, year] = c; const t = B.tags; const w = pittWall(wall);
+      if (w && !t['building:material'] && !t['building:facade:material']) { t['building:material'] = w.mat; if (w.skirt) t['pitt:skirt'] = '1'; }
+      const rs = pittRoof(roof); if (rs && !t['roof:shape']) t['roof:shape'] = rs;
+      if (story > 0 && !t['building:levels'] && !t.height) t['building:levels'] = String(Math.max(1, Math.floor(story + 0.4)));
+      if (year > 1700 && !t.start_date) t.start_date = String(year);
+      if (/MANF-HM/.test(style) && (!t.building || t.building === 'yes' || t.building === 'house')) t.building = 'static_caravan';
+      B.pitt = { wall, roof, style, story, year, parcel: p.pn }; n++;
+      const f = i === 0 && F && p.pn && F['p' + p.pn]; if (f) { if (f.mat) t['building:material'] = f.mat; if (f.colour && f.mat !== 'brick') t['building:colour'] = f.colour; if (f.levels) t['building:levels'] = String(f.levels); if (f.roof) t['roof:colour'] = f.roof; if (f.roofShape) t['roof:shape'] = f.roofShape; B.facade = f; } // photo-read look for the parcel's main building
+    });
+  }
+  return n;
+}
+
+// ---- what named buildings really look like, read off street-level photos ----
+// public-data/facades.json: { "<OpenStreetMap way id>" or "p<county parcel number>": { mat, colour, levels, roof, roofShape, note } } — filled in from
+// Mapillary photos (tools/fetch-mapillary.mjs + tools/mapillary-sheets.py). mat is brick | vinyl | wood | metal |
+// plaster (stucco / painted block) | glass | concrete; colour is the wall colour (ignored for bare brick).
+const Facades = { p: null, get() { if (!this.p) this.p = fetchTimeout((window.GV_DATA || 'public-data/') + 'facades.json', 15000).then(r => r.ok ? r.json() : {}).catch(() => ({})); return this.p; } };
+function applyFacades(P, F) {
+  if (!F) return 0; let n = 0;
+  for (const B of P.buildings) {
+    const f = F[B.id]; if (!f) continue; const t = B.tags;
+    if (f.mat) t['building:material'] = f.mat; if (f.colour && f.mat !== 'brick') t['building:colour'] = f.colour;
+    if (f.levels) t['building:levels'] = String(f.levels); if (f.roof) t['roof:colour'] = f.roof; if (f.roofShape) t['roof:shape'] = f.roofShape;
+    B.facade = f; n++;
+  }
+  return n;
+}
