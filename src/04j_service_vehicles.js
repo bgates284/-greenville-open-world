@@ -258,7 +258,9 @@ function svMergeStatic(G) {
 }
 function makeServiceVehicle(kind) {
   const T = SVC_TPL[kind] || (SVC_TPL[kind] = svMergeStatic(SVC_BUILD[kind]()));
-  const G = T.clone(true); const mats = new Map();
+  // (Object3D.clone deep-copies userData through JSON, and the template's userData points at its own meshes and
+  // materials — that serialised the whole model every time, ~7 s per vehicle; the clone gets fresh userData below anyway)
+  const ud = T.userData; T.userData = {}; let G; try { G = T.clone(true); } finally { T.userData = ud; } const mats = new Map();
   G.traverse(o => { if (o.isMesh && o.material && /^svf/.test(o.material.name)) { if (!mats.has(o.material)) mats.set(o.material, o.material.clone()); o.material = mats.get(o.material); } });
   G.userData = { size: T.userData.size, kind, svc: true,
     wheels: T.userData.wheels.map((w, i) => ({ piv: G.getObjectByName('svw' + i), spin: G.getObjectByName('svs' + i), front: w.front })),

@@ -460,7 +460,7 @@ function pointAlong(road, s) {
 }
 function isJunction(id, P) { const d = P.deg.get(id) || 0; const adj = World.nodeAdj.get(id); return d >= 3 || (adj && adj.filter(a => a.road.car).length >= 2); }
 
-function buildRoadMeshes(T, P) {
+async function buildRoadMeshes(T, P) {
   const buckets = {}; for (const k in MAT.road) buckets[k] = new MB();
   const sw = new MB(), deckSide = new MB(), disc = new MB();
   const piers = [];
@@ -470,9 +470,10 @@ function buildRoadMeshes(T, P) {
   for (const id of T.roadIds) {
     const road = World.roads.get(id); if (!road || !road.mesh) continue;
     try { roadMesh(road); } catch (e) { console.warn('road skipped', id, e); }
+    await yieldMaybe();
   }
   function roadMesh(road) {
-    const R = resample(road.pts, 5);
+    const R = resample(road.pts, Q === QUALITY.low ? 8 : 5);
     const yoff = 0.15 + road.rank * 0.012;
     const yAt = road.bridge ? (p) => road.deckAt(p[2]) : (p) => H(p[0], p[1]) + yoff;
     strip(buckets.plain, R, 0, road.w, yAt, 1 / 12, road.bridge ? 1.1 : true); // markings are separate geometry (04d_streets.js)
@@ -511,7 +512,7 @@ function buildRoadMeshes(T, P) {
     }
   }
   // intersections, crosswalks, stop bars, lane markings, sidewalk corners
-  try { TT("streetDetail", () => buildStreetDetail(T, P, J, R_of, mk, disc, sw)); } catch (e) { console.warn('street detail skipped', e); }
+  try { await TTa("streetDetail", () => buildStreetDetail(T, P, J, R_of, mk, disc, sw)); } catch (e) { console.warn('street detail skipped', e); }
   try { buildParkingLines(T, P, mk); } catch (e) { console.warn('parking lines skipped', e); }
   const addMesh = (mb, mat, shadow = false) => { const g = mb.geo(); if (!g) return; const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = shadow; T.group.add(m); };
   for (const k in buckets) addMesh(buckets[k], MAT.road[k]);
@@ -574,7 +575,7 @@ async function buildBuildings(T, P) {
   const wvDown = (x, z) => { let m = 1e9; for (const [x0, z0, r] of TOWN_CENTERS) m = Math.min(m, Math.hypot(x - x0, z - z0) / r * 150); return m; };
   const luAt = (x, z) => { const u = Math.floor((x - W.x0) / (W.x1 - W.x0) * 512), v = Math.floor((z - W.z0) / (W.z1 - W.z0) * 512); if (u < 0 || v < 0 || u > 511 || v > 511) return 40; return decodeCls(T.luR[v * 512 + u]); };
   for (const B of P.buildings) {
-    if ((++_cnt & 127) === 0) await yieldMaybe();
+    if ((++_cnt & 3) === 0) await yieldMaybe(); // hand the frame back every ~10 ms so loading never stalls the game
     try { addOneBuilding(B); } catch (e) { if (!buildBuildings._w) { buildBuildings._w = 1; console.warn('building skipped', B.id, e); } }
   }
   function addOneBuilding(B) {
@@ -730,7 +731,7 @@ async function buildBuildings(T, P) {
   const gs = roofS.geo(); if (gs) { const m = new THREE.Mesh(gs, MAT.shingle); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   const gf = roofF.geo(); if (gf) { const m = new THREE.Mesh(gf, MAT.flatroof); m.castShadow = true; m.receiveShadow = true; T.group.add(m); }
   addMB(T, decor, lmPlainMat()); addMB(T, seats, standsMat());
-  { const g = houseDetail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.houseTrim); m.castShadow = true; m.receiveShadow = true; m.userData.detail = true; T.group.add(m); } }
+  { const g = houseDetail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.houseTrim); m.castShadow = true; m.receiveShadow = true; m.userData.near = true; T.group.add(m); } }
 }
 
 // ---------- trees ----------
@@ -765,17 +766,25 @@ function buildTrees(T, P) {
   }
   if (T.noTrees) for (const sp in lists) lists[sp] = lists[sp].filter(t => !T.noTrees.some(([x, z, rr]) => (t[0] - x) ** 2 + (t[1] - z) ** 2 < rr * rr)); // kept clear by hand-built landmarks (fountain, flower beds, porches)
   const o = new THREE.Object3D(); const col = new THREE.Color();
+  // each species is split into 3 x 3 patches per square, so patches behind you are culled and far ones drop detail (Tiles.detailLOD)
+  const NC = 3, cw = sx / NC, ch = sz / NC; let gi = 0;
   for (const sp in lists) {
-    const L = lists[sp]; if (!L.length) continue;
-    const im = new THREE.InstancedMesh(sp === 'oak' && Q === QUALITY.low ? GEO.oakLo : GEO[sp], MAT.tree, L.length); im.userData.detail = true;
-    L.forEach((t, i) => {
-      o.position.set(t[0], H(t[0], t[1]) - 0.1, t[1]); o.rotation.set(0, t[3], 0); o.scale.set(t[2], t[2] * (0.9 + (i % 7) * 0.04), t[2]); o.updateMatrix(); im.setMatrixAt(i, o.matrix);
-      const k = 0.82 + ((i * 2654435761) >>> 0) % 1000 / 1000 * 0.36; col.setRGB(k, k * (0.96 + (i % 5) * 0.02), k * 0.95); im.setColorAt(i, col);
-      const rr = sp === 'myrtle' ? 0.25 : 0.4 * t[2];
-      const ob = knockable(T, { x: t[0], z: t[1], r: rr }, { kind: 'tree', ims: [im], idx: i, mass: 160 * t[2] * t[2], min: t[2] > 1.1 ? 9 : 5.5, f: sp === 'myrtle' ? 0.4 : 0.28 });
-      T.hashItems.push([World.obsHash, World.obsHash.insert(ob, t[0] - rr, t[1] - rr, t[0] + rr, t[1] + rr)]);
+    const cells = Array.from({ length: NC * NC }, () => []);
+    for (const t of lists[sp]) { const cx = clamp(Math.floor((t[0] - W.x0) / cw), 0, NC - 1), cz = clamp(Math.floor((t[1] - W.z0) / ch), 0, NC - 1); cells[cz * NC + cx].push(t); }
+    cells.forEach((L, ci) => {
+      if (!L.length) return;
+      const im = new THREE.InstancedMesh(sp === 'oak' && Q === QUALITY.low ? GEO.oakLo : GEO[sp], MAT.tree, L.length); im.userData.detail = true; if (sp === 'oak') im.userData.oak = true;
+      const cx = ci % NC, cz = (ci / NC) | 0; im.userData.cell = [W.x0 + cx * cw, W.z0 + cz * ch, W.x0 + (cx + 1) * cw, W.z0 + (cz + 1) * ch];
+      L.forEach((t, i) => {
+        const j = gi++;
+        o.position.set(t[0], H(t[0], t[1]) - 0.1, t[1]); o.rotation.set(0, t[3], 0); o.scale.set(t[2], t[2] * (0.9 + (j % 7) * 0.04), t[2]); o.updateMatrix(); im.setMatrixAt(i, o.matrix);
+        const k = 0.82 + ((j * 2654435761) >>> 0) % 1000 / 1000 * 0.36; col.setRGB(k, k * (0.96 + (j % 5) * 0.02), k * 0.95); im.setColorAt(i, col);
+        const rr = sp === 'myrtle' ? 0.25 : 0.4 * t[2];
+        const ob = knockable(T, { x: t[0], z: t[1], r: rr }, { kind: 'tree', ims: [im], idx: i, mass: 160 * t[2] * t[2], min: t[2] > 1.1 ? 9 : 5.5, f: sp === 'myrtle' ? 0.4 : 0.28 });
+        T.hashItems.push([World.obsHash, World.obsHash.insert(ob, t[0] - rr, t[1] - rr, t[0] + rr, t[1] + rr)]);
+      });
+      im.castShadow = Q !== QUALITY.low; im.receiveShadow = true; im.computeBoundingSphere(); T.group.add(im);
     });
-    im.castShadow = Q !== QUALITY.low; im.receiveShadow = true; im.computeBoundingSphere(); T.group.add(im);
   }
 }
 
@@ -878,7 +887,7 @@ function buildParked(T, P) {
   const o = new THREE.Object3D(); const col = new THREE.Color();
   for (const ty in types) {
     const L = types[ty]; if (!L.length) continue; const G = GEO.car[ty];
-    const parts = [[G.liteBody, MAT.carBodyWhite, true], [G.liteGlass, MAT.carGlass, false], [G.liteTrim, MAT.carTrim, false], [G.liteLamps, MAT.lampOff, false], [G.wheelsStatic, MAT.wheel, false]];
+    const parts = [[G.liteBody, MAT.carBodyWhite, true], [G.liteGlass, MAT.carGlass, false], [G.liteTrim, MAT.carTrim, false], [G.wheelsStatic, MAT.wheel, false]]; if (Q === QUALITY.high) parts.push([G.liteLamps, MAT.lampOff, false]); // (unlit lamps on parked cars: ~560 triangles each, only on High)
     const meshes = parts.map(([g, m]) => new THREE.InstancedMesh(g, m, L.length));
     L.forEach((s, i) => {
       o.position.set(s[0], H(s[0], s[1]) + 0.05, s[1]); o.rotation.set(0, s[2], 0); o.updateMatrix();
@@ -886,7 +895,7 @@ function buildParked(T, P) {
       const kk = { kind: 'car', ims: meshes, idx: i, mass: 1300, min: 3, f: 1 };
       for (const k of [-1.2, 1.2]) { const x = s[0] + Math.sin(s[2]) * k, z = s[1] + Math.cos(s[2]) * k; T.hashItems.push([World.obsHash, World.obsHash.insert(knockable(T, { x, z, r: 1.0 }, kk), x - 1, z - 1, x + 1, z + 1)]); }
     });
-    meshes[0].castShadow = true; meshes.forEach(m => { m.computeBoundingSphere(); m.userData.detail = true; T.group.add(m); });
+    meshes[0].castShadow = true; meshes.forEach(m => { m.computeBoundingSphere(); m.userData.near = true; T.group.add(m); });
   }
 }
 
@@ -941,14 +950,23 @@ const Tiles = {
     }
     this.detailLOD(px, pz);
   },
-  // trees, parked cars and house trim only in squares near you (farther ones are mostly in the fog anyway)
+  // trees only in squares near you (farther ones are mostly in the fog anyway); parked cars, house trim, lamp posts
+  // and benches only in the squares right around you, and the far squares' oaks swap to a low-poly crown
   detailLOD(px, pz) {
-    const D = (Q.detailD || 900) * (Player.mode === 'fly' || Player.mode === 'heli' ? 1.6 : 1);
+    const k = Player.mode === 'fly' || Player.mode === 'heli' ? 1.6 : 1, D = (Q.detailD || 900) * k, Dn = (Q.nearD || 420) * k;
+    const moved = !this._lp || Math.hypot(px - this._lp[0], pz - this._lp[1]) > 20 || this._lk !== k; if (moved) { this._lp = [px, pz]; this._lk = k; }
+    const hi = Q !== QUALITY.low;
     for (const T of this.map.values()) {
       if (T.state !== 'ready' || !T.W) continue;
-      const dx = Math.max(T.W.x0 - px, 0, px - T.W.x1), dz = Math.max(T.W.z0 - pz, 0, pz - T.W.z1); const show = Math.hypot(dx, dz) < D;
-      if (T.detailShown === show) continue; T.detailShown = show;
-      for (const o of T.group.children) if (o.userData.detail) o.visible = show;
+      const dx = Math.max(T.W.x0 - px, 0, px - T.W.x1), dz = Math.max(T.W.z0 - pz, 0, pz - T.W.z1); const d = Math.hypot(dx, dz), show = d < D, near = d < Dn;
+      if (T.detailShown === show && T.nearShown === near && !moved) continue; T.detailShown = show; T.nearShown = near;
+      for (const o of T.group.children) {
+        const c = o.userData.cell;
+        if (c) { // a patch of trees: shown within the detail distance, full oak crowns only fairly close
+          const cd = Math.hypot(Math.max(c[0] - px, 0, px - c[2]), Math.max(c[1] - pz, 0, pz - c[3])); o.visible = cd < D;
+          if (o.userData.oak && hi) { const g = cd < Dn * 0.6 ? GEO.oak : GEO.oakLo; if (o.geometry !== g) o.geometry = g; }
+        } else if (o.userData.near) o.visible = near; else if (o.userData.detail) o.visible = show;
+      }
     }
   },
   unload(T) {
@@ -988,6 +1006,8 @@ async function buildTile(T) {
   await ensureDEM(tileBBox(T.tx, T.ty), T.prio);
   if (T.state === 'gone') return;
   _yieldT = performance.now();
+  // the square was dropped while it was still being built (you moved on): undo what it already put in the world
+  const gone = () => { if (T.state !== 'gone') return false; for (const [h, it] of T.hashItems) h.remove(it); T.hashItems.length = 0; T.group.removeFromParent(); return true; };
   const P = TT('parseTile', () => parseTile(data, T.tx, T.ty)); await yieldMaybe();
   TT('registerRoads', () => registerRoads(T, P)); await yieldMaybe();
   const late = ms => sleep(ms).then(() => null);
@@ -1000,22 +1020,22 @@ async function buildTile(T) {
   try { prepCivic(T, P); } catch (e) { console.warn('stations skipped', e); }
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();
-  TT('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe();
-  try { TT('buildRails', () => buildRails(T, P)); } catch (e) { console.warn('railway track skipped', e); }
-  await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
-  try { TT('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); }
+  await TTa('buildRoadMeshes', () => buildRoadMeshes(T, P)); await yieldMaybe(); if (gone()) return;
+  try { TT('buildRails', () => buildRails(T, P)); } catch (e) { console.warn('railway track skipped', e); } await yieldMaybe();
+  await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe(); if (gone()) return;
+  try { await TTa('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); } await yieldMaybe();
   try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();
-  try { TT('buildCampusGrounds', () => buildCampusGrounds(T, P)); } catch (e) { console.warn('campus grounds skipped', e); } // ECU walks, oaks, lamps (04n_campus.js)
+  try { TT('buildCampusGrounds', () => buildCampusGrounds(T, P)); } catch (e) { console.warn('campus grounds skipped', e); } await yieldMaybe(); // ECU walks, oaks, lamps (04n_campus.js)
   try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
-  try { TT('buildHandmade', () => buildHandmade(T, P)); } catch (e) { console.warn('hand-built landmarks skipped', e); }
-  try { TT('buildCivic', () => buildCivic(T, P)); } catch (e) { console.warn('stations skipped', e); }
+  try { TT('buildHandmade', () => buildHandmade(T, P)); } catch (e) { console.warn('hand-built landmarks skipped', e); } await yieldMaybe();
+  try { TT('buildCivic', () => buildCivic(T, P)); } catch (e) { console.warn('stations skipped', e); } await yieldMaybe();
   try { buildMailboxes(T); } catch (e) { }
   TT('buildTrees', () => buildTrees(T, P)); await yieldMaybe();
-  TT('buildSignals', () => buildSignals(T, P));
-  TT('buildStreetSigns', () => buildStreetSigns(T, P));
-  TT('buildParked', () => buildParked(T, P));
+  TT('buildSignals', () => buildSignals(T, P)); await yieldMaybe();
+  TT('buildStreetSigns', () => buildStreetSigns(T, P)); await yieldMaybe();
+  TT('buildParked', () => buildParked(T, P)); await yieldMaybe();
+  if (gone()) return;
   registerAreas(T, P);
-  if (T.state === 'gone') return;
   worldRoot.add(T.group);
 }
 

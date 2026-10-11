@@ -66,9 +66,10 @@ function buildJunctions(T, P) {
   return J;
 }
 
-function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
+async function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
   // ---- lane markings along each road ----
   for (const id of T.roadIds) {
+    await yieldMaybe();
     const road = World.roads.get(id); if (!road || !road.mesh) continue; const L = roadLanes(road); if (!L.marked) continue;
     const RR = R_of.get(id); if (!RR) continue; const { R, Ry } = RR;
     // stretches clear of junctions (plus room for a crosswalk / stop bar)
@@ -104,6 +105,7 @@ function buildStreetDetail(T, P, J, R_of, mk, disc, sw) {
   }
   // ---- intersections: surface, crosswalks, stop bars, curb returns + sidewalk corners ----
   for (const j of J.values()) {
+    await yieldMaybe();
     const A = j.arms, n = A.length; const e = j.e;
     const sideV = a => [-a.dz, a.dx]; // toward the next arm (counter-clockwise in angle order)
     const mouth = a => { const d = Math.min(e, a.segLen); const s = sideV(a); const c = [j.x + a.dx * d, j.z + a.dz * d]; return { prev: [c[0] - s[0] * a.w / 2, c[1] - s[1] * a.w / 2], next: [c[0] + s[0] * a.w / 2, c[1] + s[1] * a.w / 2], d }; };
@@ -289,9 +291,10 @@ function subdivTri(a, b, c, maxL, out) {
   const ab = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], bc = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2], ca = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2];
   subdivTri(a, ab, ca, maxL, out); subdivTri(ab, b, bc, maxL, out); subdivTri(ca, bc, c, maxL, out); subdivTri(ab, bc, ca, maxL, out);
 }
-function buildLots(T, P) {
+async function buildLots(T, P) {
   const W = T.W, asph = new MB(), curb = new MB(); const LOT = 0.06;
   for (const a of P.areas) {
+    await yieldMaybe();
     if (a.kind !== 'parking' || !a.rings.length) continue; const ring = a.rings[0]; if (ring.length < 3) continue;
     const t = a.tags || {}; if (t.parking === 'multi-storey' || t.parking === 'underground' || t.amenity === 'fuel' || /gravel|grass|dirt|unpaved|ground/.test(t.surface || '')) continue;
     const [cx, cz] = centroid(ring); if (cx < W.x0 || cx >= W.x1 || cz < W.z0 || cz >= W.z1) continue; // each lot once, by the square it's centred in

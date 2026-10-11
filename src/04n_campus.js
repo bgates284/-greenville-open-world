@@ -104,14 +104,14 @@ function buildCampusGrounds(T, P) {
   }
   if (lamps.length) {
     const pole = new MB(true), DARK = new THREE.Color('#1f2224');
-    const globe = new THREE.SphereGeometry(0.3, 14, 10); globe.scale(1, 1.15, 1); globe.translate(0, 4.35, 0);
+    const globe = new THREE.SphereGeometry(0.3, 10, 7); globe.scale(1, 1.15, 1); globe.translate(0, 4.35, 0);
     const im = new THREE.InstancedMesh(globe, campusGlobeMat(), lamps.length); const o = new THREE.Object3D();
     lamps.forEach(([x, z], i) => {
       const y = H(x, z); HM.geo(pole, new THREE.CylinderGeometry(0.2, 0.26, 0.5, 8), DARK, x, y + 0.25, z); HM.geo(pole, new THREE.CylinderGeometry(0.06, 0.09, 3.6, 8), DARK, x, y + 2.2, z);
       HM.geo(pole, new THREE.CylinderGeometry(0.16, 0.08, 0.22, 8), DARK, x, y + 4.06, z); HM.geo(pole, new THREE.ConeGeometry(0.12, 0.25, 8), DARK, x, y + 4.82, z);
       o.position.set(x, y, z); o.updateMatrix(); im.setMatrixAt(i, o.matrix); T.lampPos.push([x, y + 4.35, z]); HM.obstacle(T, x, z, 0.2);
     });
-    addMB(T, pole, lmPlainMat()); im.userData.detail = true; T.group.add(im);
+    addMB(T, pole, lmPlainMat()); T.group.children[T.group.children.length - 1].userData.near = true; im.userData.near = true; T.group.add(im);
   }
   if (benches.length) {
     const WOOD = new THREE.Color('#6e4c30'), IRON = new THREE.Color('#25282a');
@@ -122,7 +122,7 @@ function buildCampusGrounds(T, P) {
       for (const u of [-0.72, 0.72]) { const q = P(u, -0.05); HM.box(deco, q[0], q[1], y, y + 0.43, 0.04, 0.27, yaw, IRON); const q2 = P(u, -0.33); HM.box(deco, q2[0], q2[1], y, y + 0.92, 0.035, 0.03, yaw, IRON); }
       HM.obstacle(T, x, z, 0.6);
     }
-    addMB(T, deco, lmPlainMat());
+    addMB(T, deco, lmPlainMat()); T.group.children[T.group.children.length - 1].userData.near = true;
   }
 }
 
@@ -180,7 +180,7 @@ function campusDetails(LM, B, T, ctx, edges, box, sa) {
         const x = ed.a[0] + tx * s + ed.nx * 1.0, z = ed.a[1] + tz * s + ed.nz * 1.0;
         if (door && (x - door[0]) ** 2 + (z - door[1]) ** 2 < 12) continue;
         if (nearestRoad(x, z, 2.5, r => r.car || r.hw === 'footway' || r.hw === 'pedestrian') || insideBuilding(x, z)) continue;
-        const r0 = 0.42 + R() * 0.2, g = new THREE.IcosahedronGeometry(r0, 1); g.scale(1.3, 0.75, 1.3); g.translate(x, H(x, z) + r0 * 0.6, z); addGeoTo(decor, g, C(GR[(R() * GR.length) | 0]));
+        const r0 = 0.42 + R() * 0.2, g = new THREE.IcosahedronGeometry(r0, 0); g.scale(1.3, 0.75, 1.3); g.translate(x, H(x, z) + r0 * 0.6, z); addGeoTo(decor, g, C(GR[(R() * GR.length) | 0]));
         if (++n > 110) return;
       }
     }

@@ -14,7 +14,10 @@
 World.hospitalSpots = World.hospitalSpots || new Map(); // tile → [{type,x,z,yaw}]
 const ECU_PURPLE = '#4b1f78', ECU_GOLD = '#f2c230';
 
-function inArea(a, x, z) { return a.rings.some(r => pointInPoly(x, z, r)) && !(a.holes || []).some(h => pointInPoly(x, z, h)); }
+function inArea(a, x, z) {
+  const b = a._bb || (a._bb = a.rings.reduce((m, r) => { for (const p of r) { if (p[0] < m[0]) m[0] = p[0]; if (p[1] < m[1]) m[1] = p[1]; if (p[0] > m[2]) m[2] = p[0]; if (p[1] > m[3]) m[3] = p[1]; } return m; }, [1e9, 1e9, -1e9, -1e9]));
+  if (x < b[0] || z < b[1] || x > b[2] || z > b[3]) return false;
+  return a.rings.some(r => pointInPoly(x, z, r)) && !(a.holes || []).some(h => pointInPoly(x, z, h)); }
 function landmarkZones(P) {
   const Z = [];
   for (const a of P.areas) {
