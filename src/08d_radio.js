@@ -49,27 +49,49 @@ const Radio = {
     a.addEventListener('waiting', () => { if (this.live) this.setState('tuning'); });
     a.addEventListener('error', () => { if (this.live) this.setState('nosignal'); });
     const el = this.el = document.createElement('div'); el.id = 'radio'; el.hidden = true;
-    el.innerHTML = '<button class="rb pw" title="Radio on / off (O)" aria-label="Radio on or off">⏻</button>' +
+    el.innerHTML = '<div class="grip" title="Drag to move the radio (double-click to put it back)" aria-label="Move the radio">⠿</div><button class="rb pw" title="Radio on / off (O)" aria-label="Radio on or off">⏻</button>' +
       '<button class="rb" data-t="-1" title="Tune down (,)" aria-label="Previous station">◀</button>' +
       '<div class="rd"><div class="rf"></div><div class="rn"></div><div class="rs"></div></div>' +
       '<button class="rb" data-t="1" title="Tune up (.)" aria-label="Next station">▶</button>' +
       '<div class="rv"><button class="rb sm" data-v="-1" title="Volume down (-)" aria-label="Volume down">−</button><div class="rvb"><i></i></div><button class="rb sm" data-v="1" title="Volume up (=)" aria-label="Volume up">+</button></div>' +
-      '<select class="rl" title="All stations" aria-label="Choose a station">' + RADIO_STATIONS.map((s, i) => `<option value="${i}">${s[0]} ${s[1]} · ${s[2]} ${s[3]}</option>`).join('') + '</select>';
-    (document.getElementById('hud') || document.body).appendChild(el);
+      '<select class="rl" title="All stations" aria-label="Choose a station">' + RADIO_STATIONS.map((s, i) => `<option value="${i}">${s[0]} ${s[1]} · ${s[2]} ${s[3]}</option>`).join('') + '</select>' +
+      '<button class="rb mini" title="Smaller / bigger radio" aria-label="Collapse or expand the radio">▾</button>';
+    document.body.appendChild(el); // above the touch-control layer, so it can be tapped on phones
+    for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click']) el.addEventListener(ev, e => e.stopPropagation()); // taps on the radio never steer or look around
     el.querySelectorAll('button').forEach(b => b.addEventListener('mousedown', e => e.preventDefault())); // don't take keyboard focus (Space must stay the brake)
     el.querySelector('.pw').onclick = () => this.power();
     el.querySelectorAll('[data-t]').forEach(b => b.onclick = () => this.tune(+b.dataset.t));
     el.querySelectorAll('[data-v]').forEach(b => b.onclick = () => this.volume(+b.dataset.v * 0.1));
     const sel = el.querySelector('.rl'); sel.onchange = () => { this.pick(+sel.value); sel.blur(); try { canvasEl.focus(); } catch (e) { } };
     el.querySelector('.rd').onclick = () => { if (this.state === 'tap') this.start(true); };
+    el.querySelector('.mini').onclick = () => { this.compact = !this.compact; this.savePos(); this.applyPos(); };
+    // ---- move it anywhere: drag the grip; the spot is remembered (as a fraction of the screen, so it survives rotating a phone) ----
+    try { const p = JSON.parse(localStorage.getItem('gv-radio-pos') || 'null'); if (p) { this.pos = p.x >= 0 ? { x: p.x, y: p.y } : null; this.compact = !!p.c; } else this.compact = matchMedia('(max-width: 700px)').matches; } catch (e) { }
+    const grip = el.querySelector('.grip'); let drag = null;
+    grip.addEventListener('pointerdown', e => { e.preventDefault(); const r = el.getBoundingClientRect(); drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top }; try { grip.setPointerCapture(e.pointerId); } catch (er) { } el.classList.add('dragging'); });
+    grip.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return; const r = el.getBoundingClientRect(); const cl = v => Math.max(0, Math.min(1, v)); this.pos = { x: cl((e.clientX - drag.dx) / Math.max(1, innerWidth - r.width)), y: cl((e.clientY - drag.dy) / Math.max(1, innerHeight - r.height)) }; this.applyPos(); });
+    const end = e => { if (!drag || e.pointerId !== drag.id) return; drag = null; el.classList.remove('dragging'); this.savePos(); };
+    grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+    grip.addEventListener('dblclick', () => { this.pos = null; this.savePos(); this.applyPos(); });
+    addEventListener('resize', () => this.applyPos());
+    this.applyPos();
     addEventListener('keydown', e => this.onKey(e));
     setInterval(() => this.tick(), 250);
     this.render();
   },
+  pos: null, compact: false,
+  savePos() { try { localStorage.setItem('gv-radio-pos', JSON.stringify(this.pos ? { x: +this.pos.x.toFixed(4), y: +this.pos.y.toFixed(4), c: this.compact } : { x: -1, c: this.compact })); } catch (e) { } },
+  applyPos() { // fractions of the free space, clamped on screen; no position yet = the default corner
+    const el = this.el; if (!el) return; el.classList.toggle('compact', this.compact); el.querySelector('.mini').textContent = this.compact ? '▸' : '▾';
+    if (!this.pos) { el.style.left = el.style.top = el.style.right = el.style.bottom = ''; el.classList.add('home'); return; }
+    el.classList.remove('home'); const r = el.getBoundingClientRect(); const w = r.width || 300, h = r.height || 50;
+    const x = Math.max(0, Math.min(1, this.pos.x)) * Math.max(0, innerWidth - w), y = Math.max(0, Math.min(1, this.pos.y)) * Math.max(0, innerHeight - h);
+    el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+  },
   save() { try { localStorage.setItem('gv-radio', JSON.stringify({ on: this.on, idx: this.idx, vol: this.vol })); } catch (e) { } },
   tick() { // follow the player in and out of vehicles
     const inVeh = !!(typeof Game !== 'undefined' && Game.playing && typeof Player !== 'undefined' && /^(drive|fly|heli)$/.test(Player.mode));
-    if (inVeh === this.inVeh) return; this.inVeh = inVeh; this.el.hidden = !inVeh;
+    if (inVeh === this.inVeh) return; this.inVeh = inVeh; this.el.hidden = !inVeh; if (inVeh) requestAnimationFrame(() => this.applyPos());
     if (inVeh && this.on) this.start(); else if (!inVeh) this.stopAudio();
     this.render();
   },
@@ -97,8 +119,8 @@ const Radio = {
     const el = this.el; if (!el) return; const s = RADIO_STATIONS[this.idx];
     el.classList.toggle('off', !this.on);
     el.querySelector('.rf').textContent = this.on ? `${s[0]} ${s[1]}` : 'RADIO';
-    el.querySelector('.rn').textContent = this.on ? `${s[2]} · ${s[3]}` : 'Off · press O';
-    el.querySelector('.rs').textContent = !this.on ? '' : { tuning: 'Tuning…', live: '● Live', nosignal: 'No signal — try another station', tap: 'Click here to start' }[this.state] || '';
+    el.querySelector('.rn').textContent = this.on ? `${s[2]} · ${s[3]}` : (typeof Touch !== 'undefined' && Touch.on ? 'Off · tap ⏻' : 'Off · press O');
+    el.querySelector('.rs').textContent = !this.on ? '' : { tuning: 'Tuning…', live: '● Live', nosignal: 'No signal — try another station', tap: (typeof Touch !== 'undefined' && Touch.on ? 'Tap' : 'Click') + ' here to start' }[this.state] || '';
     el.querySelector('.rs').className = 'rs ' + this.state;
     el.querySelector('.rvb i').style.width = Math.round(this.vol * 100) + '%';
     const sel = el.querySelector('.rl'); if (+sel.value !== this.idx) sel.value = String(this.idx);
