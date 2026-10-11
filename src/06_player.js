@@ -109,7 +109,7 @@ const Player = {
     dynRoot.add(this.person.g); this.person.g.visible = vis; this.person.g.position.copy(this.pos); this.person.g.rotation.y = this.yaw;
     UI.toast('New look');
   },
-  focus() { return this.mode === 'drive' ? this.car.pos : this.mode === 'fly' ? Plane.pos : this.mode === 'heli' ? Heli.pos : this.pos; },
+  focus() { return this.mode === 'drive' ? this.car.pos : this.mode === 'fly' ? Plane.pos : this.mode === 'heli' ? Heli.pos : this.mode === 'drone' ? Drone.pos : this.pos; },
   unstick() { // Y key: back to the nearest street next to your car
     const f = this.focus(); const wasDriving = this.mode === 'drive';
     this.placeAt(f.x, f.z, false); if (wasDriving) this.toggleCar(); UI.toast('Moved to an open street nearby');
@@ -118,6 +118,7 @@ const Player = {
     Airport.tick(dt, this.focus()); Chute.tick(dt); Rides.tick(dt);
     if (Airport.built && !Plane.placed) { Plane.placed = true; if (!(Plane.m && Plane.m.g.visible)) Plane.park(); }
     if (Airport.built && !Heli.placed) { Heli.placed = true; if (!(Heli.m && Heli.m.g.visible)) Heli.park(); }
+    if (this.mode === 'drone') { Drone.update(dt); return; } // free camera (06e_drone.js)
     if (this.mode === 'heli') {
       if (hit('KeyC')) { this.camMode = this.camMode === 0 ? 1 : this.camMode === 1 ? 2 : 0; UI.toast(['Chase camera', 'Far camera', 'Cockpit'][this.camMode]); }
       Heli.update(dt);

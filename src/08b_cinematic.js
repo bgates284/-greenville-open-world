@@ -21,6 +21,7 @@ const Cine = {
     if (!$('bigmap').hidden) return false;
     if (Player.mode === 'fly' && typeof Plane !== 'undefined' && !Plane.onGround) return false; // never leave a plane in the air
     if (Player.mode === 'heli' && typeof Heli !== 'undefined' && !Heli.onGround) return false;
+    if (Player.mode === 'drone') return false; // the drone is already a free camera
     return true;
   },
 

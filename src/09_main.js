@@ -36,14 +36,14 @@ const Game = {
   },
   pause() { this.paused = true; $('menu').hidden = false; $('playBtn').textContent = 'Travel to location'; $('resumeBtn').hidden = false; if (document.exitPointerLock) document.exitPointerLock(); $('clockRange').value = Env.hour; },
   resume() { this.paused = false; $('menu').hidden = true; canvasEl.focus(); },
-  async play(idx) {
+  async play(idx, opt = {}) {
     Sound.start();
     const [name, la, lo] = Array.isArray(idx) ? idx : (LANDMARKS[idx] || LANDMARKS[0]);
     if (!this._foodRefresh) { this._foodRefresh = true; Food.refresh(); }
-    $('playBtn').disabled = true;
+    $('playBtn').disabled = true; $('droneBtn').disabled = true;
     let gx = lonToX(lo), gz = latToZ(la); if (/your plane/.test(name)) { Airport.init(); gx = Airport.stand.x; gz = Airport.stand.z; }
     const ok = await this.goTo(gx, gz, name);
-    $('playBtn').disabled = false;
+    $('playBtn').disabled = false; $('droneBtn').disabled = false;
     if (!ok) return;
     if (/your plane/.test(name)) {
       await Airport.ensure(); Plane.park(); Plane.placed = true;
@@ -54,9 +54,10 @@ const Game = {
     this.started = true; setTimeout(() => Phys.load(), 1500);
     setTimeout(() => Prefetch.start(), 8000); // new players: save the whole county in the background
     $('menu').hidden = true; $('hud').hidden = false; this.playing = true; this.paused = false; canvasEl.focus();
+    if (opt.drone) { Drone.enter(Player.pos.x, Player.pos.z, Player.camYaw); return; }
     UI.toast(/your plane/.test(name) ? 'Welcome to Pitt-Greenville Airport — walk to the plane and press E to fly' : 'Welcome to ' + name + ' — press E to drive, M for the map', 5000);
   },
-  async teleport(x, z) { await this.goTo(x, z, 'this spot'); },
+  async teleport(x, z) { const d = Player.mode === 'drone', yaw = Drone.yaw; await this.goTo(x, z, 'this spot'); if (d) Drone.enter(x, z, yaw); }, // the big map keeps you in the drone
   async goTo(x, z, label) {
     UI.loading(true, 'Building Greenville', 'Finding ' + label + '…', 0.02);
     if (Phys.ready) Phys.clear(); try { Transit.clear(); } catch (e) { }

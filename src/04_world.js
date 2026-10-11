@@ -953,7 +953,7 @@ const Tiles = {
   // trees only in squares near you (farther ones are mostly in the fog anyway); parked cars, house trim, lamp posts
   // and benches only in the squares right around you, and the far squares' oaks swap to a low-poly crown
   detailLOD(px, pz) {
-    const k = Player.mode === 'fly' || Player.mode === 'heli' ? 1.6 : 1, D = (Q.detailD || 900) * k, Dn = (Q.nearD || 420) * k;
+    const k = Player.mode === 'fly' || Player.mode === 'heli' || (Player.mode === 'drone' && Drone.pos.y - H(px, pz) > 60) ? 1.6 : 1, D = (Q.detailD || 900) * k, Dn = (Q.nearD || 420) * k;
     const moved = !this._lp || Math.hypot(px - this._lp[0], pz - this._lp[1]) > 20 || this._lk !== k; if (moved) { this._lp = [px, pz]; this._lk = k; }
     const hi = Q !== QUALITY.low;
     for (const T of this.map.values()) {

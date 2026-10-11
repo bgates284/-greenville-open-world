@@ -62,6 +62,7 @@ const Sound = {
     if (P.mode === 'heli') { const r = Heli.rpm, c = Heli.col, V = Heli.v.length(); // rotor thump + turbine whine
       this.o1.frequency.setTargetAtTime(14 + r * 12 + c * 4, t, 0.2); this.o2.frequency.setTargetAtTime(28 + r * 24, t, 0.2); this.lp.frequency.setTargetAtTime(300 + r * 900 + c * 500, t, 0.2);
       this.eg.gain.setTargetAtTime(Heli.onGround && c < 0.05 ? 0 : 0.012 + c * 0.018, t, 0.3); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.003), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
+    if (P.mode === 'drone') { const V = Drone.vel.length(); this.eg.gain.setTargetAtTime(0, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.0015), t, 0.2); this.rainG.gain.setTargetAtTime(Env.rain * 0.08, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     if (P.mode === 'para') { const V = Chute.vel.length(); this.eg.gain.setTargetAtTime(0, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.2, V * 0.004), t, 0.2); this.rainG.gain.setTargetAtTime(Env.rain * 0.08, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     if (P.mode === 'fly') { const th = Plane.thr, V = Plane.v.length(); const rpm = 0.45 + th * 0.55;
       this.o1.frequency.setTargetAtTime(60 + rpm * 70, t, 0.2); this.o2.frequency.setTargetAtTime(30 + rpm * 35, t, 0.2); this.lp.frequency.setTargetAtTime(500 + rpm * 1400, t, 0.2);
@@ -108,7 +109,12 @@ const UI = {
     $('soundChk').addEventListener('change', e => Sound.setOn(e.target.checked));
     try { if (localStorage.getItem('gv-parcels') === 'off') { $('parcelChk').checked = false; Parcels.enabled = false; } } catch (e) { }
     $('parcelChk').addEventListener('change', e => { Parcels.enabled = e.target.checked; try { localStorage.setItem('gv-parcels', e.target.checked ? 'on' : 'off'); } catch (x) { } this.toast('Applies to areas loaded from now on'); });
-    $('playBtn').addEventListener('click', () => { const v = $('startSel').value; if (v[0] === 'f') { const [la, lo] = v.slice(1).split(',').map(Number); const o = $('startSel').selectedOptions[0]; Game.play([o.textContent, la, lo]); } else Game.play(parseInt(v)); });
+    const start = drone => { const v = $('startSel').value; if (v[0] === 'f') { const [la, lo] = v.slice(1).split(',').map(Number); const o = $('startSel').selectedOptions[0]; Game.play([o.textContent, la, lo], { drone }); } else Game.play(parseInt(v), { drone }); };
+    $('playBtn').addEventListener('click', () => start(false));
+    $('droneBtn').addEventListener('click', () => { // no body, no car: a fast free camera (06e_drone.js); mid-game it takes off from where you are
+      if (Game.started && Game.paused) { const f = Player.focus(); if (Player.mode === 'fly' || Player.mode === 'heli' || Player.mode === 'para') Player.placeAt(f.x, f.z, false); Game.resume(); if (Player.mode !== 'drone') Drone.enter(f.x, f.z, Player.camYaw); }
+      else start(true);
+    });
     $('resumeBtn').addEventListener('click', () => Game.resume());
     { // garage (03l_cars.js)
       const sel = $('carSel'), colSel = $('carColor'), cur = Garage.pick();
@@ -242,7 +248,7 @@ const UI = {
     const P = Player, f = P.focus();
     $('clockT').textContent = this.fmtHour(Env.hour);
     $('clockW').textContent = `${{ clear: 'Clear', partly: 'Partly cloudy', overcast: 'Overcast', rain: 'Rain' }[Env.weather]} · ${this.tempF()}°F`;
-    const sp = $('speedo'); sp.hidden = P.mode !== 'drive'; if (P.mode === 'drive') { $('spd').textContent = Math.round(Math.abs(P.car.speed) * 2.237); $('gear').textContent = P.car.gear + (P.headlights ? ' · lights' : ''); }
+    const sp = $('speedo'); sp.hidden = P.mode !== 'drive' && P.mode !== 'drone'; if (P.mode === 'drone') { $('spd').textContent = Math.round(Drone.vel.length() * 2.237); $('gear').textContent = 'drone · ' + Math.round((Drone.pos.y - H(Drone.pos.x, Drone.pos.z)) * 3.28) + ' ft up'; } else if (P.mode === 'drive') { $('spd').textContent = Math.round(Math.abs(P.car.speed) * 2.237); $('gear').textContent = P.car.gear + (P.headlights ? ' · lights' : ''); }
     // street + area names
     this._n = (this._n || 0) + 1;
     if (this._n % 2 === 0) {
