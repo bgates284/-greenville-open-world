@@ -92,6 +92,26 @@ function ncBuildingType(occ, area) {
   }
 }
 // add the footprints OSM is missing (heights are left to the game's own rules, not the survey's storeys)
+// does a footprint sit on a street? Uses the square's own road list (neighbouring squares may not be loaded yet),
+// the middle of each road's lanes, and samples the outline, its edges and its inside every ~3 m —
+// so a building only partly in the road (left from before a road was built or widened) is caught too
+function footOnRoad(P, ring) {
+  if (!P._roadBand) {
+    const h = P._roadBand = new SpatialHash(40);
+    for (const rd of P.roads) {
+      const t = rd.tags || {}; if (!RC[t.highway] || t.tunnel === 'yes' || t.tunnel === 'building_passage' || (t.bridge && t.bridge !== 'no') || t.covered === 'yes' || (t.layer && +t.layer < 0)) continue;
+      if (t.highway === 'service' && /parking_aisle|drive-through|driveway/.test(t.service || '')) continue;
+      const info = roadInfo(t); if (!info) continue; const hw = info.w * 0.36; // the travel lanes, not the edges (mapped widths run generous)
+      for (let i = 0; i < rd.pts.length - 1; i++) { const a = rd.pts[i], b = rd.pts[i + 1]; h.insert({ a, b, hw }, Math.min(a[0], b[0]) - hw, Math.min(a[1], b[1]) - hw, Math.max(a[0], b[0]) + hw, Math.max(a[1], b[1]) + hw); }
+    }
+  }
+  const H2 = P._roadBand; const on = (x, z) => { for (const s of H2.query(x, z, x, z)) if (segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]).d < s.hw) return true; return false; };
+  const pts = []; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; pts.push(a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); x0 = Math.min(x0, a[0]); z0 = Math.min(z0, a[1]); x1 = Math.max(x1, a[0]); z1 = Math.max(z1, a[1]); }
+  const st = Math.max(3, Math.max(x1 - x0, z1 - z0) / 12); for (let x = x0 + st / 2; x < x1; x += st) for (let z = z0 + st / 2; z < z1; z += st) if (pointInPoly(x, z, ring)) pts.push([x, z]);
+  let n = 0; for (const p of pts) if (on(p[0], p[1])) n++;
+  return n >= Math.max(2, pts.length * 0.15) || (pts.length < 6 && n > 0);
+}
 function mergeNCBuildings(T, P, data) {
   if (!data || !data.rows || !data.rows.length) return 0;
   const W = T.W; const bl = new SpatialHash(30); const ringBox = r => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const q of r) { x0 = Math.min(x0, q[0]); z0 = Math.min(z0, q[1]); x1 = Math.max(x1, q[0]); z1 = Math.max(z1, q[1]); } return [x0, z0, x1, z1]; };
@@ -115,7 +135,7 @@ function mergeNCBuildings(T, P, data) {
       return;
     }
     // footprints are from 2009–12: skip ones now under a road or a mapped parking lot (demolished since)
-    if (onRoadSurface(cx, cz)) return;
+    if (onRoadSurface(cx, cz) || footOnRoad(P, ring)) return;
     if (park.some(a => pointInPoly(cx, cz, a.rings[0]))) return;
     const tags = { building: ncBuildingType(occ, area), source: 'NCEM' }; if (year > 1700) tags.start_date = String(year);
     const B = { id: -(T.tx * 1e7 + T.ty * 1e4 + i + 1) * 10, tags, ring, holes: [], part: false, nc: true }; B._c = [cx, cz];

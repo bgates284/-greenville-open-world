@@ -81,7 +81,7 @@ function applyParcels(T, P, data) {
       const ring = [[cx - ux * w / 2 + fx * d / 2, cz - uz * w / 2 + fz * d / 2], [cx + ux * w / 2 + fx * d / 2, cz + uz * w / 2 + fz * d / 2], [cx + ux * w / 2 - fx * d / 2, cz + uz * w / 2 - fz * d / 2], [cx - ux * w / 2 - fx * d / 2, cz - uz * w / 2 - fz * d / 2]];
       const probes = ring.concat([[cx, cz]]);
       if (!probes.every(q => pointInPoly(q[0], q[1], p.ring))) { if (tries === 4) return null; w *= 0.9; d *= 0.9; continue; }
-      if (probes.some(q => hitsBuilding(q[0], q[1]) || onRoadSurface(q[0], q[1]))) return null;
+      if (probes.some(q => hitsBuilding(q[0], q[1]) || onRoadSurface(q[0], q[1])) || footOnRoad(P, ring)) return null;
       const B = { id: 800000000 + (hashStr(p.parno) % 100000000), tags, ring, holes: [], part: false, synth: true, parcel: p };
       styleFromParcel(B, p, rng);
       // driveway to the street + mailbox at the curb (houses, duplexes, mobile homes, townhouses)
