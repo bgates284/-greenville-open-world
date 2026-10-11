@@ -549,7 +549,7 @@ const PAL = {
   metal: ['#ffffff', '#dfe6ea', '#e8e2d6', '#cfd8d0', '#d6d0e0'],
   shingle: ['#5a5a5c', '#3f4042', '#6b5a4a', '#4a4038', '#5d6468', '#7a6a58', '#3b4a3f', '#7a3b2c', '#48494b'],
   flat: ['#d8d8d6', '#bfc0bf', '#9a9b9c', '#e8e8e6', '#7d7f82', '#cfcac0'],
-  campus: ['#ffffff', '#fbeee8', '#f4e6de'], tanbrick: ['#ffffff'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
+  campus: ['#ffffff', '#fbeee8', '#f4e6de'], campusModern: ['#ffffff'], tanbrick: ['#ffffff'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
@@ -756,6 +756,12 @@ function buildTrees(T, P) {
     if (r() > (dens[cls] || 0) / maxD) continue;
     put(W.x0 + (px + r()) / 512 * sx, W.z0 + (pz + r()) / 512 * sz, cls); count++;
   }
+  }
+  if (T.extraTrees) { // hand-placed trees (campus oaks, 04n_campus.js), unless a real tree already stands there
+    const cell = new Map(), K = 8, key = (x, z) => ((x / K) | 0) + ',' + ((z / K) | 0);
+    for (const sp in lists) for (const t of lists[sp]) { const k = key(t[0], t[1]); (cell.get(k) || cell.set(k, []).get(k)).push(t); }
+    for (const t of T.extraTrees) { let near = false; const cx = (t[0] / K) | 0, cz = (t[1] / K) | 0; for (let dx = -1; dx <= 1 && !near; dx++) for (let dz = -1; dz <= 1 && !near; dz++) for (const q of cell.get((cx + dx) + ',' + (cz + dz)) || []) if ((q[0] - t[0]) ** 2 + (q[1] - t[1]) ** 2 < 36) { near = true; break; } if (!near) lists[t[4] || 'oak'].push(t.slice(0, 4)); }
+    T.extraTrees = null;
   }
   if (T.noTrees) for (const sp in lists) lists[sp] = lists[sp].filter(t => !T.noTrees.some(([x, z, rr]) => (t[0] - x) ** 2 + (t[1] - z) ** 2 < rr * rr)); // kept clear by hand-built landmarks (fountain, flower beds, porches)
   const o = new THREE.Object3D(); const col = new THREE.Color();
@@ -999,6 +1005,7 @@ async function buildTile(T) {
   await TTa('buildBuildings', () => buildBuildings(T, P)); await yieldMaybe();
   try { TT('buildLots', () => buildLots(T, P)); } catch (e) { console.warn('parking lots skipped', e); }
   try { TT('buildBusinessWalks', () => buildBusinessWalks(T, P)); } catch (e) { console.warn('business sidewalks skipped', e); } await yieldMaybe();
+  try { TT('buildCampusGrounds', () => buildCampusGrounds(T, P)); } catch (e) { console.warn('campus grounds skipped', e); } // ECU walks, oaks, lamps (04n_campus.js)
   try { TT('buildStadiums', () => buildStadiums(T, P, P.zones || (P.zones = landmarkZones(P)))); } catch (e) { console.warn('stadium skipped', e); } await yieldMaybe();
   try { TT('buildHandmade', () => buildHandmade(T, P)); } catch (e) { console.warn('hand-built landmarks skipped', e); }
   try { TT('buildCivic', () => buildCivic(T, P)); } catch (e) { console.warn('stations skipped', e); }

@@ -332,6 +332,7 @@ function buildBusinessWalks(T, P) {
     if (!biz || /^(house|detached|residential|apartments|garage|garages|shed|roof|carport|barn|farm_auxiliary|hangar|industrial|manufacture|stadium|grandstand|parking)$/.test(bt)) continue;
     const ring = B.ring; const area = Math.abs(signedArea(ring)); if (area < 60 || area > 60000) continue;
     const [cx, cz] = centroid(ring); if (cx < W.x0 || cx >= W.x1 || cz < W.z0 || cz >= W.z1) continue;
+    if (P.zones && zoneAt(P.zones, 'campus', cx, cz)) continue; // ECU buildings stand in lawn and shrubs, reached by the brick walks (04n_campus.js)
     const sa = signedArea(ring); const w = area < 400 ? 1.8 : 2.6;
     const nrm = ring.map((p, i) => { const q = ring[(i + 1) % ring.length]; const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; let nx = (q[1] - p[1]) / L, nz = -(q[0] - p[0]) / L; if (sa < 0) { nx = -nx; nz = -nz; } return [nx, nz, L]; });
     const Y = p => [p[0], H(p[0], p[1]) + TOP, p[1]], U = p => [p[0] / 2, p[1] / 2];

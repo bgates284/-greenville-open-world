@@ -59,8 +59,12 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
   if (campus) {
     let h = lv > 0 ? lv * 4.2 + 0.9 : /Joyner Library/.test(n) ? 21 : /Colliseum|Coliseum/.test(n) ? 17 : /Recreation/.test(n) ? 12 : area < 600 ? 9.3 : area < 2600 ? 13.5 : 17.7;
     const hip = rect > 0.72 && obb && obb.W < 26 && area < 3200 && h < 19;
-    return { kind: 'campus', fac: 'campus', h, shape: hip ? 'hipped' : 'flat', wall: pick(['#ffffff', '#fbeee8', '#f4e6de', '#fff4ee'], (B.id % 11) / 11), roof: hip ? '#4f5856' : '#b9b7b1',
-      portico: /Wright Auditorium|Spilman|Ragsdale|Whichard Building/.test(n), name: n };
+    // the older Georgian halls carry slate roofs; the 1960s–2010s blocks (towers, labs, the library, the arts centre) are flat-topped
+    const modern = /Science and Technology|Life Sciences|Joyner|Bate|Brewster|Mendenhall|Fine Arts|Recreation|Health Services|Police|Parking|Howell|Messick|Fletcher Music|Christenbury|Minges|Belk|Clement|Greene|Jones|Scott|Aycock|Tyler|Garrett|Umstead|Slay|Building 43|Croatan|Dining|Student Center|Campus Towers/i.test(n) || lv >= 5 || h > 19.5;
+    const band = !hip && !modern && area > 120;
+    return { kind: 'campus', fac: modern ? 'campusModern' : 'campus', h, shape: hip ? 'hipped' : 'flat', wall: pick(['#ffffff', '#fdf3ee', '#f8ece6', '#fff8f2'], (B.id % 11) / 11), roof: hip ? '#4a5052' : '#8f9192',
+      look: { roof: band ? '#6c7173' : modern ? '#9a9c9c' : '#8f9192' }, band, modern,
+      portico: /Wright Auditorium|Spilman|Ragsdale|Whichard Building|Austin Building|Graham Building|Jarvis Residence|Cotten Hall|Fleming Hall/.test(n), name: n };
   }
   return null;
 }
@@ -88,7 +92,7 @@ function landmarkExtras(LM, B, T, ctx) {
     band(wallTop - 0.55, wallTop, 0.28, WHITE);                  // cornice
     band(base + 0.35, base + 0.95, 0.08, new THREE.Color('#e3ddd0')); // stone water table
     if (LM.portico) {
-      const e = frontEdge(); if (e) {
+      const e = LM.kind === 'campus' ? campusFrontEdge(edges) : frontEdge(); if (e) {
         const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; const yaw = Math.atan2(e.nx, e.nz);
         const w = Math.min(e.L * 0.6, 26), depth = 4.2, colH = Math.min(wallTop - base - 1.2, 12), n = Math.max(4, Math.round(w / 3.6) | 0);
         const ux = Math.cos(yaw), uz = -Math.sin(yaw); // along the wall
@@ -104,6 +108,7 @@ function landmarkExtras(LM, B, T, ctx) {
       }
     }
   }
+  if (LM.kind === 'campus') try { campusDetails(LM, B, T, ctx, edges, box, sa); } catch (e) { console.warn('campus details skipped', e); } // slate roof band, doorways, shrubs (04n_campus.js)
   if (LM.kind === 'civicLook' && LM.look.kind === 'mainmill') {
     band(wallTop - 0.75, wallTop - 0.55, 0.14, new THREE.Color('#8a3f2c'));        // corbelled brick cornice
     band(wallTop - 0.55, wallTop + 0.15, 0.06, new THREE.Color('#9b4a35'));
@@ -403,19 +408,8 @@ function paintDiamonds(g, P, Z) {
   }
 }
 
-// campus walks are brick; sports fields get their markings
+// sports fields get their markings (campus brick walks are real geometry, 04n_campus.js)
 function paintLandmarkGround(g, P) {
   const Z = P.zones || (P.zones = landmarkZones(P));
-  if (Z.some(q => q.kind === 'campus' || q.kind === 'athletic' || q.kind === 'medcampus')) {
-    g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const rd of P.roads) {
-      const hw = rd.tags.highway; if (!/^(footway|pedestrian|path|cycleway)$/.test(hw) || rd.pts.length < 2) continue;
-      if (/dirt|ground|gravel|unpaved|grass/.test(rd.tags.surface || '')) continue;
-      const m = rd.pts[rd.pts.length >> 1]; if (!(zoneAt(Z, 'campus', m[0], m[1]) || zoneAt(Z, 'athletic', m[0], m[1]) || zoneAt(Z, 'medcampus', m[0], m[1]))) continue;
-      const w = hw === 'pedestrian' ? 5 : 2.6;
-      linePath(g, rd.pts); g.strokeStyle = '#c9c2b4'; g.lineWidth = w + 0.5; g.stroke();   // concrete edging
-      linePath(g, rd.pts); g.strokeStyle = '#a3715f'; g.lineWidth = w; g.stroke();         // red brick
-    }
-  }
   paintDiamonds(g, P, Z);
 }

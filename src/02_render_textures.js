@@ -166,9 +166,9 @@ function buildTextures() {
   });
   // ECU campus: Georgian-revival red brick, white multi-pane windows, limestone lintels with keystones
   mk('campus', 3.8, 4.2, (g, ge, r) => {
-    g.fillStyle = '#cfc6b6'; g.fillRect(0, 0, 512, 512);
+    g.fillStyle = '#a99d8d'; g.fillRect(0, 0, 512, 512); // mortar
     for (let y = 0, row = 0; y < 512; y += 6, row++) for (let x = (row % 2) * -8; x < 512; x += 16) {
-      const t = r(); g.fillStyle = `rgb(${128 + t * 38 | 0},${46 + t * 18 | 0},${34 + t * 12 | 0})`; g.fillRect(x + 1, y + 1, 14, 4);
+      const t = r(), u = r(); g.fillStyle = `rgb(${146 + t * 40 | 0},${58 + t * 20 + u * 8 | 0},${40 + t * 12 | 0})`; g.fillRect(x + 1, y + 1, 15, 5);
     }
     for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
       const x0 = b * 128, y0 = 512 - (f + 1) * 128;
@@ -176,9 +176,18 @@ function buildTextures() {
       g.fillStyle = '#e9e4d8'; g.fillRect(x0 + 32, y0 + 110, 64, 6);                                                              // sill
       win(g, ge, r, x0 + 38, y0 + 30, 52, 78, '#fbfaf6', '#2a3440', '#56657a', .36);
       g.fillStyle = '#fbfaf6'; for (const x of [55, 72]) g.fillRect(x0 + x, y0 + 30, 3, 78); for (const y of [56, 82]) g.fillRect(x0 + 38, y0 + y, 52, 3); // muntins
-      g.fillStyle = 'rgba(40,40,40,.55)'; g.fillRect(x0 + 24, y0 + 30, 10, 78); g.fillRect(x0 + 94, y0 + 30, 10, 78);            // shutters
     }
     g.fillStyle = 'rgba(233,228,216,.9)'; g.fillRect(0, 500, 512, 12);                                                             // stone water table
+  });
+  // ECU's later halls (1960s towers, labs, arts): the same red brick, wide dark-framed windows in bands, cast-stone sills
+  mk('campusModern', 3.6, 4.0, (g, ge, r) => {
+    g.fillStyle = '#a99d8d'; g.fillRect(0, 0, 512, 512);
+    for (let y = 0, row = 0; y < 512; y += 6, row++) for (let x = (row % 2) * -8; x < 512; x += 16) { const t = r(), u = r(); g.fillStyle = `rgb(${140 + t * 40 | 0},${56 + t * 20 + u * 8 | 0},${40 + t * 12 | 0})`; g.fillRect(x + 1, y + 1, 15, 5); }
+    for (let f = 0; f < 4; f++) {
+      const y0 = 512 - (f + 1) * 128;
+      g.fillStyle = '#ddd5c6'; g.fillRect(0, y0 + 104, 512, 9);                                   // continuous sill band
+      for (let b = 0; b < 4; b++) { const x0 = b * 128; win(g, ge, r, x0 + 14, y0 + 30, 100, 70, '#3b3f42', '#26313b', '#4f6172', .34); g.fillStyle = '#3b3f42'; g.fillRect(x0 + 62, y0 + 30, 4, 70); g.fillRect(x0 + 14, y0 + 52, 100, 3); }
+    }
   });
   // Winterville Public Safety: light tan brick, a darker tan band, tall maroon-framed windows, recessed panels
   mk('tanbrick', 4.0, 5.6, (g, ge, r) => {

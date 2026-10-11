@@ -56,9 +56,14 @@ function hmStudentCenter(T, B, P, mb) {
     const [cx, cz] = centroid(ring); const yaw = Math.atan2(main.nx, main.nz); HM.box(mb, cx, cz, top, top + 3.2, 9, 6, yaw, C('#b8bcbe')); HM.box(mb, cx - main.nx * 14, cz - main.nz * 14, top, top + 2.2, 5, 4, yaw, C('#aeb2b4')); }
   HM.solid(T, ring, top, 'Main Campus Student Center');
   // ---- a porch: glass hall under a leaning, cantilevered gable canopy ----
+  // room in front of a wall before the street's kerb (the 10th Street side is only ~15 m deep)
+  const roomBefore = (e, s) => { const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L; const x = e.a[0] + tx * s, z = e.a[1] + tz * s; let room = 60;
+    for (let o = 2; o < 60; o += 1) { const r = nearestRoad(x + e.nx * o, z + e.nz * o, 14, q => q.car && q.hw !== 'service'); if (r && r.d < r.road.w / 2 + 0.5) { room = o; break; } } return room; };
   const porch = (e, big) => {
     const L = e.L, tx = (e.b[0] - e.a[0]) / L, tz = (e.b[1] - e.a[1]) / L, nx = e.nx, nz = e.nz;
-    const W = Math.min(L * 0.62, big ? 36 : 26), sc = L / 2 + (big ? -L * 0.08 : 0), Dp = big ? 19 : 14, bk = 5, hall = big ? 8 : 6;
+    const W = Math.min(L * 0.62, big ? 36 : 26), sc = L / 2 + (big ? -L * 0.08 : 0), bk = 5, hall = big ? 8 : 6;
+    const room = Math.min(roomBefore(e, sc - W * 0.3), roomBefore(e, sc), roomBefore(e, sc + W * 0.3)); // kerb distance
+    const Dp = Math.max(8, Math.min(big ? 19 : 14, room - 4.5)), plaza = Math.max(Dp + 1, Math.min(Dp + 7, room - 1.2));
     const Q = (s, o, y) => [e.a[0] + tx * s + nx * o, y, e.a[1] + tz * s + nz * o];
     const gq = H(...(([x, , z]) => [x, z])(Q(sc, Dp * 0.6, 0)));
     const sL = sc - W / 2, sR = sc + W / 2, sP = sc - W * 0.12;                // eaves and the (off-centre) ridge
@@ -96,19 +101,39 @@ function hmStudentCenter(T, B, P, mb) {
     HM.box(mb, ...(([x, , z]) => [x, z])(Q(sc, hall / 2, 0)), hy, hy + 0.5, W * 0.3 + 0.2, hall / 2 + 0.2, Math.atan2(tx, tz) + Math.PI / 2, FASCIA);
     HM.solid(T, [Q(h0, 0, 0), Q(h1, 0, 0), Q(h1, hall, 0), Q(h0, hall, 0)].map(p => [p[0], p[2]]), hy, 'Main Campus Student Center');
     // brick-paved plaza under and in front of the porch
-    const pz = [[sc - W / 2 - 4, 0], [sc + W / 2 + 4, 0], [sc + W / 2 + 4, Dp + 7], [sc - W / 2 - 4, Dp + 7]].map(([s, o]) => Q(s, o, 0));
+    const pz = [[sc - W / 2 - 4, 0], [sc + W / 2 + 4, 0], [sc + W / 2 + 4, plaza], [sc - W / 2 - 4, plaza]].map(([s, o]) => Q(s, o, 0));
     const py = Math.max(...pz.map(p => H(p[0], p[2]))) + 0.05; const k = 1 / 1.6;
     wb.quad(...pz.map(p => [p[0], py, p[2]]), [pz[0][0] * k, pz[0][2] * k], [pz[1][0] * k, pz[1][2] * k], [pz[2][0] * k, pz[2][2] * k], [pz[3][0] * k, pz[3][2] * k], [0, 1, 0], C('#e8d9d2'));
     for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0]]) wb.quad([pz[a][0], py, pz[a][2]], [pz[b][0], py, pz[b][2]], [pz[b][0], py - 0.6, pz[b][2]], [pz[a][0], py - 0.6, pz[a][2]], Z0, Z0, Z0, Z0, null, C('#e8d9d2'));
     addDeck(T, pz.map(p => [p[0], p[2]]), py); { const c = Q(sc, Dp / 2, 0); (T.noTrees || (T.noTrees = [])).push([c[0], c[2], W / 2 + 3]); }
-    return { sc, W, Dp, Q, py, tx, tz };
+    return { sc, W, Dp, Q, py, tx, tz, room, plaza };
   };
   const pm = porch(main, true); if (back && back !== main) try { porch(back, false); } catch (err) { console.warn('student center back porch skipped', err); }
-  // ---- the E C U letters in their flower bed, out toward the street beside the main porch ----
-  const LA = pm.Q(pm.sc + pm.W * 0.5 - 3, pm.Dp + 11, 0); ecuLetters(T, mb, LA, main.nx, main.nz, 1);
+  // ---- the E C U letters in their flower bed on the 10th Street lawn beside the main porch, facing the street ----
+  try { const at = ecuLetterSpot(T, ring, main, pm); if (at) ecuLetters(T, mb, [at.x, 0, at.z], at.nx, at.nz, 1); } catch (err) { console.warn('ECU letters skipped', err); }
   addMB(T, mb, lmPlainMat());
   { const g = wb.geo(); if (g) { const m = new THREE.Mesh(g, hmRedBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m); } }
   { const g = gb.geo(); if (g) { const m = new THREE.Mesh(g, ecuGlassMat()); m.receiveShadow = true; T.group.add(m); } }
+}
+
+// where the letters go: on the strip of lawn between the building and 10th Street, beside the porch plaza
+// (west first, then east), a few metres back from the kerb, turned to face the street
+function ecuLetterSpot(T, ring, main, pm) {
+  const L = main.L, tx = (main.b[0] - main.a[0]) / L, tz = (main.b[1] - main.a[1]) / L;
+  const tenth = r => /10th/i.test(r.name || '') && r.car;
+  const ok = (x, z) => { // the bed (9.5 x 4.2 m) clear of the building and the road
+    if (pointInPoly(x, z, ring)) return false;
+    for (let a = 0; a < 6.28; a += 0.5) for (const [ra, rb] of [[10, 4.6], [6, 2.5]]) { const px = x + Math.cos(a) * ra * tx + Math.sin(a) * rb * main.nx, pz = z + Math.cos(a) * ra * tz + Math.sin(a) * rb * main.nz; if (pointInPoly(px, pz, ring)) return false; const r = nearestRoad(px, pz, 12, q => q.car); if (r && r.d < r.road.w / 2 + 1.5) return false; }
+    return true;
+  };
+  const cands = []; for (let k = 0; k < 14; k++) for (const sg of [-1, 1]) cands.push(pm.sc + sg * (pm.W / 2 + 4 + 10.5 + k * 2.5));
+  cands.sort((a, b) => Math.abs(a - pm.sc) - Math.abs(b - pm.sc) + (a < pm.sc ? -0.5 : 0.5) - (b < pm.sc ? -0.5 : 0.5));
+  for (const s of cands) {
+    const bx = main.a[0] + tx * s, bz = main.a[1] + tz * s; const r = nearestRoad(bx + main.nx * 12, bz + main.nz * 12, 60, tenth); if (!r) continue;
+    let nx = r.x - bx, nz = r.z - bz; const d = Math.hypot(nx, nz) || 1; nx /= d; nz /= d; // toward the street
+    for (const off of [6.5, 7.5, 9, 11]) { const x = r.x - nx * (r.road.w / 2 + off), z = r.z - nz * (r.road.w / 2 + off); if (ok(x, z)) return { x, z, nx, nz }; }
+  }
+  return null;
 }
 
 // the giant precast E · C · U, standing staggered in a raised bed of purple and gold flowers; they face (nx, nz)
@@ -133,11 +158,13 @@ function ecuLetters(T, mb, at, nx, nz, scale = 1) {
     const px = x0 + rx * u + nx * v, pz = z0 + rz * u + nz * v; const s = 0.28 + R() * 0.22; const fg = new THREE.IcosahedronGeometry(s, 0); fg.scale(1, 0.7, 1); HM.geo(mb, fg, C(FL[(R() * FL.length) | 0]), px, g + 0.5 + s * 0.4, pz); }
   for (let i = 0; i < 9; i++) { const u = (i / 8 - 0.5) * bedA * 1.7, v = -bedB * 0.75; const s = 0.5 + R() * 0.25; HM.geo(mb, new THREE.IcosahedronGeometry(s, 1), C('#3f6b34'), x0 + rx * u + nx * v, g + 0.5 + s * 0.6, z0 + rz * u + nz * v); } // low shrubs at the back
   // the letters
+  const lb = new MB(true);
   ['E', 'C', 'U'].forEach((ch, i) => {
     const geo = new THREE.ExtrudeGeometry(shapeOf(ch), { depth: DEP, bevelEnabled: false, curveSegments: 4 }); geo.translate(-LW / 2, 0, -DEP / 2);
     const tw = [0.06, -0.04, 0.1][i], fwd = [0.5, -0.4, 0.2][i] * scale; geo.rotateY(yaw + tw);
     const off = (i - 1) * (LW + 0.9 * scale); const px = x0 + rx * off + nx * fwd, pz = z0 + rz * off + nz * fwd;
     HM.geo(mb, new THREE.BoxGeometry(LW + 0.5, 0.35, DEP + 0.5).rotateY(yaw + tw), C('#cfc6b3'), px, g + 0.5, pz); // plinth
-    HM.geo(mb, geo, CREAM, px, g + 0.67, pz); HM.obstacle(T, px, pz, LW * 0.55);
+    HM.geo(lb, geo, CREAM, px, g + 0.67, pz); HM.obstacle(T, px, pz, LW * 0.55);
   });
+  addMB(T, lb, MAT.ecuLetters || (MAT.ecuLetters = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: 0xfff0d6, emissiveIntensity: 0 }))); // floodlit at night (05_env.js)
 }
