@@ -22,6 +22,30 @@ const hit = c => { if (Pressed.has(c)) { Pressed.delete(c); return true; } retur
 // =====================================================================
 // PLAYER: on foot or driving
 // =====================================================================
+function spawnSpot(x, z) { // where you appear for a start location: an open stretch of real street near (x,z), you on the curb side of your car
+    // find an OPEN stretch of real street near (x,z): far from building walls, not on a bridge
+    let n = null, bestScore = -1e9;
+    const cands = World.segHash.query(x - 220, z - 220, x + 220, z + 220).filter(it => it.road.car && it.road.ai && !it.road.bridge && it.road.rank >= 3);
+    for (const it of cands) {
+      const a = it.road.pts[it.i], b = it.road.pts[it.i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 12) continue;
+      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; const d = Math.hypot(mx - x, mz - z); if (d > 220) continue;
+      let clear = 30;
+      for (const bl of World.bldHash.query(mx - 30, mz - 30, mx + 30, mz + 30)) for (let i = 0, j = bl.ring.length - 1; i < bl.ring.length; j = i++) { const sd = segDist(mx, mz, bl.ring[j][0], bl.ring[j][1], bl.ring[i][0], bl.ring[i][1]); if (sd.d < clear) clear = sd.d; }
+      const score = clear * 1.0 - d / 25;
+      if (score > bestScore) { bestScore = score; n = { road: it.road, i: it.i, t: 0.5, d, x: mx, z: mz }; }
+    }
+    if (!n) n = nearestRoad(x, z, 250, r => r.ai && !r.bridge && r.rank >= 3) || nearestRoad(x, z, 400, r => r.car && !r.bridge);
+    let cx = x, cz = z, yaw = 0;
+    if (n) {
+      const r = n.road, a = r.pts[n.i], b = r.pts[n.i + 1]; let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const lane = r.oneway ? 0 : Math.min(r.w / 4, 2.2); cx = n.x - dz * lane; cz = n.z + dx * lane; yaw = Math.atan2(dx, dz);
+      if (r.oneway === -1) yaw += Math.PI;
+    }
+    const lane0 = n && !n.road.oneway ? Math.min(n.road.w / 4, 2.2) : 0;
+    const side = n ? (n.road.w / 2 - lane0 + 1.6) : 3;
+    const px = cx - Math.cos(yaw) * side, pz = cz + Math.sin(yaw) * side; // curb side of the car
+    return { cx, cz, yaw, n, c: freeSpot(px, pz, cx, cz) };
+}
 const Player = {
   mode: 'walk', pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, grounded: true,
   camYaw: 0, camPitch: 0.25, camDist: 5, camMode: 0, camPos: new THREE.Vector3(),
@@ -53,29 +77,9 @@ const Player = {
     catch (e) { console.warn('car unavailable', id, e); if (typeof UI !== 'undefined' && UI.toast) UI.toast('Could not load that car — keeping the current one'); }
   },
   placeAt(x, z, crowd) {
-    // find an OPEN stretch of real street near (x,z): far from building walls, not on a bridge
-    let n = null, bestScore = -1e9;
-    const cands = World.segHash.query(x - 220, z - 220, x + 220, z + 220).filter(it => it.road.car && it.road.ai && !it.road.bridge && it.road.rank >= 3);
-    for (const it of cands) {
-      const a = it.road.pts[it.i], b = it.road.pts[it.i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 12) continue;
-      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; const d = Math.hypot(mx - x, mz - z); if (d > 220) continue;
-      let clear = 30;
-      for (const bl of World.bldHash.query(mx - 30, mz - 30, mx + 30, mz + 30)) for (let i = 0, j = bl.ring.length - 1; i < bl.ring.length; j = i++) { const sd = segDist(mx, mz, bl.ring[j][0], bl.ring[j][1], bl.ring[i][0], bl.ring[i][1]); if (sd.d < clear) clear = sd.d; }
-      const score = clear * 1.0 - d / 25;
-      if (score > bestScore) { bestScore = score; n = { road: it.road, i: it.i, t: 0.5, d, x: mx, z: mz }; }
-    }
-    if (!n) n = nearestRoad(x, z, 250, r => r.ai && !r.bridge && r.rank >= 3) || nearestRoad(x, z, 400, r => r.car && !r.bridge);
-    let cx = x, cz = z, yaw = 0;
-    if (n) {
-      const r = n.road, a = r.pts[n.i], b = r.pts[n.i + 1]; let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-      const lane = r.oneway ? 0 : Math.min(r.w / 4, 2.2); cx = n.x - dz * lane; cz = n.z + dx * lane; yaw = Math.atan2(dx, dz);
-      if (r.oneway === -1) yaw += Math.PI;
-    }
+    const S = spawnSpot(x, z), { cx, cz, yaw, n } = S;
     this.car.pos.set(cx, surfaceY(cx, cz) + 0.22, cz); this.car.yaw = yaw; this.car.speed = 0; this.car.steer = 0; this.car.vy = 0;
-    const lane0 = n && !n.road.oneway ? Math.min(n.road.w / 4, 2.2) : 0;
-    const side = n ? (n.road.w / 2 - lane0 + 1.6) : 3;
-    const px = cx - Math.cos(yaw) * side, pz = cz + Math.sin(yaw) * side; // curb side of the car
-    const c = freeSpot(px, pz, cx, cz);
+    const c = S.c;
     this.pos.set(c[0], groundY(c[0], c[1], H(c[0], c[1]) + 1), c[1]); this.vel.set(0, 0, 0); this.yaw = yaw;
     if (this.mode === 'fly' && Plane.hud) { Plane.hud.style.display = 'none'; Plane.parked = true; Plane.thr = 0; } // traveling away from the plane / helicopter: leave it parked
     if (this.mode === 'heli' && Heli.hud) { Heli.hud.style.display = 'none'; Heli.parked = true; }

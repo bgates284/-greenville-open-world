@@ -26,6 +26,9 @@ if (fs.existsSync(pbSrc)) { fs.mkdirSync(path.join(site, 'data', 'pittbld'), { r
 // building looks read off street-level photos (tools/fetch-mapillary.mjs)
 if (fs.existsSync(path.join(root, 'public-data', 'facades.json'))) fs.copyFileSync(path.join(root, 'public-data', 'facades.json'), path.join(site, 'data', 'facades.json'));
 // detailed car models (03l_cars.js)
+// hand-made people (07g_nurse.js)
+const pplSrc = path.join(root, 'public-data', 'people');
+if (fs.existsSync(pplSrc)) { fs.mkdirSync(path.join(site, 'data', 'people'), { recursive: true }); for (const f of fs.readdirSync(pplSrc)) fs.copyFileSync(path.join(pplSrc, f), path.join(site, 'data', 'people', f)); }
 const vehSrc = path.join(root, 'public-data', 'vehicles');
 if (fs.existsSync(vehSrc)) { fs.mkdirSync(path.join(site, 'data', 'vehicles'), { recursive: true }); for (const f of fs.readdirSync(vehSrc)) fs.copyFileSync(path.join(vehSrc, f), path.join(site, 'data', 'vehicles', f)); }
 if (!fs.existsSync(path.join(site, 'data', 'osm', 'index.json'))) fs.writeFileSync(path.join(site, 'data', 'osm', 'index.json'), '[]');
