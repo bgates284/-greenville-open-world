@@ -235,6 +235,23 @@ function buildTextures() {
       g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(x0 + 40, y0 + 26, 48, 80); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x0 + 36, y0 + 20, 56, 6); // bricked-up arch window
     }
   });
+  // Dickinson Ave storefront blocks: ground-floor shop windows (row f=0) under a sign band, upper-floor windows above.
+  // pal: [wall rgb, trim colour, glass top, glass bottom, upper-window style]
+  const dkStore = (name, base, trim, gTop, gBot, seed, pilasters) => mk(name, 3.6, 4.2, (g, ge, r) => {
+    noiseFill(g, 512, 512, base, 7, seed);
+    if (base[0] > 150 && base[1] < 80) { g.fillStyle = 'rgba(0,0,0,.07)'; for (let y = 0; y < 512; y += 6) g.fillRect(0, y, 512, 1); } // painted brick courses
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      if (f % 2 === 0) { // shopfront: big panes, transom, kick plate, sign band above
+        win(g, ge, r, x0 + 12, y0 + 34, 104, 74, null, gTop, gBot, .45); g.fillStyle = trim; g.fillRect(x0 + 6, y0 + 14, 116, 12); g.fillRect(x0 + 6, y0 + 108, 116, 8); g.fillRect(x0 + 62, y0 + 34, 4, 74);
+      } else { win(g, ge, r, x0 + 38, y0 + 28, 52, 74, trim, gTop, gBot, .3); g.fillStyle = trim; g.fillRect(x0 + 34, y0 + 102, 60, 6); }
+      if (pilasters) { g.fillStyle = trim; g.fillRect(x0, y0, 7, 128); }
+    }
+    if (pilasters) { g.fillStyle = trim; g.fillRect(0, 0, 512, 10); g.fillRect(0, 256, 512, 10); } // cornice line at each two-storey top
+  });
+  dkStore('dkRedTrim', [172, 36, 38], '#f2efe8', '#4a5560', '#1e252b', 82, true);   // red-painted brick, white pilasters and cornice
+  dkStore('dkCream', [226, 208, 182], '#5b5f63', '#3a4148', '#1a1f24', 83, false);  // cream stucco, dark storefronts
+  dkStore('dkSage', [152, 178, 160], '#f1efe9', '#46525b', '#1d252b', 84, false);   // sage-green, white trim
   // ECU Health Medical Center: warm tan precast with tall dark-tinted windows in each bay, faint panel joints
   mk('ecuTan', 3.0, 4.2, (g, ge, r) => {
     noiseFill(g, 512, 512, [222, 198, 166], 9, 77);

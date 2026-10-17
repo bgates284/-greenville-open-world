@@ -101,7 +101,8 @@ function buildCivic(T, P) {
   }
   try { pccEntrance(T, P, mb); } catch (e) { console.warn('PCC sign skipped', e); }
   try { paintMurals(T, P); } catch (e) { console.warn('mural skipped', e); }
-  for (const B of P.buildings) if (B.dkMural) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { dressDickinsonMural(T, B, mb); } catch (e) { console.warn('Dickinson mural skipped', e); } }
+  for (const B of P.buildings) if (B.dkLook) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { dressDickinson(T, B, mb); } catch (e) { console.warn('Dickinson mural skipped', e); } }
+  try { dickinsonStreet(T, P, mb); } catch (e) { console.warn('Dickinson planters skipped', e); }
   addMB(T, mb, lmPlainMat());
 }
 // ground height + wall top of a finished building (from the collision record)
@@ -461,11 +462,35 @@ function paintMurals(T, P) {
 // up top, and a big painted wall facing up the avenue across the lawn. (The painting is an original arts-district
 // scene in the game's own style — the avenue's name, the rail line, the Tar River and tobacco leaves — not a copy
 // of the real mural.)
-const DK_MURAL = { lat: 35.60952, lon: -77.37640 };
-function prepDickinsonMural(T, P) {
-  const x = lonToX(DK_MURAL.lon), z = latToZ(DK_MURAL.lat), W = T.W; if (!(x >= W.x0 - 50 && x < W.x1 + 50 && z >= W.z0 - 50 && z < W.z1 + 50)) return;
-  let host = null, best = 1e12; for (const B of P.buildings) if (!B.part && B.ring.length >= 3 && pointInPoly(x, z, B.ring)) { const a = Math.abs(signedArea(B.ring)); if (a < best) { best = a; host = B; } }
-  if (!host) return; host.dkMural = true; host.food = null; host.units = null; host.tags = Object.assign({}, host.tags, { height: '8' }); delete host.tags['building:levels'];
+// the 700 block, matched to photos: (E, N) metres from the market (35.60943, -77.37653)
+const DK_O = [35.60943, -77.37653];
+const DK_LOOKS = [
+  { at: [12, 10], fac: 'paintRed', h: 5.2, mural: true },                   // 714: the low red building with the painted wall (market lawn on its north-east side)
+  { at: [4.3, 4.6], fac: 'dkRedTrim', h: 8.6, panel: true },               // 718: two storeys of red-painted brick, white pilasters and cornice
+  { at: [-6.4, -2.8], fac: 'dkCream', h: 8.2, stair: true, annex: true },  // the cream two-storey (Smashed Waffles, Ford+Shep) with its outside stair and a hip-roofed corner shop
+  { at: [33, -25], fac: 'dkSage', h: 8.4, tile: true },                    // across the street (707, Trollingwood): sage green with a red tile coping
+];
+const dkXZ = (e, n) => [lonToX(DK_O[1] + e / 90532), latToZ(DK_O[0] + n / 110574)];
+function prepDickinson(T, P) {
+  const W = T.W, [ox, oz] = dkXZ(0, 0); if (!(ox >= W.x0 - 80 && ox < W.x1 + 80 && oz >= W.z0 - 80 && oz < W.z1 + 80)) return;
+  for (const L of DK_LOOKS) {
+    const [x, z] = dkXZ(...L.at); let host = null, best = 1e12;
+    for (const B of P.buildings) if (!B.part && B.ring.length >= 3 && !B.dkLook && pointInPoly(x, z, B.ring)) { const a = Math.abs(signedArea(B.ring)); if (a < best) { best = a; host = B; } }
+    if (!host) continue;
+    host.dkLook = L; host.dkMural = !!L.mural; host.food = null; host.units = null; host.tags = Object.assign({}, host.tags, { height: String(L.h) }); delete host.tags['building:levels']; delete host.tags['roof:shape'];
+    if (L.annex) { // a little hip-roofed shop against the cream building's south-west side, at the street end
+      const E = HM.edgesOf(host.ring); const front = E.map(e => { const n = nearestRoad(e.mx + e.nx * 5, e.mz + e.nz * 5, 30, r => r.car); return [e, n ? n.d : 99]; }).sort((a, b) => a[1] - b[1])[0][0];
+      const [tx0, tz0] = dkXZ(-30, -40); // away from the market (south-west along the avenue)
+      const side = E.filter(e => e !== front && Math.abs(e.nx * front.nx + e.nz * front.nz) < 0.5).sort((a, b) => ((b.nx * (tx0 - b.mx) + b.nz * (tz0 - b.mz)) - (a.nx * (tx0 - a.mx) + a.nz * (tz0 - a.mz))))[0];
+      if (side) {
+        const c0 = [side.a, side.b].sort((p, q) => Math.hypot(p[0] - front.mx, p[1] - front.mz) - Math.hypot(q[0] - front.mx, q[1] - front.mz))[0], c1 = c0 === side.a ? side.b : side.a;
+        const ux = (c1[0] - c0[0]) / side.L, uz = (c1[1] - c0[1]) / side.L, P2 = (u, v) => [c0[0] + ux * u + side.nx * v, c0[1] + uz * u + side.nz * v];
+        const ring = [P2(0.6, 0.05), P2(8.6, 0.05), P2(8.6, 7.5), P2(0.6, 7.5)];
+        if (!P.buildings.some(B => B !== host && ring.some(p => pointInPoly(p[0], p[1], B.ring))))
+          P.buildings.push({ id: 9.2e9 + 1, tags: { building: 'retail', height: '4.6' }, ring: signedArea(ring) < 0 ? ring.reverse() : ring, holes: [], part: false, dkLook: { fac: 'dkCream', h: 4.6, shape: 'hipped', roof: '#5a5f63' } });
+      }
+    }
+  }
 }
 function dkMuralTex() {
   if (MAT.dkMural) return MAT.dkMural;
@@ -491,27 +516,58 @@ function dkMuralTex() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return MAT.dkMural = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
 }
-function dressDickinsonMural(T, B, mb) {
-  const { g, top } = bldTop(B), E = HM.edgesOf(B.ring).filter(e => e.L >= 4); if (!E.length) return;
-  for (const e of E) { const n = nearestRoad(e.mx + e.nx * 6, e.mz + e.nz * 6, 40, r => r.car); e.rd = n ? n.d : 99; e.road = n; }
+function dressDickinson(T, B, mb) {
+  const L = B.dkLook, { g, top } = bldTop(B), E = HM.edgesOf(B.ring).filter(e => e.L >= 2); if (!E.length) return;
+  for (const e of E) { const n = nearestRoad(e.mx + e.nx * 6, e.mz + e.nz * 6, 40, r => r.car); e.rd = n ? n.d : 99; e.road = n; e.yaw = Math.atan2(e.nx, e.nz); }
   const front = E.slice().sort((a, b) => a.rd - b.rd)[0], rd = front.road; if (!rd) return;
-  // up-avenue direction (toward Uptown, north-east): the tangent of the road at the front
+  const band = (edges, y0, y1, out, col) => { for (const e of edges) HM.box(mb, e.mx + e.nx * out / 2, e.mz + e.nz * out / 2, y0, y1, e.L / 2 + out * 0.5, out / 2, e.yaw, col); };
+  // up-avenue direction (toward Uptown, north-east): the road tangent at the front
   let tx = -front.nz, tz = front.nx; const up = [lonToX(-77.3712) - front.mx, latToZ(35.6122) - front.mz]; if (tx * up[0] + tz * up[1] < 0) { tx = -tx; tz = -tz; }
-  const side = E.filter(e => e !== front).sort((a, b) => (b.nx * tx + b.nz * tz) - (a.nx * tx + a.nz * tz))[0]; if (!side) return;
-  const RED = new THREE.Color('#b0262a'), WHITE = new THREE.Color('#f4f2ec');
-  // the painted wall: a one-storey stretch along the side, starting at the sidewalk end
+  const upSide = E.filter(e => e !== front).sort((a, b) => (b.nx * tx + b.nz * tz) - (a.nx * tx + a.nz * tz))[0];
+  const WHITE = new THREE.Color('#f4f2ec'), H0 = top;
+  if (L.fac === 'dkRedTrim') band(E, H0 - 0.7, H0 + 0.15, 0.25, WHITE);                                   // white cornice
+  if (L.tile) { band(E, H0 - 0.15, H0 + 0.45, 0.4, new THREE.Color('#a8452f')); band([front], g + 3.25, g + 3.5, 1.1, WHITE); } // red tile coping, shopfront canopy
+  if (L.fac === 'dkCream') band(E, H0 - 0.35, H0 + 0.2, 0.15, new THREE.Color('#c9b79c'));
+  if (L.panel && upSide) { const s = upSide; HM.box(mb, s.mx + s.nx * 0.06, s.mz + s.nz * 0.06, g + 5.6, Math.min(H0 - 0.9, g + 8), Math.min(3, s.L / 3), 0.06, s.yaw, WHITE); } // the blank white sign panel high on the side
+  if (L.stair) { // steel stair up the front to a door on the upper floor, at the up-avenue end
+    const c = [front.a, front.b].sort((p, q) => ((q[0] - p[0]) * tx + (q[1] - p[1]) * tz))[0], fux = Math.sign((front.b[0] - front.a[0]) * tx + (front.b[1] - front.a[1]) * tz) || 1;
+    const ux = (front.b[0] - front.a[0]) / front.L * fux, uz = (front.b[1] - front.a[1]) / front.L * fux, DK = new THREE.Color('#3b3f43');
+    const at = (u, v) => [c[0] - ux * u + front.nx * v, c[1] - uz * u + front.nz * v], n = 14;
+    for (let k = 0; k < n; k++) { const [x, z] = at(1.6 + (n - k) * 0.42, 0.75); HM.box(mb, x, z, g + k * 0.3, g + k * 0.3 + 0.08, 0.22, 0.6, front.yaw, DK); } // treads
+    { const [x, z] = at(1.0, 0.75); HM.box(mb, x, z, g + 4.1, g + 4.25, 0.9, 0.7, front.yaw, DK); HM.box(mb, x, z, g, g + 4.1, 0.06, 0.06, front.yaw, DK); }
+    for (const v of [0.12, 1.38]) for (let k = 0; k <= n; k += 2) { const [x, z] = at(1.6 + (n - k) * 0.42, v); HM.box(mb, x, z, g + k * 0.3, g + k * 0.3 + 1.0, 0.03, 0.03, front.yaw, DK); }
+    const [dx, dz] = at(1.0, 0.05); HM.box(mb, dx, dz, g + 4.25, g + 6.4, 0.5, 0.05, front.yaw, new THREE.Color('#2a3036'));
+  }
+  if (!L.mural || !upSide) return;
+  const RED = new THREE.Color('#b0262a'), side = upSide;
+  // the painted wall along the side facing the market lawn, from the sidewalk end
   const sl = [side.a, side.b].sort((p, q) => Math.hypot(p[0] - rd.x, p[1] - rd.z) - Math.hypot(q[0] - rd.x, q[1] - rd.z)); // [street end, back end]
-  const L = Math.min(side.L - 0.4, 17), ux = (sl[1][0] - sl[0][0]) / side.L, uz = (sl[1][1] - sl[0][1]) / side.L, yaw = Math.atan2(side.nx, side.nz);
-  const mx = sl[0][0] + ux * (L / 2 + 0.2), mz = sl[0][1] + uz * (L / 2 + 0.2), mh = 4.3;
-  HM.box(mb, mx + side.nx * 0.5, mz + side.nz * 0.5, g - 0.3, g + mh + 0.9, L / 2, 0.5, yaw, RED);                                  // the low painted wall
-  HM.box(mb, mx + side.nx * 0.5, mz + side.nz * 0.5, g + mh + 0.9, g + mh + 1.05, L / 2 + 0.05, 0.55, yaw, new THREE.Color('#8e1e22')); // its coping
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.8, mh), dkMuralTex()); m.position.set(mx + side.nx * 1.02, g + 0.6 + mh / 2, mz + side.nz * 1.02); m.rotation.y = yaw; m.receiveShadow = true; T.group.add(m);
-  // corner door with a flat white awning, and the blank white sign panel up on the front
-  const fyaw = Math.atan2(front.nx, front.nz), fux = (front.b[0] - front.a[0]) / front.L, fuz = (front.b[1] - front.a[1]) / front.L;
+  const Lm = Math.min(side.L - 0.4, 17), ux = (sl[1][0] - sl[0][0]) / side.L, uz = (sl[1][1] - sl[0][1]) / side.L;
+  const mx = sl[0][0] + ux * (Lm / 2 + 0.2), mz = sl[0][1] + uz * (Lm / 2 + 0.2), mh = Math.min(4.3, H0 - g - 0.9);
+  HM.box(mb, mx + side.nx * 0.3, mz + side.nz * 0.3, H0 - 0.2, H0 + 0.25, Lm / 2 + 0.05, 0.35, side.yaw, new THREE.Color('#8e1e22')); // coping
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(Lm - 0.8, mh), dkMuralTex()); m.position.set(mx + side.nx * 0.08, g + 0.45 + mh / 2, mz + side.nz * 0.08); m.rotation.y = side.yaw; m.receiveShadow = true; T.group.add(m);
+  // corner door with a flat white awning
+  const fux = (front.b[0] - front.a[0]) / front.L, fuz = (front.b[1] - front.a[1]) / front.L;
   const corner = [front.a, front.b].sort((p, q) => Math.hypot(p[0] - sl[0][0], p[1] - sl[0][1]) - Math.hypot(q[0] - sl[0][0], q[1] - sl[0][1]))[0], sgn = corner === front.a ? 1 : -1;
-  const ax = corner[0] + fux * sgn * 4.5, az = corner[1] + fuz * sgn * 4.5;
-  HM.box(mb, ax + front.nx * 1.6, az + front.nz * 1.6, g + 3.1, g + 3.45, 3.6, 1.6, fyaw, WHITE);
-  HM.box(mb, ax + front.nx * 0.08, az + front.nz * 0.08, g, g + 2.8, 1.6, 0.08, fyaw, new THREE.Color('#5c6064'));                     // grey doors
-  const px = corner[0] + fux * sgn * 9, pz = corner[1] + fuz * sgn * 9; HM.box(mb, px + front.nx * 0.06, pz + front.nz * 0.06, g + 4.6, g + Math.min(top - g - 0.8, 7), 2.8, 0.06, fyaw, WHITE);
-  HM.obstacle(T, mx + side.nx * 0.5, mz + side.nz * 0.5, 0.6);
+  const ax = corner[0] + fux * sgn * 3.8, az = corner[1] + fuz * sgn * 3.8;
+  HM.box(mb, ax + front.nx * 1.6, az + front.nz * 1.6, g + 3.1, g + 3.45, 3.4, 1.6, front.yaw, WHITE);
+  HM.box(mb, ax + front.nx * 0.08, az + front.nz * 0.08, g, g + 2.8, 1.6, 0.08, front.yaw, new THREE.Color('#5c6064'));
+  void RED;
+}
+// wooden planter boxes along both kerbs of the 600–800 blocks
+function dickinsonStreet(T, P, mb) {
+  const [ox, oz] = dkXZ(0, 0), W = T.W; if (!(ox >= W.x0 && ox < W.x1 && oz >= W.z0 && oz < W.z1)) return;
+  const n = nearestRoad(ox, oz, 40, r => r.car && /Dickinson/.test(r.name || '')); if (!n) return;
+  const r = n.road, WOOD = new THREE.Color('#8a5a34'), SOIL = new THREE.Color('#4f6b34'); let acc = 0;
+  for (let i = 0; i < r.pts.length - 1; i++) {
+    const a = r.pts[i], b = r.pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) continue; const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, yaw = Math.atan2(-uz, ux) + Math.PI / 2;
+    for (let s = (10 - acc % 10) % 10; s < L; s += 10) {
+      const x = a[0] + ux * s, z = a[1] + uz * s; if (Math.hypot(x - ox, z - oz) > 90) continue;
+      for (const sg of [-1, 1]) {
+        const off = r.w / 2 + 0.9, px = x - uz * off * sg, pz = z + ux * off * sg; if (insideBuilding(px, pz)) continue; const y = H(px, pz);
+        HM.box(mb, px, pz, y, y + 0.7, 0.45, 1.3, yaw, WOOD); HM.box(mb, px, pz, y + 0.7, y + 0.78, 0.38, 1.22, yaw, SOIL); HM.obstacle(T, px, pz, 0.6);
+      }
+    }
+    acc += L;
+  }
 }
