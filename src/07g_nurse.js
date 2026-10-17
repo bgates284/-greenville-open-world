@@ -6,6 +6,22 @@
 // baby is held steady while she walks; she glances around, and turns her head to look at you
 // when you come close.
 // =====================================================================
+// one walk cycle for the hand-rigged people (nurse, the kid who follows you). Bone axes: rotating a limb by a
+// NEGATIVE x angle swings it forward; a POSITIVE x angle on the shin bends the knee. ph = stride phase,
+// A = 0 (standing) … 1 (walking), run = 0 … 1 (jogging: longer stride, more knee and arm).
+function rigWalk(B, base, ph, A, run) {
+  const s = Math.sin(ph), c = Math.cos(ph), leg = (0.34 + 0.22 * run) * A, knee = (0.55 + 0.5 * run) * A;
+  B.thighL.rotation.x = -leg * s; B.thighR.rotation.x = leg * s;
+  B.shinL.rotation.x = knee * Math.max(0, -c) + 0.05 * A; B.shinR.rotation.x = knee * Math.max(0, c) + 0.05 * A; // knee bends while that leg swings through
+  B.footL.rotation.x = -(B.thighL.rotation.x + B.shinL.rotation.x) * 0.7; B.footR.rotation.x = -(B.thighR.rotation.x + B.shinR.rotation.x) * 0.7;
+  B.hips.position.y = base.hipsY + (Math.abs(c) * (0.02 + 0.02 * run) - 0.012 - 0.02 * run) * A; B.hips.rotation.y = -0.05 * s * A; B.spine.rotation.y = 0.07 * s * A;
+  B.spine.rotation.x = 0.08 * run * A; // lean into a jog
+  if (B.upperArmL) { // arms down at the sides, swinging against the legs
+    const sw = (0.3 + 0.35 * run) * A * s, bend = 0.18 + (0.25 + 0.9 * run) * A;
+    B.upperArmL.rotation.set(sw, 0, -1.28); B.upperArmR.rotation.set(-sw, 0, 1.28);
+    B.foreArmL.rotation.set(0, -bend, 0); B.foreArmR.rotation.set(0, bend, 0);
+  }
+}
 const Nurse = {
   LL: [35.6075, -77.4031], // ECU Health Medical Center (LANDMARKS)
   g: null, bones: null, state: 'off', center: null, pos: new THREE.Vector3(), yaw: 0, target: null, wait: 0,
@@ -66,20 +82,16 @@ const Nurse = {
         }
       }
     }
-    // ---- walk cycle: legs swing from the hips, knees bend on the forward swing, a gentle bob ----
+    // ---- walk cycle ----
     this.amp += ((moving ? 1 : 0) - this.amp) * Math.min(1, dt * 5);
     if (moving) this.ph += dt * 1.1 / 0.62 * Math.PI;
-    const s = Math.sin(this.ph), c = Math.cos(this.ph), A = this.amp;
-    B.thighL.rotation.x = 0.34 * s * A; B.thighR.rotation.x = -0.34 * s * A;
-    B.shinL.rotation.x = -0.62 * Math.max(0, c) * A - 0.05 * A; B.shinR.rotation.x = -0.62 * Math.max(0, -c) * A - 0.05 * A;
-    B.footL.rotation.x = -(B.thighL.rotation.x + B.shinL.rotation.x) * 0.7; B.footR.rotation.x = -(B.thighR.rotation.x + B.shinR.rotation.x) * 0.7;
-    B.hips.position.y = this.base.hipsY + (Math.abs(c) * 0.02 - 0.012) * A; B.hips.rotation.y = -0.05 * s * A; B.spine.rotation.y = 0.07 * s * A;
+    rigWalk(B, this.base, this.ph, this.amp, 0);
     // ---- her head: looks at you when you're close, otherwise glances around ----
     const f = Player.focus(), pdx = f.x - this.pos.x, pdz = f.z - this.pos.z, pd = Math.hypot(pdx, pdz);
     if (pd < 9 && Player.mode !== 'drone') { let a = Math.atan2(pdx, pdz) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); this.lookGoal = clamp(a, -0.95, 0.95); this.lookT = 1; }
     else if ((this.lookT -= dt) <= 0) { this.lookGoal = Math.random() < 0.35 ? 0 : (Math.random() - 0.5) * 1.3; this.lookT = 2 + Math.random() * 3.5; }
     this.look += (this.lookGoal - this.look) * Math.min(1, dt * 2.5);
-    B.head.rotation.y = this.look * 0.75; B.neck.rotation.y = this.look * 0.25; B.head.rotation.x = 0.06 + 0.02 * Math.sin(this.ph * 2) * A;
+    B.head.rotation.y = this.look * 0.75; B.neck.rotation.y = this.look * 0.25; B.head.rotation.x = 0.06 + 0.02 * Math.sin(this.ph * 2) * this.amp;
     this.g.position.set(this.pos.x, groundY(this.pos.x, this.pos.z, H(this.pos.x, this.pos.z) + 1), this.pos.z); this.g.rotation.y = this.yaw;
   },
 };
