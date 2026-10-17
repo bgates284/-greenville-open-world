@@ -38,6 +38,7 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
   const lv = parseFloat(t['building:levels']); const rect = obb ? area / (obb.L * obb.W) : 0;
   if (n === 'The Cupola' || n === 'Greenville Amphitheater' || HANDBUILT[B.id]) return { kind: 'skip' }; // hand-built (04g_handmade.js)
   if (/^(parking|garage|garages|shed|roof|carport|service)$/.test(bt)) return null;
+  if (B.dkMural) return { kind: 'dkMural', fac: 'paintRed', h: 8, shape: 'flat', wall: '#ffffff', roof: '#8a8a86' }; // the red building with the mural (04h_civic.js)
   if (typeof CIVIC_LOOK !== 'undefined' && CIVIC_LOOK[B.id]) return { kind: 'civicLook', look: CIVIC_LOOK[B.id], fac: CIVIC_LOOK[B.id].fac, h: CIVIC_LOOK[B.id].h, shape: 'flat', wall: CIVIC_LOOK[B.id].wall || '#ffffff', roof: CIVIC_LOOK[B.id].roof || '#b9b7b1' }; // e.g. Winterville Public Safety (04h_civic.js)
   // stands inside a football stadium are replaced by the seating bowl; other grandstands become stepped seating
   if (bt === 'grandstand' || bt === 'stadium' || bt === 'bleachers') {

@@ -226,6 +226,15 @@ function buildTextures() {
       for (let b = 0; b < 8; b++) if (r() < .45) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(b * 64 + 5, y0 + 34, 59, 62); }
     }
   });
+  // painted brick (the red-painted old warehouses on Dickinson Avenue): faint courses, a few bricked-up windows upstairs
+  mk('paintRed', 3.2, 4.0, (g, ge, r) => {
+    noiseFill(g, 512, 512, [176, 38, 40], 8, 81);
+    g.fillStyle = 'rgba(0,0,0,.07)'; for (let y = 0; y < 512; y += 6) g.fillRect(0, y, 512, 1);
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128; if (f % 2 === 0 || r() < 0.35) continue;
+      g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(x0 + 40, y0 + 26, 48, 80); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x0 + 36, y0 + 20, 56, 6); // bricked-up arch window
+    }
+  });
   // ECU Health Medical Center: warm tan precast with tall dark-tinted windows in each bay, faint panel joints
   mk('ecuTan', 3.0, 4.2, (g, ge, r) => {
     noiseFill(g, 512, 512, [222, 198, 166], 9, 77);

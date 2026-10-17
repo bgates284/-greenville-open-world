@@ -101,6 +101,7 @@ function buildCivic(T, P) {
   }
   try { pccEntrance(T, P, mb); } catch (e) { console.warn('PCC sign skipped', e); }
   try { paintMurals(T, P); } catch (e) { console.warn('mural skipped', e); }
+  for (const B of P.buildings) if (B.dkMural) { const [cx, cz] = centroid(B.ring); if (own(cx, cz)) try { dressDickinsonMural(T, B, mb); } catch (e) { console.warn('Dickinson mural skipped', e); } }
   addMB(T, mb, lmPlainMat());
 }
 // ground height + wall top of a finished building (from the collision record)
@@ -453,4 +454,64 @@ function paintMurals(T, P) {
     for (const e of E) { const n = nearestRoad(e.mx + e.nx * 8, e.mz + e.nz * 8, 40, r => r.car); e.rn = n ? n.road.name || '' : ''; e.rd = n ? n.d : 99; }
     const e = E.find(q => M.street.test(q.rn)) || E.slice().sort((a, b) => a.rd - b.rd)[1] || E[0];
     const { g } = bldTop(B); const m = new THREE.Mesh(new THREE.PlaneGeometry(M.w, M.h), muralTex()); m.position.set(e.mx + e.nx * 0.06, g + M.y + M.h / 2, e.mz + e.nz * 0.06); m.rotation.y = Math.atan2(e.nx, e.nz); m.receiveShadow = true; T.group.add(m); }
+}
+
+// ---------- Dickinson Avenue arts district: the red mural building at the Farmers & Makers Market (714 Dickinson Ave) ----------
+// The low red-painted brick building beside the market lawn, an awning over its corner door, a blank white sign panel
+// up top, and a big painted wall facing up the avenue across the lawn. (The painting is an original arts-district
+// scene in the game's own style — the avenue's name, the rail line, the Tar River and tobacco leaves — not a copy
+// of the real mural.)
+const DK_MURAL = { lat: 35.60952, lon: -77.37640 };
+function prepDickinsonMural(T, P) {
+  const x = lonToX(DK_MURAL.lon), z = latToZ(DK_MURAL.lat), W = T.W; if (!(x >= W.x0 - 50 && x < W.x1 + 50 && z >= W.z0 - 50 && z < W.z1 + 50)) return;
+  let host = null, best = 1e12; for (const B of P.buildings) if (!B.part && B.ring.length >= 3 && pointInPoly(x, z, B.ring)) { const a = Math.abs(signedArea(B.ring)); if (a < best) { best = a; host = B; } }
+  if (!host) return; host.dkMural = true; host.food = null; host.units = null; host.tags = Object.assign({}, host.tags, { height: '8' }); delete host.tags['building:levels'];
+}
+function dkMuralTex() {
+  if (MAT.dkMural) return MAT.dkMural;
+  const Wd = 1536, Hh = 368, c = cnv(Wd, Hh), g = c.getContext('2d'), r = mulberry32(714);
+  const sky = g.createLinearGradient(0, 0, 0, Hh); sky.addColorStop(0, '#1f6f78'); sky.addColorStop(0.55, '#f2a65a'); sky.addColorStop(1, '#f6d58e'); g.fillStyle = sky; g.fillRect(0, 0, Wd, Hh);
+  g.fillStyle = '#ffd36b'; g.beginPath(); g.arc(1180, 250, 120, Math.PI, 0); g.fill();                                     // the sun coming up over the river
+  for (let k = 0; k < 14; k++) { g.strokeStyle = 'rgba(255,224,140,.35)'; g.lineWidth = 6; g.beginPath(); const a = Math.PI + (k + 0.5) / 14 * Math.PI; g.moveTo(1180 + Math.cos(a) * 135, 250 + Math.sin(a) * 135); g.lineTo(1180 + Math.cos(a) * 200, 250 + Math.sin(a) * 200); g.stroke(); }
+  g.fillStyle = '#16525a'; g.fillRect(0, 250, Wd, Hh - 250); g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 3; for (let k = 0; k < 30; k++) { const x = r() * Wd, y = 262 + r() * 90; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 20, y - 6, x + 40, y); g.stroke(); } // Tar River
+  // the rail line along the avenue: a little freight train on a trestle
+  g.fillStyle = '#3a2a22'; g.fillRect(0, 238, Wd, 10); for (let x = 10; x < Wd; x += 60) g.fillRect(x, 248, 8, 16);
+  const car = (x, col) => { g.fillStyle = col; g.fillRect(x, 196, 110, 42); g.fillStyle = '#222'; g.beginPath(); g.arc(x + 22, 240, 9, 0, 7); g.arc(x + 88, 240, 9, 0, 7); g.fill(); };
+  g.fillStyle = '#2b2b2b'; g.fillRect(90, 186, 120, 52); g.fillRect(170, 166, 40, 22); g.fillRect(110, 168, 18, 20); g.fillStyle = '#c8202a'; g.fillRect(90, 222, 120, 6);
+  g.fillStyle = '#222'; for (const x of [110, 150, 190]) { g.beginPath(); g.arc(x, 240, 11, 0, 7); g.fill(); }
+  car(222, '#c86b2a'); car(340, '#6a8a3a'); car(458, '#2a5a8a');
+  // tobacco leaves at both ends
+  const leaf = (x, y, a, s) => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = '#4f8a32'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(40 * s, -60 * s, 0, -150 * s); g.quadraticCurveTo(-40 * s, -60 * s, 0, 0); g.fill(); g.strokeStyle = '#a9cf6a'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -145 * s); g.stroke(); g.restore(); };
+  for (let k = 0; k < 6; k++) { leaf(30 + k * 22, Hh, -0.6 + k * 0.25, 1.1); leaf(Wd - 30 - k * 22, Hh, 0.6 - k * 0.25, 1.1); }
+  // the avenue's name in big blocky letters with a drop shadow
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 120px Impact, "Arial Black", Arial, sans-serif';
+  g.fillStyle = '#123c42'; g.fillText('DICKINSON AVE', Wd / 2 + 8, 108); g.fillStyle = '#fbf3e2'; g.fillText('DICKINSON AVE', Wd / 2, 100);
+  g.font = '700 40px "Trebuchet MS", Arial, sans-serif'; g.fillStyle = '#123c42'; g.fillText('ARTS  ·  MAKERS  ·  MUSIC  ·  GREENVILLE NC', Wd / 2, 178);
+  g.strokeStyle = '#fbf3e2'; g.lineWidth = 12; g.strokeRect(6, 6, Wd - 12, Hh - 12);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return MAT.dkMural = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
+}
+function dressDickinsonMural(T, B, mb) {
+  const { g, top } = bldTop(B), E = HM.edgesOf(B.ring).filter(e => e.L >= 4); if (!E.length) return;
+  for (const e of E) { const n = nearestRoad(e.mx + e.nx * 6, e.mz + e.nz * 6, 40, r => r.car); e.rd = n ? n.d : 99; e.road = n; }
+  const front = E.slice().sort((a, b) => a.rd - b.rd)[0], rd = front.road; if (!rd) return;
+  // up-avenue direction (toward Uptown, north-east): the tangent of the road at the front
+  let tx = -front.nz, tz = front.nx; const up = [lonToX(-77.3712) - front.mx, latToZ(35.6122) - front.mz]; if (tx * up[0] + tz * up[1] < 0) { tx = -tx; tz = -tz; }
+  const side = E.filter(e => e !== front).sort((a, b) => (b.nx * tx + b.nz * tz) - (a.nx * tx + a.nz * tz))[0]; if (!side) return;
+  const RED = new THREE.Color('#b0262a'), WHITE = new THREE.Color('#f4f2ec');
+  // the painted wall: a one-storey stretch along the side, starting at the sidewalk end
+  const sl = [side.a, side.b].sort((p, q) => Math.hypot(p[0] - rd.x, p[1] - rd.z) - Math.hypot(q[0] - rd.x, q[1] - rd.z)); // [street end, back end]
+  const L = Math.min(side.L - 0.4, 17), ux = (sl[1][0] - sl[0][0]) / side.L, uz = (sl[1][1] - sl[0][1]) / side.L, yaw = Math.atan2(side.nx, side.nz);
+  const mx = sl[0][0] + ux * (L / 2 + 0.2), mz = sl[0][1] + uz * (L / 2 + 0.2), mh = 4.3;
+  HM.box(mb, mx + side.nx * 0.5, mz + side.nz * 0.5, g - 0.3, g + mh + 0.9, L / 2, 0.5, yaw, RED);                                  // the low painted wall
+  HM.box(mb, mx + side.nx * 0.5, mz + side.nz * 0.5, g + mh + 0.9, g + mh + 1.05, L / 2 + 0.05, 0.55, yaw, new THREE.Color('#8e1e22')); // its coping
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.8, mh), dkMuralTex()); m.position.set(mx + side.nx * 1.02, g + 0.6 + mh / 2, mz + side.nz * 1.02); m.rotation.y = yaw; m.receiveShadow = true; T.group.add(m);
+  // corner door with a flat white awning, and the blank white sign panel up on the front
+  const fyaw = Math.atan2(front.nx, front.nz), fux = (front.b[0] - front.a[0]) / front.L, fuz = (front.b[1] - front.a[1]) / front.L;
+  const corner = [front.a, front.b].sort((p, q) => Math.hypot(p[0] - sl[0][0], p[1] - sl[0][1]) - Math.hypot(q[0] - sl[0][0], q[1] - sl[0][1]))[0], sgn = corner === front.a ? 1 : -1;
+  const ax = corner[0] + fux * sgn * 4.5, az = corner[1] + fuz * sgn * 4.5;
+  HM.box(mb, ax + front.nx * 1.6, az + front.nz * 1.6, g + 3.1, g + 3.45, 3.6, 1.6, fyaw, WHITE);
+  HM.box(mb, ax + front.nx * 0.08, az + front.nz * 0.08, g, g + 2.8, 1.6, 0.08, fyaw, new THREE.Color('#5c6064'));                     // grey doors
+  const px = corner[0] + fux * sgn * 9, pz = corner[1] + fuz * sgn * 9; HM.box(mb, px + front.nx * 0.06, pz + front.nz * 0.06, g + 4.6, g + Math.min(top - g - 0.8, 7), 2.8, 0.06, fyaw, WHITE);
+  HM.obstacle(T, mx + side.nx * 0.5, mz + side.nz * 0.5, 0.6);
 }
