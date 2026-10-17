@@ -46,9 +46,15 @@ function landmarkStyle(B, cx, cz, area, obb, Z) {
   }
   const hosp = bt === 'hospital' || t.amenity === 'hospital' || t.healthcare === 'hospital' || /Medical Center|Hospital|Heart Institute|Cancer/i.test(n) || zoneAt(Z, 'hospital', cx, cz) || zoneAt(Z, 'medcampus', cx, cz);
   if (hosp) {
-    const glass = /Heart Institute|Cancer/i.test(n);
-    let h = lv > 0 ? lv * 4.2 + 1 : /ECU Health Medical Center/.test(n) ? 30 : /Heart Institute/.test(n) ? 22 : /Children/.test(n) ? 18 : area > 6000 ? 22 : area > 2500 ? 17 : 12.5;
-    return { kind: 'hospital', fac: glass ? 'medglass' : 'hospital', h, shape: 'flat', wall: glass ? '#ffffff' : pick(['#ffffff', '#f6f1e8', '#efe9de'], (B.id % 7) / 7), roof: '#cfcfca', main: /^ECU Health Medical Center$/.test(n) || (!n && bt === 'hospital' && area > 8000), name: n, er: t.emergency === 'yes' };
+    const look = t['ecu:look'], heart = /Heart Institute/.test(n), cancer = /Cancer/i.test(n), kids = /Children/.test(n);
+    let h = lv > 0 ? lv * 4.2 + 1 : /ECU Health Medical Center/.test(n) ? 30 : heart ? 26 : kids ? 18 : area > 6000 ? 22 : area > 2500 ? 17 : 12.5;
+    // the medical-centre cells (splitHospital) carry their look; the Heart Institute has white fins; Cancer Care is glass; the rest of the campus is the same tan precast
+    if (heart) h = Math.max(h, 26); // six storeys of fins and glass over a two-storey podium
+    const fac = look === 'glass' ? 'ecuGlass' : look === 'white' ? 'ecuWhite' : heart ? 'heartFins' : cancer ? 'medglass' : 'ecuTan';
+    const ecu = !!look;
+    return { kind: 'hospital', fac, h, shape: 'flat', wall: '#ffffff', roof: '#cfcfca', look: { roof: fac === 'ecuWhite' ? '#c9ccce' : '#bdb8ae' },
+      main: !ecu && !n && bt === 'hospital' && area > 8000, entry: t['ecu:main'] === 'yes', erBlock: t['ecu:er'] === 'yes', helipad: t['ecu:helipad'] === 'yes',
+      ecu, heart, kids, forceH: heart, name: n, er: t.emergency === 'yes', whole: B.ecuWhole, lot: B.ecuLot, erPt: B.ecuEr };
   }
   // Pitt Community College: red brick, white-framed windows, grey pitched roofs, white columned porticos or glass entrance towers, names on the front
   if (zoneAt(Z, 'pcc', cx, cz) || /Pitt Community College/.test(t.operator || '')) {
@@ -165,11 +171,16 @@ function landmarkExtras(LM, B, T, ctx) {
     }
   }
   if (LM.kind === 'hospital') {
-    band(wallTop - 0.2, wallTop + 0.9, 0.05, new THREE.Color(LM.fac === 'medglass' ? '#d8dcdf' : '#e6e1d6')); // parapet
-    band(base + 0.2, base + 1.1, 0.06, new THREE.Color('#bfb8aa'));
+    const cap = LM.fac === 'ecuWhite' ? '#2f5f9e' : LM.fac === 'medglass' ? '#d8dcdf' : LM.fac === 'ecuGlass' ? '#d9d2c4' : '#e3d7c3';
+    if (LM.fac === 'ecuWhite') band(wallTop - 1.6, wallTop + 0.6, 0.35, new THREE.Color(cap)); // the older white wings' blue roof fascia
+    else band(wallTop - 0.2, wallTop + 0.9, 0.05, new THREE.Color(cap)); // parapet
+    band(base + 0.2, base + 1.1, 0.06, new THREE.Color(LM.ecu || LM.heart || LM.kids ? '#b59f80' : '#bfb8aa'));
     // rooftop mechanical penthouse
-    if (area > 1500 && obb) { const pw = Math.min(obb.L * 0.35, 30), pd = Math.min(obb.W * 0.35, 18); box(obb.cx, obb.cz, wallTop, wallTop + 4.5, pw / 2, pd / 2, Math.atan2(obb.ux, obb.uz) + Math.PI / 2, new THREE.Color('#aeb2b4')); }
-    if (LM.main) hospitalDetails(LM, T, ctx, edges, box, frontEdge);
+    if (area > 1500 && obb && wallTop - base > (LM.ecu ? 28 : 14) && !LM.helipad) { const pw = Math.min(obb.L * 0.35, 30), pd = Math.min(obb.W * 0.35, 18); box(obb.cx, obb.cz, wallTop, wallTop + 4.5, pw / 2, pd / 2, Math.atan2(obb.ux, obb.uz) + Math.PI / 2, new THREE.Color('#aeb2b4')); }
+    if (LM.ecu) ecuHealthDetails(LM, T, ctx, edges, box, frontEdge);
+    else if (LM.main) hospitalDetails(LM, T, ctx, edges, box, frontEdge);
+    if (LM.heart) heartInstituteDetails(LM, T, ctx, edges, box, frontEdge);
+    if (LM.kids) childrensDetails(LM, T, ctx, edges, box, frontEdge);
   }
 }
 function addGeoTo(mb, geo, col) { // non-indexed copy of a three.js geometry into a mesh bucket
@@ -187,7 +198,7 @@ function signMesh(T, tex, wdt, hgt, emissive) {
   const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, emissive: emissive ? 0xffffff : 0x000000, emissiveMap: emissive ? tex : null, emissiveIntensity: emissive ? 0.9 : 0, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 });
   (T.lmMats || (T.lmMats = [])).push(m); return new THREE.Mesh(new THREE.PlaneGeometry(wdt, hgt), m);
 }
-// ER canopy + ambulances, helipad, rooftop lettering on the main hospital
+// ER canopy + ambulances, helipad, rooftop lettering on a big hospital without a hand-made look
 function hospitalDetails(LM, T, ctx, edges, box, frontEdge) {
   const { wallTop, obb, decor } = ctx;
   // tower crown: a lit glass band and a crown fascia above the top floor, glass fins up the long faces
@@ -199,19 +210,27 @@ function hospitalDetails(LM, T, ctx, edges, box, frontEdge) {
       if (e.L > 25) { const n = Math.floor(e.L / 9); for (let k = 1; k < n; k++) { const t = k / n; const x = e.a[0] + (e.b[0] - e.a[0]) * t + e.nx * 0.35, z = e.a[1] + (e.b[1] - e.a[1]) * t + e.nz * 0.35; const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L; decor.quad([x - tx * 0.9, ctx.base + 4, z - tz * 0.9], [x + tx * 0.9, ctx.base + 4, z + tz * 0.9], [x + tx * 0.9, wallTop, z + tz * 0.9], [x - tx * 0.9, wallTop, z - tz * 0.9], [0, 0], [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], FIN); } }
     }
   }
-  const spots = World.hospitalSpots.get(T.key) || []; World.hospitalSpots.set(T.key, spots);
-  // helipad on the roof
-  if (obb) {
-    const c = cnv(512, 512), g = c.getContext('2d'); g.fillStyle = '#6f7275'; g.fillRect(0, 0, 512, 512); g.strokeStyle = '#f2c230'; g.lineWidth = 22; g.beginPath(); g.arc(256, 256, 200, 0, 7); g.stroke(); g.strokeStyle = '#ffffff'; g.lineWidth = 12; g.strokeRect(16, 16, 480, 480);
-    g.fillStyle = '#ffffff'; g.fillRect(170, 150, 40, 212); g.fillRect(302, 150, 40, 212); g.fillRect(170, 236, 172, 40);
-    g.fillStyle = '#d32020'; g.fillRect(226, 110, 60, 20);
-    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const m = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.8 }); (T.lmMats || (T.lmMats = [])).push(m);
-    const s = Math.min(22, obb.W * 0.7, obb.L * 0.5); const pad = new THREE.Mesh(new THREE.PlaneGeometry(s, s), m); pad.rotation.x = -Math.PI / 2;
-    const px = obb.cx + obb.ux * obb.L * 0.25, pz = obb.cz + obb.uz * obb.L * 0.25; pad.position.set(px, wallTop + 0.95, pz); pad.receiveShadow = true; T.group.add(pad);
-    box(px, pz, wallTop, wallTop + 0.9, s / 2 + 0.5, s / 2 + 0.5, Math.atan2(obb.ux, obb.uz), new THREE.Color('#9a9c9e'));
-  }
-  // Emergency entrance
+  hospHelipad(T, ctx, box);
   const e = frontEdge(); if (!e) return;
+  hospER(T, e, box);
+  const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, yaw = Math.atan2(e.nx, e.nz);
+  const big = signMesh(T, textTexture([['ECU HEALTH', 150, '#ffffff', 90], ['MEDICAL CENTER', 92, '#ffffff', 200]], { w: 1024, h: 256 }), Math.min(e.L * 0.7, 36), Math.min(e.L * 0.7, 36) / 4, true);
+  big.position.set(mx + e.nx * 0.35, wallTop - 4, mz + e.nz * 0.35); big.rotation.y = yaw; T.group.add(big);
+}
+function hospSpots(T) { const s = World.hospitalSpots.get(T.key) || []; World.hospitalSpots.set(T.key, s); return s; }
+function hospHelipad(T, ctx, box) {
+  const { wallTop, obb } = ctx; if (!obb) return;
+  const c = cnv(512, 512), g = c.getContext('2d'); g.fillStyle = '#6f7275'; g.fillRect(0, 0, 512, 512); g.strokeStyle = '#f2c230'; g.lineWidth = 22; g.beginPath(); g.arc(256, 256, 200, 0, 7); g.stroke(); g.strokeStyle = '#ffffff'; g.lineWidth = 12; g.strokeRect(16, 16, 480, 480);
+  g.fillStyle = '#ffffff'; g.fillRect(170, 150, 40, 212); g.fillRect(302, 150, 40, 212); g.fillRect(170, 236, 172, 40);
+  g.fillStyle = '#d32020'; g.fillRect(226, 110, 60, 20);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const m = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.8 }); (T.lmMats || (T.lmMats = [])).push(m);
+  const s = Math.min(22, obb.W * 0.7, obb.L * 0.7); const pad = new THREE.Mesh(new THREE.PlaneGeometry(s, s), m); pad.rotation.x = -Math.PI / 2;
+  const px = obb.cx, pz = obb.cz; pad.position.set(px, wallTop + 0.95, pz); pad.receiveShadow = true; T.group.add(pad);
+  box(px, pz, wallTop, wallTop + 0.9, s / 2 + 0.5, s / 2 + 0.5, Math.atan2(obb.ux, obb.uz), new THREE.Color('#9a9c9e'));
+}
+// emergency department entrance: drive-through canopy, EMERGENCY sign, sliding doors, two ambulances
+function hospER(T, e, box) {
+  const spots = hospSpots(T);
   const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; const g0 = H(mx, mz); const yaw = Math.atan2(e.nx, e.nz);
   const W = Math.min(18, e.L * 0.5), D = 11, Hc = 5.2;
   const ux = e.b[0] - e.a[0], uz = e.b[1] - e.a[1]; const ul = Math.hypot(ux, uz); const tx = ux / ul, tz = uz / ul;
@@ -221,13 +240,104 @@ function hospitalDetails(LM, T, ctx, edges, box, frontEdge) {
   box(mx + e.nx * 0.25, mz + e.nz * 0.25, g0, g0 + 3.2, 4, 0.2, yaw, new THREE.Color('#34495a'));           // sliding glass doors
   const sign = signMesh(T, textTexture([['EMERGENCY', 190, '#e02020', 128]], { w: 1024, h: 256, bg: '#ffffff' }), W * 0.5, W * 0.5 / 4, true);
   sign.position.set(cx + e.nx * (D / 2 + 0.03), g0 + Hc + 0.4, cz + e.nz * (D / 2 + 0.03)); sign.rotation.y = yaw; T.group.add(sign);
-  // lettering high on the building
-  const big = signMesh(T, textTexture([['ECU HEALTH', 150, '#ffffff', 90], ['MEDICAL CENTER', 92, '#ffffff', 200]], { w: 1024, h: 256 }), Math.min(e.L * 0.7, 36), Math.min(e.L * 0.7, 36) / 4, true);
-  big.position.set(mx + e.nx * 0.35, wallTop - 4, mz + e.nz * 0.35); big.rotation.y = yaw; T.group.add(big);
-  // ambulances
   for (const s of [-0.45, 0.45]) { const a = makeAmbulance(); a.position.set(cx + tx * s * W * 0.6 + e.nx * 2, H(cx, cz) + 0.05, cz + tz * s * W * 0.6 + e.nz * 2); a.rotation.y = yaw + Math.PI; T.group.add(a); }
   spots.push({ type: 'er', x: cx + e.nx * (D / 2 + 3), z: cz + e.nz * (D / 2 + 3), yaw, tx, tz }, { type: 'door', x: mx + e.nx * 2.5, z: mz + e.nz * 2.5, yaw, tx, tz });
   T.hashItems.push([World.obsHash, World.obsHash.insert({ x: cx, z: cz, r: 0.4 }, cx - 1, cz - 1, cx + 1, cz + 1)]);
+}
+// edges of a medical-centre cell that are on the outside of the complex (not the cut lines between cells)
+function ecuOuterEdges(LM, edges) { return LM.whole ? edges.filter(e => e.L > 6 && !pointInPoly((e.a[0] + e.b[0]) / 2 + e.nx * 1.5, (e.a[1] + e.b[1]) / 2 + e.nz * 1.5, LM.whole)) : edges; }
+function ecuFacing(edges, pt) { // the outside edge that best faces a point
+  let best = null, bs = -1e9;
+  for (const e of edges) { const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, dx = pt[0] - mx, dz = pt[1] - mz, d = Math.hypot(dx, dz) || 1; const s = (dx * e.nx + dz * e.nz) / d * 40 + Math.min(e.L, 40) * 0.5 - d * 0.05; if (s > bs) { bs = s; best = e; } }
+  return best;
+}
+function ecuCanopyMat() { return MAT.ecuCanopy || (MAT.ecuCanopy = new THREE.MeshStandardMaterial({ color: '#a9cbe0', transparent: true, opacity: 0.5, roughness: 0.08, metalness: 0.4, side: THREE.DoubleSide, depthWrite: false })); }
+// the ECU Health Medical Center blocks: main entrance (white front wing, blue-framed glass gable canopy, the purple
+// "ECU HEALTH | Medical Center" band, a tan logo tower, flags, planted islands), the ER on its own block, the helipad up top
+function ecuHealthDetails(LM, T, ctx, edges, box, frontEdge) {
+  const { wallTop, decor } = ctx, outer = ecuOuterEdges(LM, edges);
+  if (LM.helipad) hospHelipad(T, ctx, box);
+  if (LM.erBlock) { const e = LM.erPt ? ecuFacing(outer, LM.erPt) : frontEdge(); if (e) hospER(T, e, box); }
+  if (!LM.entry) return;
+  const e = (LM.lot && ecuFacing(outer, LM.lot)) || frontEdge(); if (!e) return;
+  const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, g0 = H(mx, mz), yaw = Math.atan2(e.nx, e.nz);
+  const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L, nx = e.nx, nz = e.nz;
+  const at = (u, v) => [mx + tx * u + nx * v, mz + tz * u + nz * v];
+  const WHITE = new THREE.Color('#f3f2ee'), BRICK = new THREE.Color('#9c4b3b'), BLUE = new THREE.Color('#2d64ad'), DARK = new THREE.Color('#1f2a33'), TAN = new THREE.Color('#d9c2a0'), PURP = new THREE.Color(ECU_PURPLE);
+  // white single-storey front wing with a red-brick end
+  const WW = Math.min(e.L * 0.85, 46), WD = 12, WH = 5.6;
+  { const [x, z] = at(0, WD / 2); box(x, z, g0 - 0.3, g0 + WH, WW / 2, WD / 2, yaw, WHITE); }
+  { const [x, z] = at(-WW / 2 + 3.5, WD / 2 + 0.15); box(x, z, g0 - 0.3, g0 + WH + 1.2, 3.5, WD / 2 + 0.15, yaw, BRICK); }
+  { const [x, z] = at(4, WD + 0.06); box(x, z, g0 + 0.2, g0 + 3.4, WW / 2 - 8, 0.08, yaw, DARK); }          // storefront glass
+  { const [x, z] = at(4, WD + 0.1); box(x, z, g0 + 3.4, g0 + 3.6, WW / 2 - 8, 0.08, yaw, new THREE.Color('#9aa3aa')); }
+  // the purple-and-white name band along its fascia
+  { const sw = Math.min(WW * 0.62, 26), sh = sw / 9, [x, z] = at(5, WD + 0.2);
+    const c = cnv(1152, 128), g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 1152, 128); g.fillStyle = ECU_PURPLE; g.fillRect(0, 0, 470, 128);
+    g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#ffffff'; g.font = '800 78px "Arial Narrow", Arial, sans-serif'; g.fillText('ECU HEALTH', 235, 66, 440);
+    g.fillStyle = ECU_PURPLE; g.font = '600 70px Arial, sans-serif'; g.fillText('Medical Center', 811, 66, 640);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const s = signMesh(T, tex, sw, sh, false); s.position.set(x, g0 + WH - sh / 2 - 0.25, z); s.rotation.y = yaw; T.group.add(s); }
+  // blue-framed glass gable canopy over the drop-off
+  { const cw = 13, v0 = WD, v1 = WD + 11, eave = g0 + 5.4, ridge = g0 + 9.2, gl = new MB(true);
+    const P3 = (u, v, y) => { const [x, z] = at(u, v); return [x, y, z]; };
+    gl.quad(P3(-cw / 2, v0, eave), P3(-cw / 2, v1, eave), P3(0, v1, ridge), P3(0, v0, ridge), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#ffffff'));
+    gl.quad(P3(cw / 2, v1, eave), P3(cw / 2, v0, eave), P3(0, v0, ridge), P3(0, v1, ridge), [0, 0], [0, 0], [0, 0], [0, 0], null, new THREE.Color('#ffffff'));
+    gl.tri(P3(-cw / 2, v1, eave), P3(cw / 2, v1, eave), P3(0, v1, ridge), [0, 0], [0, 0], [0, 0], [nx, 0, nz], new THREE.Color('#ffffff')); // glazed gable end
+    const g = gl.geo(); if (g) { const m = new THREE.Mesh(g, ecuCanopyMat()); m.renderOrder = 2; T.group.add(m); }
+    for (const u of [-cw / 2, cw / 2]) for (const v of [v0 + 0.3, (v0 + v1) / 2, v1 - 0.2]) { const [x, z] = at(u, v); box(x, z, g0, eave, 0.22, 0.22, yaw, BLUE); }    // posts
+    for (const u of [-cw / 2, cw / 2]) { const [x, z] = at(u, (v0 + v1) / 2); box(x, z, eave - 0.35, eave, 0.25, (v1 - v0) / 2, yaw, BLUE); }                         // eave beams
+    { const [x, z] = at(0, (v0 + v1) / 2); box(x, z, ridge - 0.3, ridge, 0.25, (v1 - v0) / 2, yaw, BLUE); }                                                             // ridge
+    for (const v of [v0 + 0.2, v0 + (v1 - v0) / 3, v0 + (v1 - v0) * 2 / 3, v1 - 0.1]) for (const sg of [-1, 1]) { // rafters
+      const a = P3(sg * cw / 2, v, eave), b = P3(0, v, ridge), d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...d), cg = new THREE.BoxGeometry(0.18, L, 0.18);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(d[0] / L, d[1] / L, d[2] / L)); cg.applyQuaternion(q); cg.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); addGeoTo(decor, cg, BLUE); }
+    const [dx, dz] = at(0, WD + 0.12); box(dx, dz, g0, g0 + 3.2, 3.2, 0.12, yaw, new THREE.Color('#2a3a48'));                                                          // entrance doors
+  }
+  // the tan tower with the ECU Health logo and the street number
+  { const [x, z] = at(WW / 2 + 4, WD - 1), th = Math.min(wallTop - g0 + 2, 20);
+    box(x, z, g0 - 0.3, g0 + th, 2.6, 2.6, yaw, TAN); box(x, z, g0 + th, g0 + th + 0.5, 2.9, 2.9, yaw, new THREE.Color('#c7ae8a'));
+    const lg = cnv(256, 512), g = lg.getContext('2d'); g.fillStyle = 'rgba(0,0,0,0)'; g.clearRect(0, 0, 256, 512);
+    g.fillStyle = ECU_PURPLE; g.beginPath(); g.arc(128, 120, 80, 0, 7); g.fill(); g.fillStyle = '#ffffff'; g.font = '800 64px "Arial Narrow", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('ECU', 128, 104); g.font = '700 34px Arial'; g.fillText('HEALTH', 128, 154);
+    g.fillStyle = '#5a4630'; g.font = '700 70px Arial'; g.fillText('2100', 128, 460);
+    const tex = new THREE.CanvasTexture(lg); tex.colorSpace = THREE.SRGBColorSpace; const s = signMesh(T, tex, 4.2, 8.4, false);
+    s.position.set(x + nx * 2.65, g0 + th - 4.6, z + nz * 2.65); s.rotation.y = yaw; T.group.add(s); }
+  // flags and planted islands in front of the drop-off
+  if (typeof flagpole === 'function') { const fm = new MB(true); for (const u of [-11, -8, -5]) flagpole(T, fm, at(u, WD + 15)); addMB(T, fm, lmPlainMat()); }
+  const extra = T.extraTrees || (T.extraTrees = []), tb = treeBaseH('oak');
+  for (const u of [-18, -10, 10, 18]) { const [x, z] = at(u, WD + 22); if (!onRoadSurface(x, z)) { extra.push([x, z, (8 + Math.abs(u) * 0.1) / tb, u, 'oak']); const [ix, iz] = at(u, WD + 22); box(ix, iz, H(ix, iz) - 0.2, H(ix, iz) + 0.18, 3, 3, yaw, new THREE.Color('#5c7a3a')); } }
+  const spots = hospSpots(T); spots.push({ type: 'door', x: at(0, WD + 3)[0], z: at(0, WD + 3)[1], yaw, tx, tz });
+  // collision for the front wing and the tower
+  { const a = at(-WW / 2, 0), b = at(WW / 2, 0), c2 = at(WW / 2, WD), d = at(-WW / 2, WD), ring = [a, b, c2, d];
+    T.hashItems.push([World.bldHash, World.bldHash.insert({ ring, holes: [], minY: -1e9, maxY: g0 + WH, name: 'ECU Health Medical Center', cx: mx + nx * WD / 2, cz: mz + nz * WD / 2, h: WH }, Math.min(a[0], b[0], c2[0], d[0]), Math.min(a[1], b[1], c2[1], d[1]), Math.max(a[0], b[0], c2[0], d[0]), Math.max(a[1], b[1], c2[1], d[1]))]); }
+}
+// East Carolina Heart Institute: the round glass atrium at the entrance, white fins up the corners
+function heartInstituteDetails(LM, T, ctx, edges, box, frontEdge) {
+  const { wallTop, decor, base } = ctx, e = frontEdge(); if (!e) return;
+  const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, g0 = H(mx, mz), R = Math.min(9, e.L * 0.18), top = Math.min(wallTop - 2, g0 + 22);
+  const cx = mx + e.nx * R * 0.55, cz = mz + e.nz * R * 0.55;
+  const cyl = new THREE.CylinderGeometry(R, R, top - g0, 28, 1, true); cyl.translate(cx, (top + g0) / 2, cz);
+  const m = new THREE.Mesh(cyl, MAT.ecuAtrium || (MAT.ecuAtrium = new THREE.MeshStandardMaterial({ color: '#4c6c84', roughness: 0.08, metalness: 0.55, emissive: '#0d1a24' }))); m.castShadow = true; T.group.add(m);
+  for (let y = g0 + 4.2; y < top; y += 4.2) { const rg = new THREE.TorusGeometry(R + 0.05, 0.12, 4, 28); rg.rotateX(Math.PI / 2); rg.translate(cx, y, cz); addGeoTo(decor, rg, new THREE.Color('#e9ecee')); }
+  for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, x = cx + Math.cos(a) * (R + 0.05), z = cz + Math.sin(a) * (R + 0.05); box(x, z, g0, top, 0.08, 0.08, -a, new THREE.Color('#dfe3e6')); }
+  { const cp = new THREE.CylinderGeometry(R + 0.6, R + 0.6, 0.9, 28); cp.translate(cx, top + 0.45, cz); addGeoTo(decor, cp, new THREE.Color('#f2efe8')); }
+  const tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L, yaw = Math.atan2(e.nx, e.nz);
+  if (LM.name) { const sw = Math.min(e.L * 0.45, 22), s = signMesh(T, textTexture([['EAST CAROLINA HEART INSTITUTE', 70, '#ffffff', 50, 700]], { w: 1024, h: 96 }), sw, sw * 96 / 1024, true); const o = R + 6; s.position.set(mx + tx * o + e.nx * 0.4, wallTop - 2.2, mz + tz * o + e.nz * 0.4); s.rotation.y = yaw; T.group.add(s); }
+  box(cx + e.nx * R, cz + e.nz * R, g0, g0 + 3, 2.4, 0.15, yaw, new THREE.Color('#22303a'));
+  const spots = hospSpots(T); spots.push({ type: 'door', x: cx + e.nx * (R + 2.5), z: cz + e.nz * (R + 2.5), yaw, tx, tz });
+}
+// Maynard Children's Hospital: the white tensile sail canopies over its entrance
+function childrensDetails(LM, T, ctx, edges, box, frontEdge) {
+  let e = null, bs = -1e9; // the side facing the big road (Stantonsburg Road), not the service loop behind
+  for (const q of edges) { if (q.L < 10) continue; const nr = nearestRoad((q.a[0] + q.b[0]) / 2 + q.nx * 6, (q.a[1] + q.b[1]) / 2 + q.nz * 6, 220, r => r.car && r.rank >= 5); const sc = -(nr ? nr.d : 220) + Math.min(q.L, 40) * 0.3; if (sc > bs) { bs = sc; e = q; } }
+  if (!e) e = frontEdge(); if (!e) return;
+  const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2, g0 = H(mx, mz), tx = (e.b[0] - e.a[0]) / e.L, tz = (e.b[1] - e.a[1]) / e.L, yaw = Math.atan2(e.nx, e.nz);
+  const at = (u, v, y) => [mx + tx * u + e.nx * v, y, mz + tz * u + e.nz * v], sail = new MB(true), W = new THREE.Color('#fbfbf8');
+  for (let k = -1; k <= 1; k++) { // three hyperbolic sails, high and low corners alternating
+    const u = k * 9, A = at(u - 4.5, 1, g0 + 7.5), Bp = at(u + 4.5, 1, g0 + 4.5), C = at(u + 4.5, 10, g0 + 8), D = at(u - 4.5, 10, g0 + 4.8);
+    const N = 6; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const p = (s, t) => { const l = (P1, P2, w) => P1.map((c, n) => c + (P2[n] - c) * w); return l(l(A, Bp, s), l(D, C, s), t); }; sail.quad(p(i / N, j / N), p((i + 1) / N, j / N), p((i + 1) / N, (j + 1) / N), p(i / N, (j + 1) / N), [0, 0], [0, 0], [0, 0], [0, 0], null, W); }
+    for (const q of [Bp, C, D, A]) { const [x, , z] = q; if (q === A) continue; box(x, z, g0, q[1], 0.12, 0.12, yaw, new THREE.Color('#c9ccd0')); }
+  }
+  const g = sail.geo(); if (g) { const m = new THREE.Mesh(g, MAT.sail || (MAT.sail = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, side: THREE.DoubleSide }))); m.castShadow = true; T.group.add(m); }
+  if (LM.name) { const sw = Math.min(e.L * 0.5, 20), s = signMesh(T, textTexture([["MAYNARD CHILDREN'S HOSPITAL", 66, ECU_PURPLE, 50, 800]], { w: 1024, h: 96 }), sw, sw * 96 / 1024, false); s.position.set(mx + e.nx * 0.35, Math.min(ctx.wallTop - 1.5, g0 + 9.5), mz + e.nz * 0.35); s.rotation.y = yaw; T.group.add(s); }
 }
 function makeAmbulance() { const g = makeServiceVehicle('ambulance'); if (typeof Rides !== 'undefined') Rides.add(g, 'ambulance'); return g; } // detailed model (04j_service_vehicles.js)
 
@@ -415,4 +525,68 @@ function paintDiamonds(g, P, Z) {
 function paintLandmarkGround(g, P) {
   const Z = P.zones || (P.zones = landmarkZones(P));
   paintDiamonds(g, P, Z);
+}
+
+// ---------- ECU Health Medical Center: one huge OSM outline → a cluster of blocks ----------
+// OSM maps the whole complex (relation 7456889, ~410 × 310 m) as a single building. The real thing is a
+// stepped cluster: a 7–8 storey tan precast core, 4–6 storey wings with dark-glass curtain walls, and low
+// 2–3 storey white wings round the edge, with the main entrance facing the big south-east car parks and the
+// emergency department on North Emergency Drive. Cut the outline into ~45 × 40 m cells and give each its own
+// height and look (picked up by landmarkStyle through the ecu:* tags).
+function clipConvex(poly, win) { // Sutherland–Hodgman: poly clipped by a convex CCW window
+  let out = poly;
+  for (let i = 0; i < win.length && out.length; i++) {
+    const a = win[i], b = win[(i + 1) % win.length], inp = out; out = [];
+    const side = p => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+    for (let j = 0; j < inp.length; j++) {
+      const p = inp[j], q = inp[(j + 1) % inp.length], sp = side(p), sq = side(q);
+      if (sp >= 0) out.push(p);
+      if ((sp >= 0) !== (sq >= 0)) { const t = sp / (sp - sq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
+    }
+  }
+  const clean = []; for (const p of out) { const l = clean[clean.length - 1]; if (!l || Math.hypot(l[0] - p[0], l[1] - p[1]) > 0.05) clean.push(p); }
+  if (clean.length > 2 && Math.hypot(clean[0][0] - clean[clean.length - 1][0], clean[0][1] - clean[clean.length - 1][1]) < 0.05) clean.pop();
+  return clean;
+}
+function splitHospital(T, P) {
+  const i = P.buildings.findIndex(B => B.id === 7456889 || (/^ECU Health Medical Center$/.test(B.tags.name || '') && Math.abs(signedArea(B.ring)) > 20000));
+  if (i < 0) return; const B = P.buildings[i], ring = B.ring, ob = minAreaRect(ring); if (!ob) return;
+  const whole = ring, [wx, wz] = [ob.cx, ob.cz];
+  // the main entrance faces the biggest car park nearby; the ER faces the road named "… Emergency …"
+  let lot = null, la = 0; for (const a of P.areas) { if (a.kind !== 'parking' || !a.rings[0]) continue; const ar = Math.abs(signedArea(a.rings[0])), c = centroid(a.rings[0]); if (ar > la && Math.hypot(c[0] - wx, c[1] - wz) < 380) { la = ar; lot = c; } }
+  let er = null, ed = 1e9; for (const r of P.roads) if (/Emergency/i.test(r.tags.name || '')) for (const p of r.pts) { const d = Math.hypot(p[0] - wx, p[1] - wz); if (d < ed) { ed = d; er = p; } }
+  if (!er) er = [lonToX(-77.40476), latToZ(35.60948)]; // North Emergency Drive meets the complex here (it can be on the next square's map)
+  const nu = Math.max(2, Math.round(ob.L / 46)), nv = Math.max(2, Math.round(ob.W / 40)), cu = ob.L / nu, cv = ob.W / nv;
+  const P2 = (u, v) => [ob.cx + ob.ux * u + ob.vx * v, ob.cz + ob.uz * u + ob.vz * v];
+  const cells = [];
+  for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
+    const u0 = -ob.L / 2 + a * cu - 0.01, u1 = u0 + cu + 0.02, v0 = -ob.W / 2 + b * cv - 0.01, v1 = v0 + cv + 0.02;
+    let win = [P2(u0, v0), P2(u1, v0), P2(u1, v1), P2(u0, v1)]; if (signedArea(win) < 0) win.reverse();
+    let rg = clipConvex(ring, win); if (rg.length < 3) continue; const ar = Math.abs(signedArea(rg)); if (ar < 120) continue;
+    const holes = []; let holeA = 0;
+    for (const h of B.holes) { const hc = clipConvex(h, win); if (hc.length < 3) continue; const ha = Math.abs(signedArea(hc)); holeA += ha; if (ha > 15 && hc.every(p => { const du = (p[0] - ob.cx) * ob.ux + (p[1] - ob.cz) * ob.uz, dv = (p[0] - ob.cx) * ob.vx + (p[1] - ob.cz) * ob.vz; return du > u0 + 0.5 && du < u1 - 0.5 && dv > v0 + 0.5 && dv < v1 - 0.5; })) holes.push(hc); }
+    if (holeA > ar * 0.6) continue; // a courtyard
+    const c = centroid(rg), rn = Math.max(Math.abs((a + 0.5) / nu - 0.5) * 2, Math.abs((b + 0.5) / nv - 0.5) * 2); // 0 = middle … 1 = edge
+    cells.push({ ring: rg, holes, c, ar, rn, a, b });
+  }
+  if (cells.length < 2) return;
+  const hh = (k) => { const x = Math.sin(k * 127.1 + B.id * 0.001) * 43758.5453; return x - Math.floor(x); };
+  for (const [k, C] of cells.entries()) {
+    const r = hh(k + 1), r2 = hh(k + 41);
+    C.lv = C.rn < 0.3 ? 7 + (r < 0.5 ? 1 : 0) : C.rn < 0.7 ? 4 + Math.floor(r * 3) : 2 + (r < 0.4 ? 1 : 0);
+    C.look = C.lv >= 7 ? 'tan' : C.lv >= 4 ? (r2 < 0.35 ? 'glass' : 'tan') : (r2 < 0.55 ? 'white' : 'tan');
+    if (lot) C.dLot = Math.hypot(C.c[0] - lot[0], C.c[1] - lot[1]); if (er) C.dEr = Math.hypot(C.c[0] - er[0], C.c[1] - er[1]);
+  }
+  const by = (f) => cells.reduce((m, c) => (f(c) < f(m) ? c : m), cells[0]);
+  const main = lot ? by(c => c.dLot - c.ar * 0.002) : by(c => -c.rn);
+  main.lv = 5; main.look = 'glass'; main.main = true;
+  const erc = er ? by(c => c.dEr) : null; if (erc && erc !== main) { erc.er = true; erc.lv = Math.min(erc.lv, 3); erc.look = 'tan'; }
+  const tall = by(c => -(c.lv * 1000 + c.ar)); tall.helipad = true;
+  const out = cells.map((C, k) => {
+    const tags = { building: 'hospital', 'building:levels': String(C.lv), 'ecu:look': C.look };
+    if (C.main) { tags.name = 'ECU Health Medical Center'; tags['ecu:main'] = 'yes'; }
+    if (C.er) { tags['ecu:er'] = 'yes'; tags.emergency = 'yes'; } if (C.helipad) tags['ecu:helipad'] = 'yes';
+    return { id: B.id * 100 + k, tags, ring: C.ring, holes: C.holes, part: false, ecuWhole: whole, ecuLot: C.main ? lot : null, ecuEr: C.er ? er : null };
+  });
+  P.buildings.splice(i, 1, ...out);
 }

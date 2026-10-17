@@ -550,7 +550,7 @@ const PAL = {
   metal: ['#ffffff', '#dfe6ea', '#e8e2d6', '#cfd8d0', '#d6d0e0'],
   shingle: ['#5a5a5c', '#3f4042', '#6b5a4a', '#4a4038', '#5d6468', '#7a6a58', '#3b4a3f', '#7a3b2c', '#48494b'],
   flat: ['#d8d8d6', '#bfc0bf', '#9a9b9c', '#e8e8e6', '#7d7f82', '#cfcac0'],
-  campus: ['#ffffff', '#fbeee8', '#f4e6de'], campusModern: ['#ffffff'], tanbrick: ['#ffffff'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'],
+  campus: ['#ffffff', '#fbeee8', '#f4e6de'], campusModern: ['#ffffff'], tanbrick: ['#ffffff'], pcc: ['#ffffff', '#f6efe6'], hospital: ['#ffffff', '#f6f1e8', '#efe9de'], medglass: ['#ffffff'], ecuTan: ['#ffffff'], ecuGlass: ['#ffffff'], ecuWhite: ['#ffffff'], heartFins: ['#ffffff'],
 };
 const _col = new THREE.Color();
 function colHex(h) { return new THREE.Color(h); }
@@ -640,7 +640,7 @@ async function buildBuildings(T, P) {
     const LM = landmarkStyle(B, cx, cz, area, obb, Z);
     if (LM && LM.kind === 'skip') return;
     if (LM && LM.kind === 'grandstand') { buildGrandstand(B, T, P, seats, Z); return; }
-    if (LM) { fac = LM.fac; if (!(parseLen(t.height) > 0)) h = LM.h; if (!shape) shape = LM.shape; }
+    if (LM) { fac = LM.fac; if (!(parseLen(t.height) > 0) || LM.forceH) h = LM.h; if (!shape) shape = LM.shape; }
     if (!shape) {
       const housey = fac === 'siding' || (fac === 'brick' && (HOUSEY.has(bt) || (bt === 'yes' && lu === 80)));
       if (housey && area < 480 && rect > 0.7 && obb.W < 16) shape = r3 < 0.55 ? 'hipped' : 'gabled';
@@ -1017,6 +1017,7 @@ async function buildTile(T) {
   try { T.facades = applyFacades(P, await Promise.race([Facades.get(), late(8000)])); } catch (e) { console.warn('photo-read facades skipped', e); } // real looks read off street photos win over the tax record
   try { T.pittMatched = applyPittRecords(T, P, await Promise.race([pittP, late(20000)]), await Promise.race([Facades.get(), late(1)])); } catch (e) { console.warn('county building records skipped', e); }
   try { T.parcelAdded = applyParcels(T, P, await Promise.race([parcelP, sleep(12000).then(() => null)])); } catch (e) { console.warn('parcels skipped', e); } await yieldMaybe();
+  try { splitHospital(T, P); } catch (e) { console.warn('hospital split skipped', e); }
   try { prepCivic(T, P); } catch (e) { console.warn('stations skipped', e); }
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();

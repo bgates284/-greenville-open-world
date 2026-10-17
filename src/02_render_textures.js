@@ -226,6 +226,48 @@ function buildTextures() {
       for (let b = 0; b < 8; b++) if (r() < .45) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(b * 64 + 5, y0 + 34, 59, 62); }
     }
   });
+  // ECU Health Medical Center: warm tan precast with tall dark-tinted windows in each bay, faint panel joints
+  mk('ecuTan', 3.0, 4.2, (g, ge, r) => {
+    noiseFill(g, 512, 512, [222, 198, 166], 9, 77);
+    for (let f = 0; f < 4; f++) {
+      const y0 = 512 - (f + 1) * 128;
+      g.fillStyle = 'rgba(120,96,70,.18)'; g.fillRect(0, y0 + 124, 512, 3);                                  // panel joint at each floor
+      for (let b = 0; b < 4; b++) {
+        const x0 = b * 128; g.fillStyle = 'rgba(120,96,70,.12)'; g.fillRect(x0, y0, 2, 128);
+        const gr = g.createLinearGradient(0, y0 + 22, 0, y0 + 108); gr.addColorStop(0, '#3a4650'); gr.addColorStop(1, '#1d252c'); g.fillStyle = gr; g.fillRect(x0 + 40, y0 + 22, 48, 86);
+        g.fillStyle = 'rgba(255,255,255,.10)'; g.fillRect(x0 + 40, y0 + 22, 48, 8); g.fillStyle = '#b9a383'; g.fillRect(x0 + 37, y0 + 108, 54, 5);
+        if (r() < .4) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(x0 + 40, y0 + 22, 48, 86); }
+      }
+    }
+  });
+  // its dark-tinted glass curtain walls (main entrance block), slim grey mullions, dark spandrels
+  mk('ecuGlass', 1.6, 4.2, (g, ge, r) => {
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      const gr = g.createLinearGradient(0, y0, 0, y0 + 128); gr.addColorStop(0, '#46525c'); gr.addColorStop(0.75, '#232b32'); gr.addColorStop(1, '#1a2026'); g.fillStyle = gr; g.fillRect(x0, y0, 128, 128);
+      g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + 60, y0); g.lineTo(x0, y0 + 70); g.fill();
+      g.fillStyle = '#7d8790'; g.fillRect(x0, y0, 5, 128); g.fillStyle = '#2b3136'; g.fillRect(x0, y0 + 104, 128, 24); g.fillStyle = '#8d969e'; g.fillRect(x0, y0 + 102, 128, 3);
+      if (r() < .35) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(x0 + 5, y0 + 4, 123, 96); }
+    }
+  });
+  // the older white wings (blue roofs): white panels, punched windows
+  mk('ecuWhite', 3.0, 4.0, (g, ge, r) => {
+    noiseFill(g, 512, 512, [238, 238, 234], 6, 78);
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      win(g, ge, r, x0 + 30, y0 + 34, 68, 62, null, '#3a4a5a', '#25313c', .38); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(x0, y0 + 124, 128, 3);
+    }
+  });
+  // East Carolina Heart Institute: cream precast, white vertical fins between narrow dark windows
+  mk('heartFins', 2.4, 4.2, (g, ge, r) => {
+    noiseFill(g, 512, 512, [228, 214, 188], 7, 79);
+    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
+      const x0 = b * 128, y0 = 512 - (f + 1) * 128;
+      const gr = g.createLinearGradient(0, y0 + 12, 0, y0 + 116); gr.addColorStop(0, '#3f5462'); gr.addColorStop(1, '#22313b'); g.fillStyle = gr; g.fillRect(x0 + 34, y0 + 12, 60, 104);
+      g.fillStyle = '#f7f6f2'; g.fillRect(x0 + 2, y0, 22, 128); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x0 + 24, y0, 4, 128);           // white fin + its shadow
+      if (r() < .4) { ge.fillStyle = r() < .5 ? '#eaf4ff' : '#fff1d8'; ge.fillRect(x0 + 34, y0 + 12, 60, 104); }
+    }
+  });
   // Glass curtain wall (heart institute, cancer centre, stadium suites)
   mk('medglass', 1.6, 4.2, (g, ge, r) => {
     for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
