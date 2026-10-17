@@ -408,6 +408,35 @@ function strip(mb, R, c, w, yAt, vScale, skirt, i0 = 0, i1 = R.length - 1) {
   }
 }
 
+// ---------- bridge & overpass profiles (public-data/bridges.json, from tools/bridges.mjs) ----------
+// For every bridge and the approach roads either side: how high the roadway rides above the ground, every few
+// metres, worked out from what each bridge crosses; and where its ramps meet the ground. Decks are levelled
+// between those touch-down points (so a long viaduct doesn't follow the dips in the elevation data).
+const Bridges = {
+  data: null, base: new Map(),
+  load() { if (this.p) return this.p; const url = (window.GV_DATA ? window.GV_DATA : 'public-data/') + 'bridges.json'; return this.p = fetch(url).then(r => r.ok ? r.json() : null).then(d => { this.data = d; return d; }).catch(() => null); },
+  groupsFor(P) { const d = this.data; if (!d) return []; const g = new Set(); for (const rd of P.roads) { const e = rd.own && d.roads[rd.id]; if (e) g.add(e[0]); } return [...g]; },
+  bbox(groups) { let w = 1e9, e = -1e9, s = 1e9, n = -1e9; for (const gi of groups) for (const [x, z] of this.data.groups[gi]) { const lo = xToLon(x), la = zToLat(z); w = Math.min(w, lo); e = Math.max(e, lo); s = Math.min(s, la); n = Math.max(n, la); } return w < e ? { w, e, s, n } : null; },
+  hs(x, z) { return (H(x, z) * 2 + H(x + 8, z) + H(x - 8, z) + H(x, z + 8) + H(x, z - 8)) / 6; }, // ground, smoothed a little
+  baseFn(gi) { // level of the deck's ground line: between the touch-down points
+    let f = this.base.get(gi); if (f) return f;
+    const A = this.data.groups[gi].map(([x, z]) => [x, z, this.hs(x, z)]);
+    if (A.length === 2) { const [a, b] = A, dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1; f = (x, z) => { const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1); return a[2] + (b[2] - a[2]) * t; }; }
+    else f = (x, z) => { let sw = 0, sh = 0; for (const [ax, az, h] of A) { const d2 = (x - ax) ** 2 + (z - az) ** 2 + 25, w = 1 / d2; sw += w; sh += w * h; } return sh / sw; };
+    this.base.set(gi, f); return f;
+  },
+  setup(road, e) { // e = [group, isBridge, n, lift×10 …]
+    const gi = e[0], n = e[2], L = e.slice(3), len = road.len || 1, yoff = 0.15 + road.rank * 0.012;
+    road.liftAt = s => { const u = clamp(s / len, 0, 1) * n, k = Math.min(n - 1, Math.floor(u)), t = u - k; return n ? (L[k] + (L[k + 1] - L[k]) * t) / 10 : L[0] / 10; };
+    road.maxLift = Math.max(...L) / 10; road.ramp = !road.bridge;
+    road.deckAt = s => {
+      const q = pointAlong(road, s), lift = road.liftAt(s), g = H(q[0], q[1]);
+      const w = lift <= 0 ? 0 : lift >= 1.5 ? 1 : (lift / 1.5) ** 2 * (3 - 2 * lift / 1.5);
+      const y = (g + yoff) * (1 - w) + (this.baseFn(gi)(q[0], q[1]) + lift + 0.15) * w;
+      return road.bridge ? Math.max(y, g + 0.45) : y;
+    };
+  },
+};
 function registerRoads(T, P) {
   T.roadIds = [];
   for (const rd of P.roads) {
@@ -427,7 +456,9 @@ function registerRoads(T, P) {
     road.mesh = !!info && !road.tunnel && !road.paintOnly;
     for (let i = 1; i < road.pts.length; i++) road.cum.push(road.cum[i - 1] + Math.hypot(road.pts[i][0] - road.pts[i - 1][0], road.pts[i][1] - road.pts[i - 1][1]));
     road.len = road.cum[road.cum.length - 1];
-    if (road.bridge) {
+    const bp = road.car && Bridges.data && Bridges.data.roads[road.id];
+    if (bp) Bridges.setup(road, bp);
+    else if (road.bridge) {
       const p0 = road.pts[0], pn = road.pts[road.pts.length - 1]; const e0 = H(p0[0], p0[1]) + 0.25, e1 = H(pn[0], pn[1]) + 0.25; const Lr = road.len || 1;
       let minUnder = 1e9; for (let s = 0; s <= Lr; s += 4) { const q = pointAlong(road, s); minUnder = Math.min(minUnder, H(q[0], q[1])); }
       const clearance = Math.min(e0, e1) - minUnder; const layer = parseInt(rd.tags.layer) || 1;
@@ -439,7 +470,7 @@ function registerRoads(T, P) {
     for (let i = 0; i < road.pts.length - 1; i++) {
       const a = road.pts[i], b = road.pts[i + 1]; const pad = road.w / 2 + 1;
       World.segHash.insert({ road, i }, Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad);
-      if (road.bridge && road.car) World.bridgeHash.insert({ road, i }, Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad);
+      if (road.deckAt && road.car && (road.bridge || road.liftAt(road.cum[i]) > 0.05 || road.liftAt(road.cum[i + 1]) > 0.05)) World.bridgeHash.insert({ road, i }, Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad);
     }
     const bb = road.pts.reduce((m, p) => [Math.min(m[0], p[0]), Math.min(m[1], p[1]), Math.max(m[2], p[0]), Math.max(m[3], p[1])], [1e9, 1e9, -1e9, -1e9]);
     World.mmHash.insert({ road }, bb[0], bb[1], bb[2], bb[3]);
@@ -462,7 +493,7 @@ function isJunction(id, P) { const d = P.deg.get(id) || 0; const adj = World.nod
 
 async function buildRoadMeshes(T, P) {
   const buckets = {}; for (const k in MAT.road) buckets[k] = new MB();
-  const sw = new MB(), deckSide = new MB(), disc = new MB();
+  const sw = new MB(), deckSide = new MB(), disc = new MB(), emb = new MB(true), EMB = new THREE.Color('#6f8f4a');
   const piers = [];
   T.lampPos = [];
   const lampInst = [];
@@ -475,7 +506,7 @@ async function buildRoadMeshes(T, P) {
   function roadMesh(road) {
     const R = resample(road.pts, Q === QUALITY.low ? 8 : 5);
     const yoff = 0.15 + road.rank * 0.012;
-    const yAt = road.bridge ? (p) => road.deckAt(p[2]) : (p) => H(p[0], p[1]) + yoff;
+    const yAt = road.deckAt ? (p) => road.deckAt(p[2]) : (p) => H(p[0], p[1]) + yoff;
     strip(buckets.plain, R, 0, road.w, yAt, 1 / 12, road.bridge ? 1.1 : true); // markings are separate geometry (04d_streets.js)
     R_of.set(road.id, { R, Ry: R.map(p => yAt(p)) });
     // junction positions along this road (with each junction's clearance)
@@ -486,7 +517,20 @@ async function buildRoadMeshes(T, P) {
       for (const side of [-1, 1]) strip(deckSide, R, side * (road.w / 2 + 0.15), 0.3, p => road.deckAt(p[2]) + 0.9, 1 / 4, 0.95);
       for (let s = 12; s < road.len - 8; s += 24) { const q = pointAlong(road, s); const top = road.deckAt(s) - 1.1, gy = H(q[0], q[1]); if (top - gy > 2.5) piers.push([q[0], gy - 0.5, q[1], top]); }
     }
-    // sidewalks
+    if (road.ramp && road.maxLift > 0.3) { // approach on an embankment: grassy side slopes down to the ground, a low barrier on top
+      for (const side of [-1, 1]) for (let i = 0; i < R.length - 1; i++) {
+        const a = R[i], b = R[i + 1], la = road.liftAt(a[2]), lb = road.liftAt(b[2]); if (la < 0.25 && lb < 0.25) continue;
+        let tx = b[0] - a[0], tz = b[1] - a[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl; const nx = -tz * side, nz = tx * side, e = road.w / 2 + 0.2;
+        // the slope stops short of any other roadway alongside (a twin carriageway, a frontage road)
+        const room = (p, want) => { for (let o = e + 0.6; o <= e + want; o += 0.8) { const x = p[0] + nx * o, z = p[1] + nz * o, nr = nearestRoad(x, z, 14, q => q.mesh && q !== road); if (nr && nr.d < nr.road.w / 2 + 0.6) return Math.max(0.3, o - e - 1.0); } return want; };
+        const ya = road.deckAt(a[2]), yb = road.deckAt(b[2]), oa = e + room(a, 0.4 + la * 1.6), ob = e + room(b, 0.4 + lb * 1.6);
+        const A0 = [a[0] + nx * e, ya - 0.05, a[1] + nz * e], B0 = [b[0] + nx * e, yb - 0.05, b[1] + nz * e], A1 = [a[0] + nx * oa, H(a[0] + nx * oa, a[1] + nz * oa) - 0.1, a[1] + nz * oa], B1 = [b[0] + nx * ob, H(b[0] + nx * ob, b[1] + nz * ob) - 0.1, b[1] + nz * ob];
+        if (side > 0) emb.quad(A0, A1, B1, B0, [0, 0], [0, 0], [0, 0], [0, 0], [nx * 0.6, 1, nz * 0.6], EMB); else emb.quad(A0, B0, B1, A1, [0, 0], [0, 0], [0, 0], [0, 0], [nx * 0.6, 1, nz * 0.6], EMB);
+      }
+      for (const side of [-1, 1]) strip(deckSide, R, side * (road.w / 2 + 0.1), 0.25, p => road.deckAt(p[2]) + (road.liftAt(p[2]) > 0.8 ? 0.75 : -0.6), 1 / 4, 0.8);
+    }
+    // sidewalks (not up on a ramp)
+    if (road.ramp) for (let s0 = -1, k = 0; k < R.length; k++) { const up = road.liftAt(R[k][2]) > 0.25; if (up && s0 < 0) s0 = R[k][2]; if ((!up || k === R.length - 1) && s0 >= 0) { const c = (s0 + R[k][2]) / 2, e = (R[k][2] - s0) / 2 + 1; js.push([c, e]); s0 = -1; } }
     if (road.sidewalk && !road.bridge) {
       const sides = road.sidewalk === 'both' ? [-1, 1] : road.sidewalk === 'left' ? [-1] : [1];
       for (const side of sides) {
@@ -501,7 +545,7 @@ async function buildRoadMeshes(T, P) {
       const spacing = road.rank >= 5 ? 36 : 44; const both = road.rank >= 6;
       let k = 0;
       for (let s = spacing * 0.5; s < road.len; s += spacing, k++) {
-        if (nearJ(s, 4)) continue;
+        if (nearJ(s, 4) || (road.liftAt && road.liftAt(s) > 0.3)) continue;
         const side = both ? (k % 2 ? 1 : -1) : 1;
         const q = pointAlong(road, s), q2 = pointAlong(road, Math.min(road.len, s + 1)); let dx = q2[0] - q[0], dz = q2[1] - q[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
         const off = road.w / 2 + (road.sidewalk ? 2.9 : 1.1);
@@ -516,7 +560,7 @@ async function buildRoadMeshes(T, P) {
   try { buildParkingLines(T, P, mk); } catch (e) { console.warn('parking lines skipped', e); }
   const addMesh = (mb, mat, shadow = false) => { const g = mb.geo(); if (!g) return; const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = shadow; T.group.add(m); };
   for (const k in buckets) addMesh(buckets[k], MAT.road[k]);
-  addMesh(disc, MAT.road.plain); addMesh(sw, MAT.sidewalk); addMesh(deckSide, MAT.concrete, true);
+  addMesh(disc, MAT.road.plain); addMesh(sw, MAT.sidewalk); addMesh(deckSide, MAT.concrete, true); addMesh(emb, MAT.embank || (MAT.embank = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide })));
   if (!MAT.marking) MAT.marking = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -14 });
   addMesh(mk, MAT.marking);
   if (piers.length) {
@@ -1009,6 +1053,7 @@ async function buildTile(T) {
   // the square was dropped while it was still being built (you moved on): undo what it already put in the world
   const gone = () => { if (T.state !== 'gone') return false; for (const [h, it] of T.hashItems) h.remove(it); T.hashItems.length = 0; T.group.removeFromParent(); return true; };
   const P = TT('parseTile', () => parseTile(data, T.tx, T.ty)); await yieldMaybe();
+  await Promise.race([Bridges.load(), sleep(5000)]); { const bb = Bridges.data && Bridges.bbox(Bridges.groupsFor(P)); if (bb) await ensureDEM(bb, T.prio); } // bridges & their ramps (tools/bridges.mjs)
   TT('registerRoads', () => registerRoads(T, P)); await yieldMaybe();
   const late = ms => sleep(ms).then(() => null);
   try { mergeNCBuildings(T, P, await Promise.race([ncP, late(15000)])); } catch (e) { console.warn('NC building footprints skipped', e); } await yieldMaybe();

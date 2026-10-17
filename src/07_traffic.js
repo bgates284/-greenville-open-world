@@ -121,7 +121,7 @@ const Traffic = {
       c.ox += (-g2.dz * lo - c.ox) * k; c.oz += (g2.dx * lo - c.oz) * k;
       c.x = px + c.ox; c.z = pz + c.oz;
       let y;
-      if (c.road.bridge) { const iMin = Math.min(c.i, c.i + c.dir); const t = c.dir > 0 ? c.s / g2.L : 1 - c.s / g2.L; y = deckHeight(c.road, iMin, t) + 0.08; }
+      if (c.road.deckAt) { const iMin = Math.min(c.i, c.i + c.dir); const t = c.dir > 0 ? c.s / g2.L : 1 - c.s / g2.L; y = deckHeight(c.road, iMin, t) + 0.08; }
       else y = H(c.x, c.z) + 0.24;
       c.yaw += angleDiff(c.yaw, Math.atan2(g2.dx, g2.dz)) * Math.min(1, dt * 5);
       c.obj.position.set(c.x, y, c.z); c.obj.rotation.y = c.yaw;
@@ -259,7 +259,7 @@ const Peds = {
       if (P.mode === 'walk') { const dx = nx - P.pos.x, dz = nz - P.pos.z, d = Math.hypot(dx, dz); if (d < 0.7 && d > 1e-3) { nx = P.pos.x + dx / d * 0.7; nz = P.pos.z + dz / d * 0.7; } }
       p.x = nx; p.z = nz; p.onRoad = p.road.car && !p.road.sidewalk && Math.abs(p.lat) > 0.5;
       p.hop = Math.max(0, p.hop - dt * 12);
-      let y = p.road.bridge ? deckHeight(p.road, lo0, p.dir > 0 ? p.s / g2.L : 1 - p.s / g2.L) + 0.05 : groundY(p.x, p.z, H(p.x, p.z) + 1);
+      let y = p.road.deckAt ? deckHeight(p.road, lo0, p.dir > 0 ? p.s / g2.L : 1 - p.s / g2.L) + 0.05 : groundY(p.x, p.z, H(p.x, p.z) + 1);
       const hopY = p.state === 'dodge' ? Math.sin(Math.min(1, p.t / 0.55) * Math.PI) * 0.45 : 0;
       const g = p.person.g; g.position.set(p.x, y + hopY, p.z);
       if (p.state === 'down') {

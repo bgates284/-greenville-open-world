@@ -16,6 +16,7 @@ if (fs.existsSync(dataSrc)) for (const f of fs.readdirSync(dataSrc)) { fs.copyFi
 // railways, level crossings, bus routes and stops (npm run fetch-transit)
 if (fs.existsSync(path.join(root, 'public-data', 'transit.json'))) fs.copyFileSync(path.join(root, 'public-data', 'transit.json'), path.join(site, 'data', 'transit.json'));
 // restaurants & stores for the whole county (npm run fetch-places)
+if (fs.existsSync(path.join(root, 'public-data', 'bridges.json'))) fs.copyFileSync(path.join(root, 'public-data', 'bridges.json'), path.join(site, 'data', 'bridges.json'));
 if (fs.existsSync(path.join(root, 'public-data', 'places.json'))) fs.copyFileSync(path.join(root, 'public-data', 'places.json'), path.join(site, 'data', 'places.json'));
 // tree canopy heights per square (npm run fetch-canopy)
 const canSrc = path.join(root, 'public-data', 'canopy'); let nc = 0;
