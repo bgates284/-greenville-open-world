@@ -119,7 +119,12 @@ function hmCourthouse(T, B, P, mb) {
   // the Evans Street colonnade: six columns between the side wall's ends, toward the front
   { const side = S.E.filter(e => e !== S.front && Math.abs(e.nx * S.front.nx + e.nz * S.front.nz) < 0.3).sort((p, q) => { const px = (evansAtB ? fe.b : fe.a); return Math.hypot(p.mx - px[0], p.mz - px[1]) - Math.hypot(q.mx - px[0], q.mz - px[1]); })[0];
     if (side) { const nearFront = Math.hypot(side.a[0] - fe.mx, side.a[1] - fe.mz) < Math.hypot(side.b[0] - fe.mx, side.b[1] - fe.mz); const sc = nearFront ? Math.min(side.L - 8, 3 + 7.5) : Math.max(8, side.L - 3 - 7.5);
-      uptownPortico(T, mb, { ...S, front: side }, { n: 6, w: 14, D: 3.6, steps: 5, flat: true, sc }); } }
+      uptownPortico(T, mb, { ...S, front: side }, { n: 6, w: 14, D: 3.8, steps: 6, sc, roof: '#5f8f86' }); // pedimented too, up a flight of steps
+      for (const sg of [-1, 1]) { const { Q: Qs } = S.frame(side); for (let k = 0; k < 4; k++) { const [x, , z] = Qs(sc + sg * 8.3, 6.0 - k * 1.3, 0); HM.geo(mb, new THREE.CylinderGeometry(0.035, 0.035, 1.0, 6), C('#3a3d40'), x, H(x, z) + 0.6 + k * 0.28, z); } } } } // stair railings
+  // rusticated ground storey (banded joints) and stone quoins at the corners, as in the photos
+  { const RJ = C('#b9a888'), QN = C('#e6dcc6');
+    for (const e of S.E) { if (e.L < 3) continue; for (let y = S.g0 + 1.7; y < S.g0 + 5.4; y += 0.62) S.box(e, 0, e.L, -0.02, 0.06, y, y + 0.07, RJ);
+      for (let k = 0; ; k++) { const y0 = S.g0 + 5.6 + k * 0.9; if (y0 + 0.75 > S.top - 0.7) break; const w = k % 2 ? 0.7 : 1.1; S.box(e, 0, w, -0.04, 0.08, y0, y0 + 0.75, QN); S.box(e, e.L - w, e.L, -0.04, 0.08, y0, y0 + 0.75, QN); } } }
   // the cupola over the middle of the old block
   const top = S.top, [cx, , cz] = Q(fe.L / 2, -DEP / 2, 0), y0 = top + 6.3, DOME = C('#3d4954');
   HM.box(mb, cx, cz, top + 2, y0 + 2.2, 3.1, 3.1, yaw, W); HM.box(mb, cx, cz, y0 + 2.2, y0 + 2.7, 3.4, 3.4, yaw, W);                                 // square base on the roof
