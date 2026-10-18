@@ -85,7 +85,7 @@ function uptownPortico(T, mb, S, o) {
 // Pitt County Courthouse (1910): a buff-brick block of three storeys with a copper-green hip roof, a pedimented
 // six-column portico on Third Street, a second colonnade on the Evans Street side, and the tall white clock
 // cupola — square base, clock stage with four faces, open belfry, dark ribbed dome. The plainer later wings
-// spread behind it (the county's footprint takes in the whole complex). Two flags on the lawn.
+// spread behind it (the county's footprint takes in the whole complex). The Confederate monument on the Evans Street lawn (removed in 2020; shown as it stood), a flag either side.
 function hmCourthouse(T, B, P, mb) {
   const C = h => new THREE.Color(h), W = C('#f4f2ec');
   // the 1910 block's front wall: the long wall facing 3rd Street (the portico juts out from its middle)
@@ -117,9 +117,10 @@ function hmCourthouse(T, B, P, mb) {
   if (!S) return;
   const { Q, yaw } = uptownPortico(T, mb, S, { n: 6, w: 16, D: 4.6, text: 'PITT COUNTY COURT HOUSE', roof: '#5f8f86' });
   // the Evans Street colonnade: six columns between the side wall's ends, toward the front
+  let monAt = null;
   { const side = S.E.filter(e => e !== S.front && Math.abs(e.nx * S.front.nx + e.nz * S.front.nz) < 0.3).sort((p, q) => { const px = (evansAtB ? fe.b : fe.a); return Math.hypot(p.mx - px[0], p.mz - px[1]) - Math.hypot(q.mx - px[0], q.mz - px[1]); })[0];
     if (side) { const nearFront = Math.hypot(side.a[0] - fe.mx, side.a[1] - fe.mz) < Math.hypot(side.b[0] - fe.mx, side.b[1] - fe.mz); const sc = nearFront ? Math.min(side.L - 8, 3 + 7.5) : Math.max(8, side.L - 3 - 7.5);
-      uptownPortico(T, mb, { ...S, front: side }, { n: 6, w: 14, D: 3.8, steps: 6, sc, roof: '#5f8f86' }); // pedimented too, up a flight of steps
+      uptownPortico(T, mb, { ...S, front: side }, { n: 6, w: 14, D: 3.8, steps: 6, sc, roof: '#5f8f86' }); { const { Q: Qs } = S.frame(side); monAt = { Q: Qs, sc, yaw: Math.atan2(side.nx, side.nz) }; } // pedimented too, up a flight of steps
       for (const sg of [-1, 1]) { const { Q: Qs } = S.frame(side); for (let k = 0; k < 4; k++) { const [x, , z] = Qs(sc + sg * 8.3, 6.0 - k * 1.3, 0); HM.geo(mb, new THREE.CylinderGeometry(0.035, 0.035, 1.0, 6), C('#3a3d40'), x, H(x, z) + 0.6 + k * 0.28, z); } } } } // stair railings
   // rusticated ground storey (banded joints) and stone quoins at the corners, as in the photos
   { const RJ = C('#b9a888'), QN = C('#e6dcc6');
@@ -139,8 +140,34 @@ function hmCourthouse(T, B, P, mb) {
   const dome = new THREE.SphereGeometry(1.9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 1.15, 1); HM.geo(mb, dome, DOME, cx, y0 + 11.0, cz);
   for (let i = 0; i < 8; i++) { const a = yaw + i / 8 * Math.PI * 2; const rib = new THREE.TorusGeometry(1.92, 0.05, 4, 12, Math.PI / 2); rib.scale(1, 1.15, 1); rib.rotateY(-a); HM.geo(mb, rib, W, cx, y0 + 11.0, cz, 0, 0, 0); } // ribs
   HM.geo(mb, new THREE.SphereGeometry(0.25, 10, 6), W, cx, y0 + 13.3, cz); HM.geo(mb, new THREE.CylinderGeometry(0.04, 0.09, 1.6, 6), C('#c9a227'), cx, y0 + 14.2, cz);
-  // flags on the lawn, either side of the front walk
-  const fm = new MB(true); for (const [s, kind] of [[fe.L / 2 - 12, 'us'], [fe.L / 2 + 12, 'nc']]) { const [x, , z] = Q(s, 9, 0); if (!onRoadSurface(x, z)) flagpoleK(T, fm, x, z, kind, 11); } addMB(T, fm, lmPlainMat());
+  // the Confederate monument (1914, removed 2020 — shown here as it stood) on the Evans Street lawn, a flag either side
+  const fm = new MB(true);
+  if (monAt) { const [x, , z] = monAt.Q(monAt.sc, 13, 0); if (!onRoadSurface(x, z)) { courthouseMonument(T, mb, x, z, monAt.yaw); const tx = Math.cos(monAt.yaw), tz = -Math.sin(monAt.yaw);
+      for (const [o, kind] of [[-6.5, 'us'], [6.5, 'nc']]) { const fx = x + tx * o, fz = z + tz * o; if (!onRoadSurface(fx, fz)) flagpoleK(T, fm, fx, fz, kind, 12); } } }
+  else for (const [s, kind] of [[fe.L / 2 - 12, 'us'], [fe.L / 2 + 12, 'nc']]) { const [x, , z] = Q(s, 9, 0); if (!onRoadSurface(x, z)) flagpoleK(T, fm, x, z, kind, 11); }
+  addMB(T, fm, lmPlainMat());
+}
+// granite base in three steps, a die with the inscription and a round medallion, a tall shaft with a cap, and a
+// bronze soldier standing at parade rest on top
+function courthouseMonument(T, mb, x, z, yaw) {
+  const C = h => new THREE.Color(h), GR = C('#d6d2c8'), GR2 = C('#c8c3b8'), BZ = C('#4f5a4e'), g = H(x, z);
+  HM.box(mb, x, z, g - 0.3, g + 0.35, 2.4, 2.4, yaw, GR2); HM.box(mb, x, z, g + 0.35, g + 0.75, 1.9, 1.9, yaw, GR); HM.box(mb, x, z, g + 0.75, g + 1.15, 1.45, 1.45, yaw, GR2);
+  HM.box(mb, x, z, g + 1.15, g + 3.0, 1.05, 1.05, yaw, GR); HM.box(mb, x, z, g + 3.0, g + 3.35, 1.2, 1.2, yaw, GR2);                      // die and its cap
+  HM.box(mb, x, z, g + 3.35, g + 4.0, 0.85, 0.85, yaw, GR);
+  const sh = new THREE.CylinderGeometry(0.42, 0.62, 6.2, 4); sh.rotateY(Math.PI / 4); HM.geo(mb, sh, GR, x, g + 7.1, z, 0, yaw, 0);           // tapering shaft
+  HM.box(mb, x, z, g + 10.2, g + 10.55, 0.75, 0.75, yaw, GR2); HM.box(mb, x, z, g + 10.55, g + 10.8, 0.55, 0.55, yaw, GR);
+  // the soldier (about 2 m), facing out over the lawn
+  const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), y = g + 10.8;
+  HM.geo(mb, new THREE.CylinderGeometry(0.2, 0.26, 0.95, 10), BZ, x, y + 0.48, z);                          // legs & coat skirt
+  HM.geo(mb, new THREE.CylinderGeometry(0.22, 0.2, 0.7, 10), BZ, x, y + 1.3, z);                             // body
+  HM.geo(mb, new THREE.SphereGeometry(0.13, 10, 8), BZ, x, y + 1.82, z);                                      // head
+  HM.geo(mb, new THREE.CylinderGeometry(0.12, 0.14, 0.12, 10), BZ, x, y + 1.96, z);                           // kepi
+  HM.geo(mb, new THREE.BoxGeometry(0.06, 1.5, 0.06), BZ, x + fx * 0.28 + rx * 0.08, y + 0.85, z + fz * 0.28 + rz * 0.08); // rifle, butt on the plinth
+  for (const sg of [-1, 1]) HM.geo(mb, new THREE.CylinderGeometry(0.06, 0.06, 0.6, 6), BZ, x + fx * 0.16 + rx * sg * 0.12, y + 1.35, z + fz * 0.16 + rz * sg * 0.12, 0.5, yaw, 0); // arms forward to the muzzle
+  // the inscription and medallion on the die's front
+  const sg = HM.sign(T, 'OUR CONFEDERATE DEAD', 1.7, 0.42, { col: '#6a665d', size: 110 }); sg.position.set(x + fx * 1.07, g + 1.75, z + fz * 1.07); sg.rotation.y = yaw; T.group.add(sg);
+  HM.geo(mb, new THREE.CylinderGeometry(0.32, 0.32, 0.06, 20).rotateX(Math.PI / 2).rotateY(yaw), C('#b9b4a8'), x + fx * 1.08, g + 2.5, z + fz * 1.08);
+  HM.obstacle(T, x, z, 2.5);
 }
 function hmCourthouseSimple(T, B, P, mb) {
   const S = uptownShell(T, B, mb, { name: 'Pitt County Courthouse', street: /3rd/i, h: 15.5, floors: 3, floorH: 4.6, bay: 3.4, winW: 1.3, frontGap: 18, tallFirst: true,
