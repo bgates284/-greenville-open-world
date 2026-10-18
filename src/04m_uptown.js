@@ -1,7 +1,7 @@
 // =====================================================================
 // UPTOWN GREENVILLE LANDMARKS — modelled from photos (Wikimedia Commons, see CREDITS.md) and the National Register
 // descriptions:
-//   • Pitt County Courthouse (1910, Milburn & Heister): three storeys of tan brick, a tall white Ionic portico with a
+//   • Pitt County Courthouse (1910, Milburn & Heister): three storeys of buff brick, a copper-green hip roof, a tall white portico with a
 //     pediment naming it, a white cornice, a grey hip roof and a three-stage white cupola with clock faces
 //   • the old U.S. Post Office on Evans Street (1914): two storeys of cream stucco on a limestone base, a three-arch
 //     loggia across the front, a low terra-cotta tile hip roof with deep eaves
@@ -64,7 +64,7 @@ function uptownShell(T, B, mb, o) {
 // a classical portico on the front wall: steps, n columns, entablature (optionally lettered), pediment (optionally with an oculus)
 function uptownPortico(T, mb, S, o) {
   const { front: e, top, box, frame } = S; const C = h => new THREE.Color(h); const W = C('#f4f2ec');
-  const { tx, tz, Q } = frame(e); const yaw = Math.atan2(e.nx, e.nz); const sc = e.L / 2, wP = Math.min(e.L - 1, o.w), D = o.D;
+  const { tx, tz, Q } = frame(e); const yaw = Math.atan2(e.nx, e.nz); const sc = o.sc != null ? o.sc : e.L / 2, wP = Math.min(e.L - 1, o.w), D = o.D;
   const gF = H(...(([x, , z]) => [x, z])(Q(sc, D, 0)));
   const steps = o.steps || 6; for (let k = 0; k < steps; k++) box(e, sc - wP / 2 - 1.2 + k * 0.05, sc + wP / 2 + 1.2 - k * 0.05, D + 2.4 - k * 0.45, 0, gF - 0.3, gF + 0.2 + k * 0.2, C('#d9d3c6'));
   const yb = gF + 0.2 + steps * 0.2, colH = (o.colTop || top) - yb - (o.entH || 2.2), n = o.n;
@@ -72,6 +72,7 @@ function uptownPortico(T, mb, S, o) {
     HM.geo(mb, new THREE.CylinderGeometry(r * 0.88, r, colH, 16), W, x, yb + colH / 2, z); HM.geo(mb, new THREE.BoxGeometry(r * 2.5, 0.3, r * 2.5), W, x, yb + 0.15, z); HM.geo(mb, new THREE.BoxGeometry(r * 2.8, 0.35, r * 2), W, x, yb + colH - 0.1, z, 0, yaw, 0); HM.obstacle(T, x, z, r + 0.1); }
   const yE = yb + colH, eH = o.entH ? o.entH * 0.7 : 1.6; box(e, sc - wP / 2, sc + wP / 2, 0, D, yE, yE + eH, W);
   if (o.text) { const sg = HM.sign(T, o.text, wP * 0.8, wP * 0.8 / 4, { col: '#4a4a48', size: 120 }); const [sx, , sz] = Q(sc, D + 0.03, 0); sg.position.set(sx, yE + eH / 2, sz); sg.rotation.y = yaw; T.group.add(sg); }
+  if (o.flat) { box(e, sc - wP / 2 - 0.2, sc + wP / 2 + 0.2, 0, D + 0.2, yE + eH, yE + eH + 0.5, W); box(e, sc - (o.doorW || 1.4), sc + (o.doorW || 1.4), 0.02, 0.12, yb, yb + (o.doorH || 3.2), C('#3a2a1e')); return { sc, Q, yaw }; } // in antis on a side wall: entablature and a flat parapet, no pediment
   const pk = yE + eH + wP * 0.2;
   mb.tri(Q(sc - wP / 2 - 0.3, D + 0.05, yE + eH), Q(sc + wP / 2 + 0.3, D + 0.05, yE + eH), Q(sc, D + 0.05, pk), [0, 0], [0, 0], [0, 0], [e.nx, 0, e.nz], o.tympanum ? C(o.tympanum) : W);
   if (o.oculus) { const [ox, , oz] = Q(sc, D + 0.1, 0); const r = Math.min(0.8, wP * 0.07); HM.geo(mb, new THREE.CylinderGeometry(r + 0.18, r + 0.18, 0.08, 20).rotateX(Math.PI / 2).rotateY(yaw), W, ox, yE + eH + (pk - yE - eH) * 0.4, oz); HM.geo(mb, new THREE.CylinderGeometry(r, r, 0.1, 20).rotateX(Math.PI / 2).rotateY(yaw), C('#2b3540'), ox + e.nx * 0.03, yE + eH + (pk - yE - eH) * 0.4, oz + e.nz * 0.03); }
@@ -81,22 +82,65 @@ function uptownPortico(T, mb, S, o) {
   return { sc, Q, yaw };
 }
 
+// Pitt County Courthouse (1910): a buff-brick block of three storeys with a copper-green hip roof, a pedimented
+// six-column portico on Third Street, a second colonnade on the Evans Street side, and the tall white clock
+// cupola — square base, clock stage with four faces, open belfry, dark ribbed dome. The plainer later wings
+// spread behind it (the county's footprint takes in the whole complex). Two flags on the lawn.
 function hmCourthouse(T, B, P, mb) {
+  const C = h => new THREE.Color(h), W = C('#f4f2ec');
+  // the 1910 block's front wall: the long wall facing 3rd Street (the portico juts out from its middle)
+  // the footprint takes in the portico: find its face (the wall nearest 3rd Street), then the main front wall just behind it
+  const E0 = HM.edgesOf(B.ring); let pe = null, pd = 1e9;
+  for (const e of E0) { if (e.L < 10) continue; const nr = nearestRoad(e.mx, e.mz, 45, r => r.car && /3rd/i.test(r.name || '')); if (!nr) continue; const dx = nr.x - e.mx, dz = nr.z - e.mz, dl = Math.hypot(dx, dz) || 1; if ((dx * e.nx + dz * e.nz) / dl > 0.7 && dl < pd) { pd = dl; pe = e; } }
+  if (!pe) { hmCourthouseSimple(T, B, P, mb); return; }
+  let fe;
+  { const ptx = (pe.b[0] - pe.a[0]) / pe.L, ptz = (pe.b[1] - pe.a[1]) / pe.L, UV = B.ring.map(([x, z]) => [(x - pe.a[0]) * ptx + (z - pe.a[1]) * ptz, -((x - pe.a[0]) * pe.nx + (z - pe.a[1]) * pe.nz)]);
+    let vF = 1e9; for (const [, v] of UV) if (v > 1.5 && v < 12) vF = Math.min(vF, v); if (vF > 1e8) vF = 0;
+    let u0 = 0, u1 = pe.L; for (const [u, v] of UV) if (Math.abs(v - vF) < 1.2) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); }
+    const A = [pe.a[0] + ptx * u0 - pe.nx * vF, pe.a[1] + ptz * u0 - pe.nz * vF], Bq = [pe.a[0] + ptx * u1 - pe.nx * vF, pe.a[1] + ptz * u1 - pe.nz * vF];
+    fe = { a: A, b: Bq, L: u1 - u0, nx: pe.nx, nz: pe.nz, mx: (A[0] + Bq[0]) / 2, mz: (A[1] + Bq[1]) / 2 }; }
+  const tx = (fe.b[0] - fe.a[0]) / fe.L, tz = (fe.b[1] - fe.a[1]) / fe.L, DEP = Math.min(30, fe.L * 0.85);
+  const at = (s, v) => [fe.a[0] + tx * s - fe.nx * v, fe.a[1] + tz * s - fe.nz * v]; // s along the front, v back into the block
+  let main = [at(0, 0), at(fe.L, 0), at(fe.L, DEP), at(0, DEP)]; if (signedArea(main) < 0) main.reverse();
+  // which end of the front is the Evans Street corner (the side colonnade)
+  const ev = nearestRoad(...at(fe.L + 4, DEP / 2), 30, r => r.car && /Evans/i.test(r.name || '')), ew = nearestRoad(...at(-4, DEP / 2), 30, r => r.car && /Evans/i.test(r.name || ''));
+  const evansAtB = !ew || (ev && ev.d <= ew.d);
+  // the later wings: the rest of the footprint, kept just inside the old block's walls (and off the porticoes)
+  const big = 400; let win = [at(-big, 0.45), at(evansAtB ? fe.L - 0.45 : big, 0.45), at(evansAtB ? fe.L - 0.45 : big, big), at(-big, big)];
+  if (!evansAtB) win = [at(0.45, 0.45), at(big, 0.45), at(big, big), at(0.45, big)];
+  if (signedArea(win) < 0) win.reverse(); let rest = clipConvex(B.ring, win); if (signedArea(rest) < 0) rest = rest.slice().reverse();
+  if (rest.length >= 3 && Math.abs(signedArea(rest)) > 200)
+    uptownShell(T, { ring: rest }, mb, { name: 'Pitt County Courthouse', street: /2nd|Washington|3rd/i, h: 11.5, floors: 2, floorH: 4.4, bay: 3.6, winW: 1.4, frontGap: 0,
+      textured: hmTanBrickMat, base: ['#d8d0bf', 0.8], cornice: ['#efe8d8', 0.3], sill: '#e9e4d8', roof: '#8d9093', rise: 0.01, eave: 0.05, inset: 0.05 });
+  const S = uptownShell(T, { ring: main }, mb, { name: 'Pitt County Courthouse', street: /3rd/i, h: 15.5, floors: 3, floorH: 4.6, bay: 3.4, winW: 1.3, frontGap: 18, tallFirst: true,
+    textured: hmTanBrickMat, base: ['#d8d0bf', 1.1], cornice: ['#f4f2ec', 0.45], belt: 5.6, sill: '#e9e4d8', roof: '#5f8f86', rise: 6.5, eave: 0.7, inset: Math.min(12, DEP / 2 - 2) });
+  if (!S) return;
+  const { Q, yaw } = uptownPortico(T, mb, S, { n: 6, w: 16, D: 4.6, text: 'PITT COUNTY COURT HOUSE', roof: '#5f8f86' });
+  // the Evans Street colonnade: six columns between the side wall's ends, toward the front
+  { const side = S.E.filter(e => e !== S.front && Math.abs(e.nx * S.front.nx + e.nz * S.front.nz) < 0.3).sort((p, q) => { const px = (evansAtB ? fe.b : fe.a); return Math.hypot(p.mx - px[0], p.mz - px[1]) - Math.hypot(q.mx - px[0], q.mz - px[1]); })[0];
+    if (side) { const nearFront = Math.hypot(side.a[0] - fe.mx, side.a[1] - fe.mz) < Math.hypot(side.b[0] - fe.mx, side.b[1] - fe.mz); const sc = nearFront ? Math.min(side.L - 8, 3 + 7.5) : Math.max(8, side.L - 3 - 7.5);
+      uptownPortico(T, mb, { ...S, front: side }, { n: 6, w: 14, D: 3.6, steps: 5, flat: true, sc }); } }
+  // the cupola over the middle of the old block
+  const top = S.top, [cx, , cz] = Q(fe.L / 2, -DEP / 2, 0), y0 = top + 6.3, DOME = C('#3d4954');
+  HM.box(mb, cx, cz, top + 2, y0 + 2.2, 3.1, 3.1, yaw, W); HM.box(mb, cx, cz, y0 + 2.2, y0 + 2.7, 3.4, 3.4, yaw, W);                                 // square base on the roof
+  HM.box(mb, cx, cz, y0 + 2.7, y0 + 6.6, 2.6, 2.6, yaw, W);                                                                                         // clock stage
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) HM.box(mb, cx + Math.cos(yaw) * sx * 2.45 + Math.sin(yaw) * sz * 2.45, cz - Math.sin(yaw) * sx * 2.45 + Math.cos(yaw) * sz * 2.45, y0 + 2.7, y0 + 6.6, 0.35, 0.35, yaw, C('#ffffff')); // corner pilasters
+  for (let i = 0; i < 4; i++) { const a = yaw + i * Math.PI / 2; const m = new THREE.Mesh(new THREE.CircleGeometry(1.05, 28), pccClockMat()); m.position.set(cx + Math.sin(a) * 2.64, y0 + 4.8, cz + Math.cos(a) * 2.64); m.rotation.y = a; T.group.add(m); }
+  HM.box(mb, cx, cz, y0 + 6.6, y0 + 7.1, 2.95, 2.95, yaw, W);                                                                                       // cornice
+  HM.geo(mb, new THREE.CylinderGeometry(2.2, 2.3, 0.4, 8), W, cx, y0 + 7.3, cz, 0, yaw + Math.PI / 8, 0);
+  for (let i = 0; i < 8; i++) { const a = yaw + (i + 0.5) / 8 * Math.PI * 2; HM.geo(mb, new THREE.CylinderGeometry(0.16, 0.19, 3.0, 10), W, cx + Math.sin(a) * 1.85, y0 + 9.0, cz + Math.cos(a) * 1.85); } // open belfry
+  HM.geo(mb, new THREE.CylinderGeometry(1.3, 1.3, 3.0, 8), C('#2a3036'), cx, y0 + 9.0, cz, 0, yaw + Math.PI / 8, 0);                              // shadowed interior
+  HM.geo(mb, new THREE.CylinderGeometry(2.25, 2.25, 0.5, 8), W, cx, y0 + 10.75, cz, 0, yaw + Math.PI / 8, 0);
+  const dome = new THREE.SphereGeometry(1.9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 1.15, 1); HM.geo(mb, dome, DOME, cx, y0 + 11.0, cz);
+  for (let i = 0; i < 8; i++) { const a = yaw + i / 8 * Math.PI * 2; const rib = new THREE.TorusGeometry(1.92, 0.05, 4, 12, Math.PI / 2); rib.scale(1, 1.15, 1); rib.rotateY(-a); HM.geo(mb, rib, W, cx, y0 + 11.0, cz, 0, 0, 0); } // ribs
+  HM.geo(mb, new THREE.SphereGeometry(0.25, 10, 6), W, cx, y0 + 13.3, cz); HM.geo(mb, new THREE.CylinderGeometry(0.04, 0.09, 1.6, 6), C('#c9a227'), cx, y0 + 14.2, cz);
+  // flags on the lawn, either side of the front walk
+  const fm = new MB(true); for (const [s, kind] of [[fe.L / 2 - 12, 'us'], [fe.L / 2 + 12, 'nc']]) { const [x, , z] = Q(s, 9, 0); if (!onRoadSurface(x, z)) flagpoleK(T, fm, x, z, kind, 11); } addMB(T, fm, lmPlainMat());
+}
+function hmCourthouseSimple(T, B, P, mb) {
   const S = uptownShell(T, B, mb, { name: 'Pitt County Courthouse', street: /3rd/i, h: 15.5, floors: 3, floorH: 4.6, bay: 3.4, winW: 1.3, frontGap: 18, tallFirst: true,
-    textured: hmTanBrickMat, base: ['#d8d0bf', 1.1], cornice: ['#f4f2ec', 0.45], belt: 5.6, sill: '#e9e4d8', roof: '#6b7177', rise: 2.6, eave: 0.6, inset: 4.5 });
-  if (!S) return; const C = h => new THREE.Color(h); const W = C('#f4f2ec');
-  const { Q, yaw } = uptownPortico(T, mb, S, { n: 6, w: 16, D: 4.6, text: 'PITT COUNTY COURT HOUSE' });
-  const { front: e, top } = S;
-  // the cupola, over the middle of the old building behind the portico
-  const [cx, , cz] = Q(e.L / 2, -11, 0); const y0 = top + 2.6;
-  HM.box(mb, cx, cz, top, y0 + 2.4, 2.4, 2.4, yaw, W); HM.box(mb, cx, cz, y0 + 2.4, y0 + 2.8, 2.7, 2.7, yaw, W);                       // square base
-  const oct = new THREE.CylinderGeometry(1.7, 1.8, 3.2, 8); HM.geo(mb, oct, W, cx, y0 + 4.4, cz, 0, yaw + Math.PI / 8, 0);                // clock stage
-  for (let i = 0; i < 4; i++) { const a = yaw + i * Math.PI / 2; const m = new THREE.Mesh(new THREE.CircleGeometry(0.75, 24), pccClockMat()); m.position.set(cx + Math.sin(a) * 1.78, y0 + 4.4, cz + Math.cos(a) * 1.78); m.rotation.y = a; T.group.add(m); }
-  HM.geo(mb, new THREE.CylinderGeometry(1.95, 1.95, 0.3, 8), W, cx, y0 + 6.15, cz, 0, yaw + Math.PI / 8, 0);
-  for (let i = 0; i < 8; i++) { const a = yaw + (i + 0.5) / 8 * Math.PI * 2; HM.geo(mb, new THREE.CylinderGeometry(0.1, 0.12, 2.0, 8), W, cx + Math.sin(a) * 1.25, y0 + 7.3, cz + Math.cos(a) * 1.25); } // open belfry
-  HM.geo(mb, new THREE.CylinderGeometry(1.45, 1.45, 0.3, 8), W, cx, y0 + 8.45, cz, 0, yaw + Math.PI / 8, 0);
-  const dome = new THREE.SphereGeometry(1.25, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); HM.geo(mb, dome, W, cx, y0 + 8.6, cz);
-  HM.geo(mb, new THREE.CylinderGeometry(0.05, 0.1, 1.4, 6), C('#c9a227'), cx, y0 + 10.4, cz);
+    textured: hmTanBrickMat, base: ['#d8d0bf', 1.1], cornice: ['#f4f2ec', 0.45], belt: 5.6, sill: '#e9e4d8', roof: '#5f8f86', rise: 2.6, eave: 0.6, inset: 4.5 });
+  if (S) uptownPortico(T, mb, S, { n: 6, w: 16, D: 4.6, text: 'PITT COUNTY COURT HOUSE', roof: '#5f8f86' });
 }
 
 // Bethel Baptist Church: red brick with tall arched windows, a white Ionic portico and an oculus in the pediment
