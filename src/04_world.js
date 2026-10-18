@@ -1064,6 +1064,7 @@ async function buildTile(T) {
   try { T.parcelAdded = applyParcels(T, P, await Promise.race([parcelP, sleep(12000).then(() => null)])); } catch (e) { console.warn('parcels skipped', e); } await yieldMaybe();
   try { splitHospital(T, P); } catch (e) { console.warn('hospital split skipped', e); }
   try { prepDickinson(T, P); } catch (e) { console.warn('Dickinson mural skipped', e); }
+  try { prepLowesFoods(T, P); } catch (e) { console.warn('Lowes Foods skipped', e); }
   try { prepCivic(T, P); } catch (e) { console.warn('stations skipped', e); }
   TT('paintTerrain', () => paintTerrain(T, P)); if (T.aerial && T.aerial.close) T.aerial.close(); T.aerial = null; await yieldMaybe();
   TT('buildTerrainMesh', () => buildTerrainMesh(T)); await yieldMaybe();

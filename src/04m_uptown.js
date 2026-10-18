@@ -440,3 +440,75 @@ function hmChicos(T, B, P, mb) {
     for (const s of [L / 2 - 2.2, L / 2 + 2.2]) { const [px, pz] = at(s, -1.45); HM.box(mb, px, pz, g0 + apex - 1.4, g0 + apex + 0.4, 0.08, 0.08, yaw, C('#3a3c3e')); } }
   HM.solid(T, B.ring, g0 + apex, "Chico's");
 }
+
+// ---------- Winterville: Lowes Foods (Flower Drive) and Sam Jones BBQ (Fire Tower Road), from a photo on Tilco Drive ----------
+// The supermarket (2021) isn't on the map data yet: it's added here on its site east of its car park, its front to the
+// west. Long tan stucco walls on a stone base; at the north end a taller block of white-and-grey metal panels; two
+// cream gabled entrance pavilions and a taller gabled tower carrying the green "Lowes Foods" sign; a covered walkway
+// on posts along the southern half of the front.
+const LOWES = { lat: 35.54646, lon: -77.40254, rect: [-13, -14, 55, 60], id: 9300000001 }; // (E, N) metres: west, south, east, north
+const lwXZ = (e, n) => [lonToX(LOWES.lon + e / 90532), latToZ(LOWES.lat + n / 110574)];
+function prepLowesFoods(T, P) {
+  const [w, s, e, n] = LOWES.rect, ring = [lwXZ(w, n), lwXZ(w, s), lwXZ(e, s), lwXZ(e, n)], c = centroid(ring), W = T.W;
+  if (!(c[0] >= W.x0 && c[0] < W.x1 && c[1] >= W.z0 && c[1] < W.z1)) return;
+  P.buildings = P.buildings.filter(B => { const q = centroid(B.ring); return !pointInPoly(q[0], q[1], ring); }); // anything older the data put on the site
+  // its car park (only the aisles are mapped): paved, west of the store out to the road
+  const lot = [lwXZ(-112, 62), lwXZ(-112, -48), lwXZ(-16, -48), lwXZ(-16, 62)]; P.areas.push({ kind: 'parking', rings: [signedArea(lot) < 0 ? lot.reverse() : lot], holes: [], tags: { amenity: 'parking' } });
+  P.buildings.push({ id: LOWES.id, tags: { building: 'supermarket', name: 'Lowes Foods', shop: 'supermarket' }, ring: signedArea(ring) < 0 ? ring.slice().reverse() : ring, holes: [], part: false, made: true });
+}
+function hmLowesFoods(T, B, P, mb) {
+  const [w, s, e, n] = LOWES.rect, C = h => new THREE.Color(h);
+  const a = lwXZ(w, n), b = lwXZ(w, s), L = Math.hypot(b[0] - a[0], b[1] - a[1]), tx = (b[0] - a[0]) / L, tz = (b[1] - a[1]) / L;
+  const bw = lwXZ(w - 1, n), nx = bw[0] - a[0], nz = bw[1] - a[1], nl = Math.hypot(nx, nz), Nx = nx / nl, Nz = nz / nl, D = e - w, yaw = Math.atan2(Nx, Nz);
+  const g0 = Math.min(...B.ring.map(p => H(p[0], p[1]))), F = { at: (si, o) => [a[0] + tx * si + Nx * o, a[1] + tz * si + Nz * o], g0, yaw };
+  const P3 = (si, o, y) => { const [x, z] = F.at(si, o); return [x, g0 + y, z]; };
+  const TAN = C('#d8c3a1'), STONE = C('#9a8a76'), CREAM = C('#efe6d2'), WH = C('#f3f2ee'), GREY = C('#8f9496'), ROOF = C('#5d6266'), GLASS = C('#2b3640');
+  // the box: tan walls on all sides, a stone base, flat roof with a parapet cap
+  for (const ed of HM.edgesOf(B.ring)) { const yaw2 = Math.atan2(ed.nx, ed.nz); HM.box(mb, ed.mx - ed.nx * 0.15, ed.mz - ed.nz * 0.15, g0 - 0.3, g0 + 8, ed.L / 2, 0.15, yaw2, TAN); HM.box(mb, ed.mx + ed.nx * 0.02, ed.mz + ed.nz * 0.02, g0 - 0.3, g0 + 1.3, ed.L / 2 + 0.05, 0.08, yaw2, STONE); HM.box(mb, ed.mx, ed.mz, g0 + 8, g0 + 8.5, ed.L / 2 + 0.1, 0.25, yaw2, C('#c9b28f')); }
+  { const ct = B.ring.map(p => new THREE.Vector2(p[0], p[1])); let tris = []; try { tris = THREE.ShapeUtils.triangulateShape(ct, []); } catch (er) { } for (const t of tris) { const [A, Bv, Cc] = t.map(i => ct[i]); mb.tri([A.x, g0 + 7.95, A.y], [Bv.x, g0 + 7.95, Bv.y], [Cc.x, g0 + 7.95, Cc.y], [0, 0], [0, 0], [0, 0], [0, 1, 0], C('#b8b9b6')); } }
+  // the north block of white and grey metal panels with tall dark windows
+  bxF(F, mb, 0, 20, 0.05, 0.6, -0.3, 9.2, WH); for (let si = 1.5; si < 19; si += 3.2) bxF(F, mb, si, si + 1.2, 0.6, 0.68, 1.0, 7.8, GLASS); bxF(F, mb, 0, 20, 0.6, 0.7, 8.4, 9.2, GREY); bxF(F, mb, 0, 20, 0.6, 0.7, -0.3, 1.0, GREY);
+  // gabled pavilions (cream, white gable, grey roof) and the sign tower
+  const pavilion = (sc, wd, hEave, dep, sign) => {
+    bxF(F, mb, sc - wd / 2, sc + wd / 2, 0, dep, -0.3, hEave, CREAM); bxF(F, mb, sc - wd / 2 - 0.1, sc + wd / 2 + 0.1, dep - 0.02, dep + 0.08, -0.3, 1.3, STONE);
+    const pk = hEave + wd * 0.38;
+    mb.tri(P3(sc - wd / 2, dep + 0.02, hEave), P3(sc + wd / 2, dep + 0.02, hEave), P3(sc, dep + 0.02, pk), [0, 0], [0, 0], [0, 0], [Nx, 0, Nz], WH);
+    for (const sg of [-1, 1]) mb.quad(P3(sc + sg * (wd / 2 + 0.6), dep + 0.6, hEave - 0.3), P3(sc, dep + 0.6, pk + 0.3), P3(sc, -2, pk + 0.3), P3(sc + sg * (wd / 2 + 0.6), -2, hEave - 0.3), [0, 0], [0, 0], [0, 0], [0, 0], [sg * tx, 1, sg * tz], ROOF);
+    bxF(F, mb, sc - wd * 0.32, sc + wd * 0.32, dep + 0.02, dep + 0.1, 0, 3.4, GLASS); bxF(F, mb, sc - wd * 0.34, sc + wd * 0.34, dep + 0.05, dep + 0.14, 3.4, 3.65, WH);   // glass entrance
+    if (sign) { const c = cnv(1024, 300), g = c.getContext('2d'); g.clearRect(0, 0, 1024, 300); g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = 'italic 800 190px "Brush Script MT", "Segoe Script", Georgia, serif'; g.lineWidth = 14; g.strokeStyle = '#ffffff'; g.strokeText('Lowes Foods', 512, 150, 980); g.fillStyle = '#3f8f2e'; g.fillText('Lowes Foods', 512, 150, 980);
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; const sw = wd * 0.9, sgm = signMesh(T, tex, sw, sw * 300 / 1024, false); const [x, z] = F.at(sc, dep + 0.06); sgm.position.set(x, g0 + hEave - 1.6, z); sgm.rotation.y = yaw; T.group.add(sgm); }
+  };
+  pavilion(31, 9, 9.6, 3.2, false); pavilion(45, 8, 9.2, 2.6, false); pavilion(57, 9, 11.2, 3.6, true);
+  // covered walkway on posts along the southern half
+  { const s0 = 36, s1 = L - 1.5, d = 4.2; bxF(F, mb, s0, s1, 0, d + 0.3, 4.0, 4.45, C('#7a6a58')); for (let si = s0 + 0.3; si <= s1; si += 4.4) { bxF(F, mb, si - 0.22, si + 0.22, d - 0.22, d + 0.22, 0, 4.0, CREAM); bxF(F, mb, si - 0.3, si + 0.3, d - 0.3, d + 0.3, 0, 0.9, STONE); } }
+  // shop windows along the tan front between the pavilions
+  for (let si = 22; si < L - 2; si += 4.5) { if (Math.abs(si - 31) < 5.5 || Math.abs(si - 45) < 5 || Math.abs(si - 57) < 5.5) continue; bxF(F, mb, si - 1.4, si + 1.4, 0.0, 0.08, 1.4, 3.4, GLASS); }
+  HM.solid(T, B.ring, g0 + 8.5, 'Lowes Foods'); void D;
+}
+// Sam Jones BBQ: a long red-brick barn under a grey standing-seam roof, a lower shed roof down one side, a cupola on the ridge
+// and the smokehouse stacks out back
+function hmSamJones(T, B, P, mb, annex) {
+  const E = HM.edgesOf(B.ring); if (E.length < 3) return; const C = h => new THREE.Color(h);
+  const ob = minAreaRect(B.ring); if (!ob) return; const g0 = Math.min(...B.ring.map(p => H(p[0], p[1]))), hW = 4.2, rise = 3.6;
+  const L2 = ob.L / 2, W2 = ob.W / 2, P3 = (u, v, y) => [ob.cx + ob.ux * u + ob.vx * v, g0 + y, ob.cz + ob.uz * u + ob.vz * v];
+  // brick walls
+  const wb = new MB(true), k = 1 / 2.6; for (const e of E) wb.quad([e.a[0], g0 - 0.3, e.a[1]], [e.b[0], g0 - 0.3, e.b[1]], [e.b[0], g0 + hW, e.b[1]], [e.a[0], g0 + hW, e.a[1]], [0, (g0 - 0.3) * k], [e.L * k, (g0 - 0.3) * k], [e.L * k, (g0 + hW) * k], [0, (g0 + hW) * k], [e.nx, 0, e.nz], C('#f0d3c8'));
+  const m = new THREE.Mesh(wb.geo(), hmRedBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m);
+  // main gable roof over the inner part, a lower shed roof over the outer strip (along +v)
+  const R = C('#565c61'), vR = W2 * 0.3, ov = 0.5;   // ridge offset toward -v
+  const ridgeY = hW + rise, shedV = W2 * 0.45;
+  mb.quad(P3(-L2 - ov, -W2 - ov, hW - 0.2), P3(L2 + ov, -W2 - ov, hW - 0.2), P3(L2 + ov, -vR, ridgeY), P3(-L2 - ov, -vR, ridgeY), [0, 0], [0, 0], [0, 0], [0, 0], [-ob.vx, 1.2, -ob.vz], R);
+  mb.quad(P3(L2 + ov, shedV, hW + 1.2), P3(-L2 - ov, shedV, hW + 1.2), P3(-L2 - ov, -vR, ridgeY), P3(L2 + ov, -vR, ridgeY), [0, 0], [0, 0], [0, 0], [0, 0], [ob.vx, 1.2, ob.vz], R);
+  mb.quad(P3(L2 + ov, W2 + ov, hW - 0.2), P3(-L2 - ov, W2 + ov, hW - 0.2), P3(-L2 - ov, shedV, hW + 0.9), P3(L2 + ov, shedV, hW + 0.9), [0, 0], [0, 0], [0, 0], [0, 0], [ob.vx, 2, ob.vz], R);
+  for (const sg of [-1, 1]) { mb.tri(P3(sg * L2, -W2, hW), P3(sg * L2, shedV, hW), P3(sg * L2, -vR, ridgeY - 0.1), [0, 0], [0, 0], [0, 0], [sg * ob.ux, 0, sg * ob.uz], C('#9b4d3a')); // brick gable ends
+    mb.quad(P3(sg * L2, shedV, hW), P3(sg * L2, W2, hW), P3(sg * L2, W2, hW), P3(sg * L2, shedV, hW + 1.2), [0, 0], [0, 0], [0, 0], [0, 0], [sg * ob.ux, 0, sg * ob.uz], C('#9b4d3a')); }
+  if (annex) { HM.solid(T, B.ring, g0 + ridgeY, 'Sam Jones BBQ'); return; }
+  // cupola on the ridge
+  { const [x, , z] = P3(0, -vR, 0), yaw = Math.atan2(ob.vx, ob.vz); HM.box(mb, x, z, g0 + ridgeY - 0.4, g0 + ridgeY + 1.3, 0.9, 0.9, yaw, C('#f2efe8')); const cone = new THREE.ConeGeometry(1.35, 1.1, 4); cone.rotateY(Math.PI / 4 + yaw); HM.geo(mb, cone, R, x, g0 + ridgeY + 1.85, z); }
+  // smokehouse stacks behind
+  for (const u of [-L2 * 0.5, -L2 * 0.2]) { const [x, , z] = P3(u, -W2 - 2.5, 0); HM.geo(mb, new THREE.CylinderGeometry(0.35, 0.35, ridgeY + 2.5, 10), C('#3b3e41'), x, g0 + (ridgeY + 2.5) / 2, z); HM.geo(mb, new THREE.CylinderGeometry(0.55, 0.45, 0.4, 10), C('#2a2c2e'), x, g0 + ridgeY + 2.6, z); }
+  // the name across the front gable end (the end facing the car park / Fire Tower Road side, +u)
+  { const sg = HM.sign(T, 'SAM JONES BBQ', 6.5, 1.1, { col: '#2b1d14', size: 120 }); const [x, , z] = P3(L2 + 0.05, -vR * 0.4, 0); sg.position.set(x, g0 + hW + 1.3, z); sg.rotation.y = Math.atan2(ob.ux, ob.uz); T.group.add(sg); }
+  HM.solid(T, B.ring, g0 + ridgeY, 'Sam Jones BBQ');
+}
