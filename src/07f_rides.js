@@ -76,7 +76,7 @@ const Rides = {
   },
   toggleSiren() {
     this.siren = !this.siren; if (!this.siren) { this.stopSiren(); return; }
-    this.sirenT = 0; const A = Sound.ctx; if (A) { try { const o = A.createOscillator(); o.type = 'square'; const g = A.createGain(); g.gain.value = 0.02; const lp = A.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400; o.connect(lp); lp.connect(g); g.connect(A.destination); o.start(); this.osc = o; this.sg = g; } catch (e) { } }
+    this.sirenT = 0; const A = Sound.ctx; if (A) { try { const o = A.createOscillator(); o.type = 'square'; const g = A.createGain(); g.gain.value = 0.009; const lp = A.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400; o.connect(lp); lp.connect(g); g.connect(A.destination); o.start(); this.osc = o; this.sg = g; } catch (e) { } }
   },
   stopSiren() { if (Player.svcObj) svFlash(Player.svcObj, 0, false); this.siren = false; if (this.osc) { try { this.osc.stop(); } catch (e) { } this.osc = null; } if (this.light) this.light.intensity = 0; },
 };

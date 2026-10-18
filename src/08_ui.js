@@ -62,7 +62,7 @@ const Sound = {
     if (P.mode === 'heli') { const r = Heli.rpm, c = Heli.col, V = Heli.v.length(); // rotor thump + turbine whine
       this.o1.frequency.setTargetAtTime(14 + r * 12 + c * 4, t, 0.2); this.o2.frequency.setTargetAtTime(28 + r * 24, t, 0.2); this.lp.frequency.setTargetAtTime(300 + r * 900 + c * 500, t, 0.2);
       this.eg.gain.setTargetAtTime(Heli.onGround && c < 0.05 ? 0 : 0.012 + c * 0.018, t, 0.3); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.003), t, 0.3); this.rainG.gain.setTargetAtTime(Env.rain * 0.05, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
-    if (P.mode === 'drone') { const V = Drone.vel.length(); this.eg.gain.setTargetAtTime(0, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.12, V * 0.0015), t, 0.2); this.rainG.gain.setTargetAtTime(Env.rain * 0.08, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
+    if (P.mode === 'drone') { for (const g of [this.eg, this.windG, this.rainG, this.crOut]) g.gain.setTargetAtTime(0, t, 0.15); return; } // the drone camera is silent
     if (P.mode === 'para') { const V = Chute.vel.length(); this.eg.gain.setTargetAtTime(0, t, 0.2); this.windG.gain.setTargetAtTime(Math.min(0.2, V * 0.004), t, 0.2); this.rainG.gain.setTargetAtTime(Env.rain * 0.08, t, 0.5); this.crOut.gain.setTargetAtTime(0, t, 0.5); return; }
     if (P.mode === 'fly') { const th = Plane.thr, V = Plane.v.length(); const rpm = 0.45 + th * 0.55;
       this.o1.frequency.setTargetAtTime(60 + rpm * 70, t, 0.2); this.o2.frequency.setTargetAtTime(30 + rpm * 35, t, 0.2); this.lp.frequency.setTargetAtTime(500 + rpm * 1400, t, 0.2);
@@ -71,9 +71,9 @@ const Sound = {
     const rpm = 0.25 + (sp % 14) / 14 * 0.6 + Math.min(1, sp / 40) * 0.3; const thr = key('KeyW', 'ArrowUp') ? 1 : 0;
     this.o1.frequency.setTargetAtTime(38 + rpm * 90, t, 0.08); this.o2.frequency.setTargetAtTime(19 + rpm * 45, t, 0.08);
     this.lp.frequency.setTargetAtTime(350 + rpm * 900 + thr * 400, t, 0.1);
-    this.eg.gain.setTargetAtTime(drive && (sp > 0.5 || thr) ? Math.min(0.03, 0.008 + sp * 0.0008 + thr * 0.01) : 0, t, 0.25); // idling engines are silent; running ones just a hum
-    this.rainG.gain.setTargetAtTime(Env.rain * (drive ? 0.07 : 0.12), t, 0.5);
-    this.windG.gain.setTargetAtTime(drive ? Math.min(0.12, sp * 0.004) : 0.015, t, 0.3);
+    this.eg.gain.setTargetAtTime(drive && (sp > 0.5 || thr) ? Math.min(0.012, 0.003 + sp * 0.0003 + thr * 0.004) : 0, t, 0.25); // idling engines are silent; running ones just a hum
+    this.rainG.gain.setTargetAtTime(Env.rain * (drive ? 0.04 : 0.12), t, 0.5);
+    this.windG.gain.setTargetAtTime(drive ? Math.min(0.045, sp * 0.0015) : 0.015, t, 0.3);
     this.crOut.gain.setTargetAtTime(Env.night * (1 - Env.rain) * (drive ? 0.004 : 0.012), t, 1);
     if (!drive && Env.night < 0.3 && Env.rain < 0.3) { this.birdT -= dt; if (this.birdT < 0) { this.birdT = 3 + Math.random() * 7; this.chirp(); } }
   },
@@ -82,9 +82,9 @@ const Sound = {
     o.frequency.setValueAtTime(f, t); for (let i = 0; i < 3; i++) { o.frequency.linearRampToValueAtTime(f * 1.3, t + 0.05 + i * 0.12); o.frequency.linearRampToValueAtTime(f, t + 0.1 + i * 0.12); }
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.018, t + 0.02); g.gain.linearRampToValueAtTime(0, t + 0.4); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.45);
   },
-  honk() { const A = this.ctx; if (!A) return; const t = A.currentTime; for (const f of [392, 494]) { const o = A.createOscillator(), g = A.createGain(); o.type = 'square'; o.frequency.value = f; g.gain.setValueAtTime(0.07, t); g.gain.setTargetAtTime(0, t + 0.35, 0.05); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.6); } },
+  honk() { const A = this.ctx; if (!A) return; const t = A.currentTime; for (const f of [392, 494]) { const o = A.createOscillator(), g = A.createGain(); o.type = 'square'; o.frequency.value = f; g.gain.setValueAtTime(0.035, t); g.gain.setTargetAtTime(0, t + 0.35, 0.05); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.6); } },
   thud(v) { const A = this.ctx; if (!A) return; const t = A.currentTime; const o = A.createOscillator(), g = A.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(35, t + 0.25); g.gain.setValueAtTime(Math.min(0.3, v * 0.012), t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.32); },
-  door() { const A = this.ctx; if (!A) return; const t = A.currentTime; const o = A.createOscillator(), g = A.createGain(); o.type = 'square'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.08); g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.15); },
+  door() { const A = this.ctx; if (!A) return; const t = A.currentTime; const o = A.createOscillator(), g = A.createGain(); o.type = 'square'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.08); g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.15); },
   setOn(v) { this.on = v; if (this.ctx) this.master.gain.value = v ? 0.7 : 0; else if (v) this.start(); },
 };
 

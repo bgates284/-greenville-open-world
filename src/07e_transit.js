@@ -220,7 +220,7 @@ const Transit = {
     }
   },
   horn(dist) {
-    const A = Sound.ctx; if (!A || !Sound.on) return; const t0 = A.currentTime; const vol = clamp(0.12 * (1 - dist / 900), 0.005, 0.12);
+    const A = Sound.ctx; if (!A || !Sound.on || Player.mode === 'drone') return; const t0 = A.currentTime; const vol = clamp(0.12 * (1 - dist / 900), 0.005, 0.12);
     const pat = [[0, 1.3], [1.6, 1.3], [3.2, 0.5], [4.0, 1.8]];
     for (const [st, du] of pat) for (const fq of [311, 370, 466]) { const o = A.createOscillator(), g = A.createGain(); o.type = 'sawtooth'; o.frequency.value = fq; g.gain.setValueAtTime(0, t0 + st); g.gain.linearRampToValueAtTime(vol / 3, t0 + st + 0.08); g.gain.setValueAtTime(vol / 3, t0 + st + du - 0.1); g.gain.linearRampToValueAtTime(0, t0 + st + du); o.connect(g); g.connect(Sound.master); o.start(t0 + st); o.stop(t0 + st + du + 0.05); }
   },
