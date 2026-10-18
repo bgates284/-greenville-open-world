@@ -271,3 +271,87 @@ function hmHSClock(T, B, mb) {
   HM.solid(T, [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [x + Math.cos(yaw) * u * s + Math.sin(yaw) * v * s, z - Math.sin(yaw) * u * s + Math.cos(yaw) * v * s]), g + 27.7, 'Health Sciences clock tower');
   ecuLetters(T, mb, [e.mx + e.nx * 16, 0, e.mz + e.nz * 16], e.nx, e.nz, 0.85);
 }
+
+// Sup Dogs, 213 E 5th Street (from a photo taken from the 5th Street car park): the one-storey red-brick bar with a
+// standing-seam metal hip awning carrying the name over two big shopfront windows, and on its east end a tan
+// stucco addition — an open, wood-lined ground-floor patio with a TV, wood louvres upstairs, a covered rooftop
+// pavilion with a metal hip roof and an open roof terrace behind cable railings, reached by wooden stairs from a
+// raised wooden deck along the front.
+function hmSupDogs(T, B, P, mb) {
+  const C = h => new THREE.Color(h), E = HM.edgesOf(B.ring); if (E.length < 3) return;
+  // the front: the long wall facing 5th Street, running west → east
+  let fe = null, fs = -1; for (const e of E) { if (e.L < 12) continue; const nr = nearestRoad(e.mx, e.mz, 70, r => r.car && /5th/i.test(r.name || '')); if (!nr) continue; const dx = nr.x - e.mx, dz = nr.z - e.mz, dl = Math.hypot(dx, dz) || 1, f = (dx * e.nx + dz * e.nz) / dl; if (f > 0.6 && e.L * f > fs) { fs = e.L * f; fe = e; } }
+  if (!fe) fe = E.slice().sort((a, b) => b.L - a.L)[0];
+  let a = fe.a, b = fe.b; const east = lonToX(-77.37) ; if (a[0] > b[0]) [a, b] = [b, a]; void east;
+  const L = fe.L, tx = (b[0] - a[0]) / L, tz = (b[1] - a[1]) / L, nx = fe.nx, nz = fe.nz, yaw = Math.atan2(nx, nz);
+  const g0 = Math.min(...B.ring.map(p => H(p[0], p[1]))), at = (s, o) => [a[0] + tx * s + nx * o, a[1] + tz * s + nz * o];
+  const bx = (s0, s1, o0, o1, y0, y1, col) => { const [x, z] = at((s0 + s1) / 2, (o0 + o1) / 2); HM.box(mb, x, z, g0 + y0, g0 + y1, Math.abs(s1 - s0) / 2, Math.abs(o1 - o0) / 2, yaw + Math.PI / 2 - Math.PI / 2, col); };
+  // HM.box's half-widths run (hw along the wall's tangent, hd along its normal) when yaw = atan2(nx, nz)
+  const WOOD = C('#a8693c'), WOOD2 = C('#8a5530'), TAN = C('#d6c7ab'), WH = C('#f2f1ec'), MET = C('#b9bec2'), DK = C('#22282d'), RAIL = C('#9aa0a5');
+  const split = Math.min(L - 8, Math.max(10, L * 0.6)), hB = 5.3, hT = 7.8;
+  // ---- the brick bar: walls of the whole footprint, flat roof ----
+  { const wb = new MB(true), k = 1 / 2.6; const sa = signedArea(B.ring);
+    for (const e of E) wb.quad([e.a[0], g0 - 0.3, e.a[1]], [e.b[0], g0 - 0.3, e.b[1]], [e.b[0], g0 + hB, e.b[1]], [e.a[0], g0 + hB, e.a[1]], [0, (g0 - 0.3) * k], [e.L * k, (g0 - 0.3) * k], [e.L * k, (g0 + hB) * k], [0, (g0 + hB) * k], [e.nx, 0, e.nz], C('#ffffff'));
+    const m = new THREE.Mesh(wb.geo(), hmRedBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m);
+    const ct = B.ring.map(p => new THREE.Vector2(p[0], p[1])); let tris = []; try { tris = THREE.ShapeUtils.triangulateShape(ct, []); } catch (e) { }
+    for (const t of tris) { const [A, Bv, Cc] = t.map(i => ct[i]); mb.tri([A.x, g0 + hB, A.y], [Bv.x, g0 + hB, Bv.y], [Cc.x, g0 + hB, Cc.y], [0, 0], [0, 0], [0, 0], [0, 1, 0], C('#55595d')); }
+    for (const e of E) { const [x, z] = [e.mx, e.mz]; HM.box(mb, x - e.nx * 0.1, z - e.nz * 0.1, g0 + hB, g0 + hB + 0.35, e.L / 2, 0.15, Math.atan2(e.nx, e.nz), C('#8f8a84')); void sa; } }
+  // ---- shopfront: two big windows, doors, the metal hip awning with the name ----
+  const w0 = 1.2, w1 = split - 1.0;
+  for (const [s0, s1] of [[w0 + 1.6, (w0 + w1) / 2 - 0.5], [(w0 + w1) / 2 + 0.5, w1 - 1.6]]) {
+    bx(s0 - 0.15, s1 + 0.15, 0, 0.1, 0.7, 3.25, C('#d8d0bd'));
+    bx(s0, s1, 0.05, 0.14, 0.85, 3.1, C('#3a2a1f')); const m = new THREE.Mesh(new THREE.PlaneGeometry(s1 - s0 - 0.2, 2.1), MAT.supWin || (MAT.supWin = new THREE.MeshStandardMaterial({ color: 0x2d3640, emissive: 0xffb15a, emissiveIntensity: 0.25, roughness: 0.15, metalness: 0.3 })));
+    const [x, z] = at((s0 + s1) / 2, 0.16); m.position.set(x, g0 + 1.97, z); m.rotation.y = yaw; T.group.add(m);
+    for (let q = 1; q < 4; q++) bx(s0 + (s1 - s0) * q / 4 - 0.04, s0 + (s1 - s0) * q / 4 + 0.04, 0.15, 0.2, 0.85, 3.1, C('#1c1612'));
+    bx(s0, s1, 0.15, 0.2, 2.18, 2.26, C('#1c1612')); }
+  for (const s of [0.6, w1 - 1.0]) { bx(s, s + 1.0, 0.05, 0.16, 0, 2.6, C('#d8d0bd')); bx(s + 0.08, s + 0.92, 0.12, 0.2, 0.05, 2.5, C('#2a3540')); }
+  { const S0 = w0 + 0.4, S1 = w1 - 0.2, D = 2.0, yLo = 3.55, yHi = 5.75, aw = new MB(true);
+    const P3 = (s, o, y) => { const [x, z] = at(s, o); return [x, g0 + y, z]; };
+    aw.quad(P3(S0 + D, 0, yHi), P3(S1 - D, 0, yHi), P3(S1, D, yLo), P3(S0, D, yLo), [0, 0], [0, 0], [0, 0], [0, 0], [nx, 1.1, nz], MET);
+    aw.tri(P3(S0, 0, yHi), P3(S0 + D, 0, yHi), P3(S0, D, yLo), [0, 0], [0, 0], [0, 0], [-tx, 1.1, -tz], MET); aw.tri(P3(S1 - D, 0, yHi), P3(S1, 0, yHi), P3(S1, D, yLo), [0, 0], [0, 0], [0, 0], [tx, 1.1, tz], MET);
+    aw.tri(P3(S0, 0, yHi), P3(S0, D, yLo), P3(S0, 0, yLo), [0, 0], [0, 0], [0, 0], [-tx, 0, -tz], MET); aw.tri(P3(S1, 0, yHi), P3(S1, 0, yLo), P3(S1, D, yLo), [0, 0], [0, 0], [0, 0], [tx, 0, tz], MET);
+    for (let s = S0 + 0.5; s < S1; s += 0.5) aw.quad(P3(s - 0.02, Math.max(0, Math.min(D, (S0 + D - s) > 0 ? 0 : 0)) + 0.0, yHi + 0.01), P3(s + 0.02, 0, yHi + 0.01), P3(s + 0.02, D, yLo + 0.01), P3(s - 0.02, D, yLo + 0.01), [0, 0], [0, 0], [0, 0], [0, 0], [nx, 1.1, nz], C('#a3a8ad')); // standing seams
+    addMB(T, aw, MAT.supMetal || (MAT.supMetal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.55, side: THREE.DoubleSide })));
+    bx(S0, S1, D - 0.05, D + 0.05, yLo - 0.2, yLo, C('#c9ced2'));
+    // the name on the awning: blue letters edged in white, "GREENVILLE - NC" beneath
+    const c = cnv(1024, 320), g = c.getContext('2d'); g.clearRect(0, 0, 1024, 320); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '900 170px "Arial Black", Impact, Arial, sans-serif'; g.lineJoin = 'round'; g.lineWidth = 26; g.strokeStyle = '#ffffff'; g.strokeText('SUP DOGS', 512, 120); g.lineWidth = 12; g.strokeStyle = '#0b1f5c'; g.strokeText('SUP DOGS', 512, 120); g.fillStyle = '#2a4fd0'; g.fillText('SUP DOGS', 512, 120);
+    g.font = '800 64px Arial, sans-serif'; g.fillStyle = '#16181a'; g.fillText('GREENVILLE  -  NC', 512, 262);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; const sw = Math.min(7.2, (S1 - S0) * 0.6);
+    const sg = signMesh(T, tex, sw, sw * 320 / 1024, false); const [x, z] = at((S0 + S1) / 2, D * 0.5 + 0.12); sg.position.set(x, g0 + (yLo + yHi) / 2 + 0.05, z); sg.rotation.set(0, yaw, 0); sg.rotateX(-Math.atan2(yHi - yLo, D)); T.group.add(sg); }
+  // ---- the tan addition at the east end ----
+  const s0 = split, s1 = L, dep = 11;
+  bx(s0, s1, -dep, 0, -0.3, hT, TAN); bx(s0 - 0.1, s1 + 0.1, -dep - 0.1, 0.1, hT, hT + 0.3, C('#c8b99c'));                           // stucco block + coping
+  bx(s0 + 0.4, s0 + 5.6, 0.0, 0.12, 0, 3.4, WOOD); const tv = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.85), MAT.supTv || (MAT.supTv = new THREE.MeshStandardMaterial({ color: 0x1d6a2e, emissive: 0x2f8f3f, emissiveIntensity: 0.6 })));
+  { const [x, z] = at(s0 + 3.0, 0.14); tv.position.set(x, g0 + 2.6, z); tv.rotation.y = yaw; T.group.add(tv); }
+  bx(s0 + 5.8, s1 - 0.3, 0.0, 0.12, 0, 3.4, C('#3a2c22'));                                                                             // open patio, shadowed
+  for (const [p0, p1] of [[s0 + 0.5, s0 + 4.6], [s1 - 4.4, s1 - 0.5]]) { bx(p0, p1, 0, 0.12, 4.3, 6.9, WOOD); for (let y = 4.5; y < 6.9; y += 0.32) bx(p0, p1, 0.12, 0.2, y, y + 0.06, WOOD2); } // louvres
+  // rooftop: covered pavilion (white posts, metal hip roof) on the west half, open terrace east, cable railings all round
+  { const pS0 = s0 + 0.2, pS1 = s0 + Math.min(6.5, (s1 - s0) * 0.6), pO0 = -6.5, pO1 = 0.2, y0 = hT + 0.3, y1 = y0 + 2.9;
+    for (const s of [pS0, pS1]) for (const o of [pO0, pO1]) bx(s - 0.12, s + 0.12, o - 0.12, o + 0.12, y0, y1, WH);
+    bx(pS0 - 0.3, pS1 + 0.3, pO0 - 0.3, pO1 + 0.3, y1, y1 + 0.35, WH);
+    const rf = new MB(true), P3 = (s, o, y) => { const [x, z] = at(s, o); return [x, g0 + y, z]; }, ov = 0.8, rt = y1 + 0.35, rk = y1 + 1.6, ms = (pS0 + pS1) / 2, mo = (pO0 + pO1) / 2;
+    const A = P3(pS0 - ov, pO1 + ov, rt), Bq = P3(pS1 + ov, pO1 + ov, rt), Cq = P3(pS1 + ov, pO0 - ov, rt), Dq = P3(pS0 - ov, pO0 - ov, rt), R1 = P3(ms - 0.6, mo, rk), R2 = P3(ms + 0.6, mo, rk);
+    rf.quad(A, Bq, R2, R1, [0, 0], [0, 0], [0, 0], [0, 0], [nx, 1, nz], MET); rf.quad(Cq, Dq, R1, R2, [0, 0], [0, 0], [0, 0], [0, 0], [-nx, 1, -nz], MET); rf.tri(Dq, A, R1, [0, 0], [0, 0], [0, 0], [-tx, 1, -tz], MET); rf.tri(Bq, Cq, R2, [0, 0], [0, 0], [0, 0], [tx, 1, tz], MET);
+    addMB(T, rf, MAT.supMetal);
+    // cable railing round the roof edge
+    const rail = (sA, oA, sB, oB, yB, h) => { const len = Math.hypot(sB - sA, oB - oA), n = Math.max(1, Math.round(len / 1.3)); for (let i = 0; i <= n; i++) { const s = sA + (sB - sA) * i / n, o = oA + (oB - oA) * i / n; bx(s - 0.04, s + 0.04, o - 0.04, o + 0.04, yB, yB + h, RAIL); }
+      for (const f of [0.35, 0.6, 0.85, 1.0]) { const [xa, za] = at(sA, oA), [xb, zb] = at(sB, oB), yy = g0 + yB + h * f; const ln = Math.hypot(xb - xa, zb - za), gg = new THREE.BoxGeometry(ln, f === 1 ? 0.06 : 0.015, f === 1 ? 0.08 : 0.015); gg.rotateY(-Math.atan2(zb - za, xb - xa)); gg.translate((xa + xb) / 2, yy, (za + zb) / 2); addGeoTo(mb, gg, RAIL); } };
+    rail(s0 + 0.1, 0.05, s1 - 0.1, 0.05, y0, 1.1); rail(s1 - 0.1, 0.05, s1 - 0.1, -dep + 0.1, y0, 1.1); rail(s0 + 0.1, -dep + 0.1, s1 - 0.1, -dep + 0.1, y0, 1.1);
+    // the stairs: a raised wooden deck along the front, a flight up to a landing, then on up to the roof
+    const deckS0 = s0 - 0.3, deckS1 = s1 + 6, dO = 4.2, dY = 0.6;
+    bx(deckS0, deckS1, 0, dO, -0.2, dY, WOOD); bx(deckS0, deckS1, dO - 0.05, dO + 0.05, -0.2, dY, C('#6d4426'));
+    rail(deckS0, dO, deckS1, dO, dY, 1.0); rail(deckS1, 0.2, deckS1, dO, dY, 1.0);
+    const lY = 4.0, lS0 = s1 - 3.2, lS1 = s1 + 0.6, lO = 3.0;
+    bx(lS0, lS1, 0, lO, lY - 0.25, lY, WOOD); for (const s of [lS0 + 0.2, lS1 - 0.2]) bx(s - 0.18, s + 0.18, lO - 0.38, lO - 0.02, dY, lY - 0.25, TAN);
+    rail(lS0, lO, lS1, lO, lY, 1.0);
+    const flight = (sA, sB, yA, yB, o0, o1) => { const n = Math.round(Math.abs(yB - yA) / 0.18); for (let i = 0; i < n; i++) { const s = sA + (sB - sA) * (i + 0.5) / n, y = yA + (yB - yA) * (i + 1) / n; bx(s - Math.abs(sB - sA) / n / 2 - 0.02, s + Math.abs(sB - sA) / n / 2 + 0.02, o0, o1, y - 0.18, y, WOOD); }
+      const [xa, za] = at(sA, o1), [xb, zb] = at(sB, o1); for (const f of [0.0]) { void f; } rail(sA, o1, sB, o1, Math.min(yA, yB), 0.01); // (a stringer line)
+      const ln = Math.hypot(xb - xa, zb - za, yB - yA), gg = new THREE.BoxGeometry(0.06, 0.06, ln); gg.lookAt(new THREE.Vector3(xb - xa, yB - yA, zb - za)); gg.translate((xa + xb) / 2, g0 + (yA + yB) / 2 + 1.0, (za + zb) / 2); addGeoTo(mb, gg, RAIL); };
+    flight(deckS1 - 0.2, lS1, dY, lY, 0.3, 1.6);                                                                                            // deck → landing (rising west)
+    flight(lS0, lS0 - (y0 - lY) / 0.18 * 0.27, lY, y0, 0.3, 1.6);                                                                   // landing → roof
+    addDeck(T, [at(deckS0, 0), at(deckS1, 0), at(deckS1, dO), at(deckS0, dO)], g0 + dY);
+    addDeck(T, [at(lS0, 0), at(lS1, 0), at(lS1, lO), at(lS0, lO)], g0 + lY);
+  }
+  HM.solid(T, B.ring, g0 + hT, 'Sup Dogs');
+}
