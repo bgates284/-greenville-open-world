@@ -355,3 +355,88 @@ function hmSupDogs(T, B, P, mb) {
   }
   HM.solid(T, B.ring, g0 + hT, 'Sup Dogs');
 }
+
+// ---------- Chico's and the Cotanche Street row (from a street photo on Cotanche) ----------
+// A row of one-storey red-brick shops under one long slate-grey roof with little white gabled dormers, green-and-
+// white striped awnings and brick chimneys, facing a car park; Chico's at the Cotanche end turns a brick gable to
+// the car park — three arched openings (a window either side of the arched entrance), a round window up in the
+// gable, two tall chimneys and the sign on a frame over the roof.
+function cotFrame(B) { // front = the wall facing south over the car park; s along it (west → east), o out of it
+  const E = HM.edgesOf(B.ring); if (E.length < 3) return null; const fe = E.filter(e => e.L > 4).sort((a, b) => b.nz - a.nz)[0]; if (!fe) return null;
+  let a = fe.a, b = fe.b; if (a[0] > b[0]) [a, b] = [b, a]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]), tx = (b[0] - a[0]) / L, tz = (b[1] - a[1]) / L, nx = fe.nx, nz = fe.nz;
+  let D = 0; for (const [x, z] of B.ring) D = Math.max(D, -((x - a[0]) * nx + (z - a[1]) * nz));
+  const g0 = Math.min(...B.ring.map(p => H(p[0], p[1])));
+  const P3 = (s, o, y) => [a[0] + tx * s + nx * o, g0 + y, a[1] + tz * s + nz * o];
+  return { E, a, L, D: Math.max(6, D), tx, tz, nx, nz, g0, yaw: Math.atan2(nx, nz), P3, at: (s, o) => [a[0] + tx * s + nx * o, a[1] + tz * s + nz * o] };
+}
+function cotBrickWalls(T, B, g0, h) {
+  const wb = new MB(true), k = 1 / 2.6; for (const e of HM.edgesOf(B.ring)) wb.quad([e.a[0], g0 - 0.3, e.a[1]], [e.b[0], g0 - 0.3, e.b[1]], [e.b[0], g0 + h, e.b[1]], [e.a[0], g0 + h, e.a[1]], [0, (g0 - 0.3) * k], [e.L * k, (g0 - 0.3) * k], [e.L * k, (g0 + h) * k], [0, (g0 + h) * k], [e.nx, 0, e.nz], new THREE.Color('#e9c9bd'));
+  const m = new THREE.Mesh(wb.geo(), hmRedBrickMat()); m.castShadow = m.receiveShadow = true; T.group.add(m);
+}
+function cotAwningMat() {
+  if (MAT.cotAwn) return MAT.cotAwn; const c = cnv(256, 64), g = c.getContext('2d');
+  for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#f1efe6' : '#2f6b3f'; g.fillRect(i * 16, 0, 16, 64); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  return MAT.cotAwn = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, side: THREE.DoubleSide });
+}
+const COT_ROOF = '#4b4f54';
+function hmCotancheRow(T, B, P, mb) {
+  const F = cotFrame(B); if (!F) return; const { L, D, P3, at, yaw, g0, tx, tz, nx, nz } = F, C = h => new THREE.Color(h), hW = 4.4, rise = 3.6, ov = 0.45;
+  cotBrickWalls(T, B, g0, hW);
+  // the long roof: ridge along the row, the same height and pitch on every shop so it reads as one roof
+  const R = C(COT_ROOF), Dr = 11, slope = rise / (Dr / 2 + ov), roofY = o => hW - 0.25 + (ov - o) * slope;
+  mb.quad(P3(-0.02, ov, hW - 0.25), P3(L + 0.02, ov, hW - 0.25), P3(L + 0.02, -Dr / 2, hW + rise), P3(-0.02, -Dr / 2, hW + rise), [0, 0], [0, 0], [0, 0], [0, 0], [nx, 1.4, nz], R);
+  mb.quad(P3(L + 0.02, -D - ov, hW - 0.25), P3(-0.02, -D - ov, hW - 0.25), P3(-0.02, -Dr / 2, hW + rise), P3(L + 0.02, -Dr / 2, hW + rise), [0, 0], [0, 0], [0, 0], [0, 0], [-nx, 1.4, -nz], R);
+  // white gabled dormers sitting on the front slope
+  const W = C('#f4f2ec');
+  for (let k = 0, n = Math.max(1, Math.round(L / 6)); k < n; k++) { const s = (k + 0.5) * L / n, oF = -0.9, hw = 0.75, yb = roofY(oF) - 0.05, yt = yb + 1.55, pk = yt + 0.6, oBk = ov - (pk - hW + 0.25) / slope;
+    mb.quad(P3(s - hw, oF, yb), P3(s + hw, oF, yb), P3(s + hw, oF, yt), P3(s - hw, oF, yt), [0, 0], [0, 0], [0, 0], [0, 0], [nx, 0, nz], W);           // face
+    mb.tri(P3(s - hw, oF, yt), P3(s + hw, oF, yt), P3(s, oF, pk), [0, 0], [0, 0], [0, 0], [nx, 0, nz], W);                                         // gable
+    const oCk = ov - (yt - hW + 0.25) / slope;
+    for (const sg of [-1, 1]) mb.tri(P3(s + sg * hw, oF, yb), P3(s + sg * hw, oF, yt), P3(s + sg * hw, oCk, yt), [0, 0], [0, 0], [0, 0], [sg * tx, 0, sg * tz], W); // cheeks
+    for (const sg of [-1, 1]) mb.quad(P3(s + sg * (hw + 0.12), oF + 0.15, yt - 0.05), P3(s, oF + 0.15, pk + 0.05), P3(s, oBk, pk + 0.05), P3(s + sg * (hw + 0.12), oCk, yt - 0.05), [0, 0], [0, 0], [0, 0], [0, 0], [sg * tx, 1, sg * tz], R);
+    const [wx, wz] = at(s, oF + 0.08); HM.box(mb, wx, wz, yb + 0.25, yb + 1.35, 0.42, 0.06, yaw, C('#2d3640')); HM.box(mb, wx, wz, yb + 0.78, yb + 0.82, 0.42, 0.05, yaw, W); }
+  // shopfronts and a striped awning along the front
+  bxF(F, mb, 0.4, L - 0.4, 0.02, 0.1, 0.6, 3.0, C('#2b3540')); for (let s = 0.4; s <= L - 0.4 + 1e-6; s += (L - 0.8) / 4) bxF(F, mb, s - 0.08, s + 0.08, 0.1, 0.16, 0.6, 3.0, C('#1f2a22'));
+  bxF(F, mb, 0.4, L - 0.4, 0.0, 0.12, 0.2, 0.6, C('#b9907a'));
+  { const aw = new MB(), yH = 3.6, yL = 2.75, d = 1.5; aw.quad(P3(0.3, 0.05, yH), P3(L - 0.3, 0.05, yH), P3(L - 0.3, d, yL), P3(0.3, d, yL), [0, 0], [L / 2.2, 0], [L / 2.2, 1], [0, 1], [nx, 1, nz]);
+    aw.quad(P3(0.3, d, yL), P3(L - 0.3, d, yL), P3(L - 0.3, d, yL - 0.35), P3(0.3, d, yL - 0.35), [0, 0], [L / 2.2, 0], [L / 2.2, 0.3], [0, 0.3], [nx, 0, nz]);
+    const g = aw.geo(); if (g) { const m = new THREE.Mesh(g, cotAwningMat()); m.castShadow = true; T.group.add(m); } }
+  // a chimney at the east end of the row
+  if (B.id === 201538321) { const [x, z] = at(L - 0.6, -Dr * 0.55); HM.box(mb, x, z, g0 + hW, g0 + hW + rise + 1.6, 0.55, 0.7, yaw, C('#9b4d3a')); HM.box(mb, x, z, g0 + hW + rise + 1.6, g0 + hW + rise + 1.85, 0.65, 0.8, yaw, C('#7e3e2f')); }
+  HM.solid(T, B.ring, g0 + hW + rise, 'Cotanche Street shops');
+}
+function bxF(F, mb, s0, s1, o0, o1, y0, y1, col) { const [x, z] = F.at((s0 + s1) / 2, (o0 + o1) / 2); HM.box(mb, x, z, F.g0 + y0, F.g0 + y1, Math.abs(s1 - s0) / 2, Math.abs(o1 - o0) / 2, F.yaw, col); }
+function hmChicos(T, B, P, mb) {
+  const F = cotFrame(B); if (!F) return; const { L, D, P3, at, yaw, g0, tx, tz, nx, nz } = F, C = h => new THREE.Color(h), hW = 5.2, apex = 9.6, BR = C('#a3523d'), W = C('#f4f2ec');
+  cotBrickWalls(T, B, g0, hW);
+  // the brick gable to the car park (with a little step at its foot), and the roof running back from it
+  const gab = new MB(true); gab.quad(P3(-0.3, 0.05, hW), P3(L + 0.3, 0.05, hW), P3(L + 0.3, 0.05, hW + 0.5), P3(-0.3, 0.05, hW + 0.5), [0, 0], [0, 0], [0, 0], [0, 0], [nx, 0, nz], C('#b8b0a2'));
+  gab.tri(P3(0, 0.02, hW + 0.5), P3(L, 0.02, hW + 0.5), P3(L / 2, 0.02, apex), [0, 0], [0, 0], [0, 0], [nx, 0, nz], BR); addMB(T, gab, lmPlainMat());
+  const R = C(COT_ROOF); mb.quad(P3(-0.4, 0.2, hW + 0.4), P3(-0.4, -D - 0.4, hW + 0.4), P3(L / 2, -D - 0.4, apex - 0.2), P3(L / 2, 0.2, apex - 0.2), [0, 0], [0, 0], [0, 0], [0, 0], [-tx, 1.2, -tz], R);
+  mb.quad(P3(L + 0.4, -D - 0.4, hW + 0.4), P3(L + 0.4, 0.2, hW + 0.4), P3(L / 2, 0.2, apex - 0.2), P3(L / 2, -D - 0.4, apex - 0.2), [0, 0], [0, 0], [0, 0], [0, 0], [tx, 1.2, tz], R);
+  mb.tri(P3(0, -D, hW), P3(L, -D, hW), P3(L / 2, -D, apex - 0.4), [0, 0], [0, 0], [0, 0], [-nx, 0, -nz], BR);
+  // the round window in the gable
+  { const [x, z] = at(L / 2, 0.08); HM.geo(mb, new THREE.CylinderGeometry(0.62, 0.62, 0.1, 24).rotateX(Math.PI / 2).rotateY(yaw), C('#c9a28f'), x, g0 + hW + 1.9, z); HM.geo(mb, new THREE.CylinderGeometry(0.42, 0.42, 0.12, 24).rotateX(Math.PI / 2).rotateY(yaw), C('#2d3640'), x + nx * 0.02, g0 + hW + 1.9, z + nz * 0.02); }
+  // three arches: windows either side of the arched entrance
+  for (const [k, door] of [[-1, false], [0, true], [1, false]]) { const sc = L / 2 + k * L * 0.31, aw = door ? 2.6 : 2.8, ah = door ? 3.6 : 3.4;
+    const sh = new THREE.Shape(); sh.moveTo(-aw / 2, 0); sh.lineTo(aw / 2, 0); sh.lineTo(aw / 2, ah - aw / 2); sh.absarc(0, ah - aw / 2, aw / 2, 0, Math.PI, false); sh.lineTo(-aw / 2, 0);
+    const g = new THREE.ShapeGeometry(sh, 14); g.rotateY(yaw); const [x, z] = at(sc, 0.07); HM.geo(mb, g, door ? C('#3a2c22') : C('#26303a'), x, g0 + (door ? 0 : 0.7), z);
+    const ring = new THREE.TorusGeometry(aw / 2 + 0.12, 0.14, 4, 14, Math.PI); ring.rotateY(yaw); const [rx, rz] = at(sc, 0.12); HM.geo(mb, ring, C('#8e4433'), rx, g0 + (door ? 0 : 0.7) + ah - aw / 2, rz);
+    if (!door) { for (let q = 1; q < 4; q++) bxF(F, mb, sc - aw / 2 + aw * q / 4 - 0.03, sc - aw / 2 + aw * q / 4 + 0.03, 0.08, 0.14, 0.7, 0.7 + ah - 0.2, C('#1b1f22')); HM.box(mb, ...at(sc, 0.45), g0 + 0.55, g0 + 0.95, aw / 2, 0.3, yaw, C('#6a4630')); } // muntins, flower box
+    else for (let st = 0; st < 3; st++) bxF(F, mb, sc - 1.6, sc + 1.6, 0, 1.6 - st * 0.5, -0.2, 0.18 + st * 0.17, C('#b7aea2')); }
+  for (const s of [L * 0.19, L * 0.81]) { const [x, z] = at(s, 0.35); HM.geo(mb, new THREE.BoxGeometry(0.28, 0.45, 0.28), C('#1e1e1e'), x, g0 + 2.9, z, 0, yaw, 0); } // lanterns
+  // hedge and a low iron fence along the front to the west
+  { const [x, z] = at(L * 0.25, 2.6); HM.box(mb, x, z, g0, g0 + 0.9, L * 0.25, 0.5, yaw, C('#3f6b2e')); }
+  // chimneys: a tall one on the west wall, another at the back
+  { const [x, z] = at(-0.4, -D * 0.4); HM.box(mb, x, z, g0, g0 + apex + 2.2, 0.6, 0.9, yaw, C('#9b4d3a')); HM.box(mb, x, z, g0 + apex + 2.2, g0 + apex + 2.5, 0.7, 1.0, yaw, C('#7e3e2f')); }
+  { const [x, z] = at(L * 0.62, -D * 0.85); HM.box(mb, x, z, g0 + hW, g0 + apex + 1.4, 0.65, 0.65, yaw, C('#9b4d3a')); HM.box(mb, x, z, g0 + apex + 1.4, g0 + apex + 1.7, 0.75, 0.75, yaw, C('#7e3e2f')); }
+  // the sign on its frame over the roof: red letters on a white oval, a green band beneath
+  { const c = cnv(512, 256), g = c.getContext('2d'); g.clearRect(0, 0, 512, 256);
+    g.fillStyle = '#5d5f60'; g.fillRect(10, 150, 492, 60); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(256, 110, 170, 100, 0, 0, 7); g.fill(); g.lineWidth = 10; g.strokeStyle = '#3a3c3e'; g.stroke();
+    g.fillStyle = '#2f6b3f'; g.fillRect(150, 160, 212, 34); g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 74px Georgia, "Times New Roman", serif'; g.fillStyle = '#c4202a'; g.lineWidth = 6; g.strokeStyle = '#ffffff'; g.strokeText('CHICOS', 256, 104, 300); g.fillText('CHICOS', 256, 104, 300);
+    g.font = '700 22px Arial'; g.fillStyle = '#ffffff'; g.fillText('MEXICAN RESTAURANT', 256, 178);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; const sw = 5.2, sg = signMesh(T, tex, sw, sw / 2, false); const [x, z] = at(L / 2, -1.3); sg.position.set(x, g0 + apex + 0.9, z); sg.rotation.y = yaw; T.group.add(sg);
+    for (const s of [L / 2 - 2.2, L / 2 + 2.2]) { const [px, pz] = at(s, -1.45); HM.box(mb, px, pz, g0 + apex - 1.4, g0 + apex + 0.4, 0.08, 0.08, yaw, C('#3a3c3e')); } }
+  HM.solid(T, B.ring, g0 + apex, "Chico's");
+}
